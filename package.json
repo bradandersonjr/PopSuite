@@ -1,0 +1,15 @@
+{
+  "name": "popsuite",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run dev --prefix PopJot\" \"npm run dev --prefix PopKey\"",
+    "dev:popjot": "npm run dev --prefix PopJot",
+    "dev:popkey": "npm run dev --prefix PopKey",
+    "build": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run build --prefix PopJot\" \"npm run build --prefix PopKey\"",
+    "build:popjot": "npm run build --prefix PopJot",
+    "build:popkey": "npm run build --prefix PopKey"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

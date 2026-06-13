@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/brad/.claude/projects/c--dev-Web-Apps-PopSuite/memory/**)",
+      "Bash(ls shared/)",
+      "Bash(ls 'shared')",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(git checkout *)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}
