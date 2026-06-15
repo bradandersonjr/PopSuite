@@ -2,6 +2,9 @@
   "name": "PopJot",
   "private": true,
   "version": "1.0.0",
+  "description": "Screen-annotation overlay with a radial tool menu and freehand drawing canvas.",
+  "homepage": "https://popjot.app",
+  "author": "Brad Anderson <brad@bradandersonjr.com>",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "vite",
@@ -10,7 +13,7 @@
     "prebuild": "node scripts/check-pro-stub.mjs",
     "build": "vite build",
     "build:electron": "electron-vite build",
-    "dist": "electron-vite build && electron-builder --config electron-builder.yml",
+    "dist": "electron-vite build && electron-builder --config electron-builder.yml --publish never",
     "build:extension": "vite build --config vite.extension.config.ts --mode popup && node ../pop-shared/scripts/build-content.mjs && node ../pop-shared/scripts/pack-extension.mjs",
     "build:dev": "vite build --mode development",
     "package": "electron-vite build && electron-builder --win --config electron-builder.yml",

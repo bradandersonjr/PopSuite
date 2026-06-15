@@ -27,8 +27,9 @@ win:
 nsis:
   oneClick: true
   perMachine: false
-  installerIcon: assets/icon.png
-  uninstallerIcon: assets/icon.png
+  # Installer/uninstaller icons fall back to the app icon (generated from the
+  # 256px win.icon PNG). NSIS can't load a .png as installerIcon directly — add a
+  # real assets/icon.ico and point installerIcon/uninstallerIcon at it for custom art.
 
 # ─── macOS ──────────────────────────────────────────────────────────
 mac:
