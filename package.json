@@ -16,7 +16,9 @@
     "typecheck": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run typecheck --prefix PopJot\" \"npm run typecheck --prefix PopKey\"",
     "lint": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run lint --prefix PopJot\" \"npm run lint --prefix PopKey\"",
     "test": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run test --prefix PopJot\" \"npm run test --prefix PopKey\"",
-    "verify": "npm run typecheck && npm run lint && npm run test"
+    "verify": "npm run typecheck && npm run lint && npm run test",
+    "release:popjot": "node scripts/release.mjs popjot",
+    "release:popkey": "node scripts/release.mjs popkey"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
