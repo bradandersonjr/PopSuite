@@ -78,7 +78,7 @@ jobs:
             ${{ needs.setup.outputs.app_dir }}/release/*.zip
             ${{ needs.setup.outputs.app_dir }}/release/*.AppImage
             ${{ needs.setup.outputs.app_dir }}/release/*.deb
-            ${{ needs.setup.outputs.app_dir }}/release/*.yml
+            ${{ needs.setup.outputs.app_dir }}/release/latest*.yml
             ${{ needs.setup.outputs.app_dir }}/release/*.blockmap
           if-no-files-found: ignore
           retention-days: 5
@@ -97,9 +97,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Mark versions with a pre-release suffix (e.g. 1.0.0-rc.1) as pre-release.
+          prerelease=""
+          case "${{ needs.setup.outputs.version }}" in *-*) prerelease="--prerelease" ;; esac
           gh release create "${GITHUB_REF_NAME}" dist-artifacts/* \
             --repo "${GITHUB_REPOSITORY}" \
             --title "${{ needs.setup.outputs.app_name }} ${{ needs.setup.outputs.version }}" \
-            --generate-notes \
+            --generate-notes $prerelease \
           || gh release upload "${GITHUB_REF_NAME}" dist-artifacts/* \
             --repo "${GITHUB_REPOSITORY}" --clobber
