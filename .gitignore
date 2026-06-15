@@ -1,6 +1,9 @@
 node_modules/
 dist/
 build/
+
+# Private Pro implementation — must never be committed to this public repo
+/private/
 .DS_Store
 *.log
 .env
