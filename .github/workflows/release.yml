@@ -88,6 +88,9 @@ jobs:
     needs: [setup, build]
     runs-on: ubuntu-latest
     steps:
+      # Checkout so the app's RELEASE_NOTES.md is available as the release body.
+      - uses: actions/checkout@v4
+
       - name: Collect installers from all platforms
         uses: actions/download-artifact@v4
         with:
@@ -101,9 +104,19 @@ jobs:
           # Mark versions with a pre-release suffix (e.g. 1.0.0-rc.1) as pre-release.
           prerelease=""
           case "${{ needs.setup.outputs.version }}" in *-*) prerelease="--prerelease" ;; esac
+
+          # Use the app's hand-written RELEASE_NOTES.md as the body; fall back to
+          # auto-generated notes if it's missing.
+          notes_file="${{ needs.setup.outputs.app_dir }}/RELEASE_NOTES.md"
+          if [ -f "$notes_file" ]; then
+            notes_arg=(--notes-file "$notes_file")
+          else
+            notes_arg=(--generate-notes)
+          fi
+
           gh release create "${GITHUB_REF_NAME}" dist-artifacts/* \
             --repo "${GITHUB_REPOSITORY}" \
             --title "${{ needs.setup.outputs.app_name }} ${{ needs.setup.outputs.version }}" \
-            --generate-notes $prerelease \
+            "${notes_arg[@]}" $prerelease \
           || gh release upload "${GITHUB_REF_NAME}" dist-artifacts/* \
             --repo "${GITHUB_REPOSITORY}" --clobber
