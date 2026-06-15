@@ -1,7 +1,7 @@
 {
   "name": "PopKey",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.0-rc.1",
   "description": "On-screen keystroke & mouse-action visualizer for screencasts and demos.",
   "homepage": "https://popkey.app",
   "author": "Brad Anderson <brad@bradandersonjr.com>",
