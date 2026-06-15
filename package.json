@@ -1,13 +1,22 @@
 {
   "name": "popsuite",
   "private": true,
+  "workspaces": [
+    "pop-shared",
+    "PopJot",
+    "PopKey"
+  ],
   "scripts": {
     "dev": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run dev --prefix PopJot\" \"npm run dev --prefix PopKey\"",
     "dev:popjot": "npm run dev --prefix PopJot",
     "dev:popkey": "npm run dev --prefix PopKey",
     "build": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run build --prefix PopJot\" \"npm run build --prefix PopKey\"",
     "build:popjot": "npm run build --prefix PopJot",
-    "build:popkey": "npm run build --prefix PopKey"
+    "build:popkey": "npm run build --prefix PopKey",
+    "typecheck": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run typecheck --prefix PopJot\" \"npm run typecheck --prefix PopKey\"",
+    "lint": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run lint --prefix PopJot\" \"npm run lint --prefix PopKey\"",
+    "test": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run test --prefix PopJot\" \"npm run test --prefix PopKey\"",
+    "verify": "npm run typecheck && npm run lint && npm run test"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

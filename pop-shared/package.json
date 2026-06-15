@@ -1,0 +1,6 @@
+{
+  "name": "pop-shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared foundation (Electron shell, settings system, UI kit, build presets) for the PopSuite apps. Consumed by PopJot and PopKey via the ../pop-shared relative path and @shared/* alias; relies on the hoisted root node_modules for its dependencies."
+}

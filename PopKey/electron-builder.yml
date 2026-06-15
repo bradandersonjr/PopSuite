@@ -1,0 +1,55 @@
+appId: com.popkey.app
+productName: PopKey
+copyright: Copyright © 2026 PopKey
+
+directories:
+  output: release
+
+files:
+  - out/**/*
+  - "!node_modules/**/*"
+
+extraResources:
+  - from: assets/tray-icon.png
+    to: tray-icon.png
+  - from: assets/icon.png
+    to: icon.png
+
+asar: true
+
+# ─── Windows ────────────────────────────────────────────────────────
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: assets/icon.png
+
+nsis:
+  oneClick: true
+  perMachine: false
+  installerIcon: assets/icon.png
+  uninstallerIcon: assets/icon.png
+
+# ─── macOS ──────────────────────────────────────────────────────────
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  icon: assets/icon.icns
+  category: public.app-category.utilities
+  # Allow the transparent overlay window to work on macOS
+  extendInfo:
+    NSHighResolutionCapable: true
+
+dmg:
+  sign: false
+
+# ─── Linux ──────────────────────────────────────────────────────────
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  icon: assets/icon.png
+  category: Utility

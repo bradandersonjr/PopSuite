@@ -7,46 +7,48 @@ PopSuite is a monorepo of two desktop-first Electron utilities that share a comm
 
 Both apps are built with Electron + React + Vite + Tailwind + Zustand and consume shared code from **`pop-shared`**.
 
+PopSuite is a single git repository managed as an **npm workspace**. `pop-shared/`, `PopJot/`, and `PopKey/` are all members of one repo; there are no submodules and no separate copies of the shared code.
+
 ## Layout
 
 ```
-PopSuite/
-├── PopJot/          # annotation app  (Electron + React)
-│   └── shared/      # git submodule → pop-shared
-├── PopKey/          # input-visualizer app (Electron + React)
-│   └── shared/      # git submodule → pop-shared
-├── pop-shared/      # shared source of truth (standalone git repo)
-│   ├── src/         # runtime code (see "Shared architecture" below)
-│   ├── config/      # vite/electron-vite/vitest/tailwind/eslint/postcss presets
-│   ├── tsconfig/    # base tsconfigs (app / electron / node)
-│   └── scripts/     # extension build scripts (build-content, pack-extension)
-└── package.json     # root orchestration scripts (concurrently)
+PopSuite/             # single git repo + npm workspace root
+├── pop-shared/       # THE shared foundation (one copy, consumed by both apps)
+│   ├── src/          # runtime code (see "Shared architecture" below)
+│   ├── config/       # vite/electron-vite/vitest/tailwind/eslint/postcss presets
+│   ├── tsconfig/     # base tsconfigs (app / electron / node)
+│   └── scripts/      # extension build scripts (build-content, pack-extension)
+├── PopJot/           # annotation app — unique src/ + thin configs → ../pop-shared
+├── PopKey/           # input-visualizer app — unique src/ + thin configs → ../pop-shared
+├── node_modules/     # hoisted: shared by pop-shared + both apps
+└── package.json      # workspace config + orchestration scripts (concurrently)
 ```
 
 ## Getting started
 
-Each app installs and runs independently:
+One install at the repo root hoists all dependencies into a single `node_modules`
+shared by `pop-shared` and both apps:
 
 ```sh
-cd PopJot && npm install && npm run dev:electron
-cd PopKey && npm install && npm run dev:electron
-```
-
-Or drive both from the root:
-
-```sh
-npm install          # root only needs `concurrently`
+npm install          # one hoisted workspace install for everything
 npm run dev          # runs PopJot + PopKey dev servers in parallel
 npm run build        # builds both
 npm run dev:popjot   # single app
 ```
 
+To run a single app's desktop build directly:
+
+```sh
+npm run dev:electron --prefix PopJot
+npm run dev:electron --prefix PopKey
+```
+
 ## Shared architecture (`pop-shared`)
 
-Shared code lives in **`pop-shared`** and is consumed by each app at `./shared`,
-imported via the `@shared/*` path alias. Inside shared code, `@/*` resolves to the
-**consuming app's** `src/` — this is intentional, so shared roots and components can
-bind to each app's own `store`, `engine`, and `SystemTray`.
+Shared code lives in **`pop-shared/`** at the repo root and is consumed by each app
+via the `../pop-shared` relative path and the `@shared/*` import alias. Inside shared
+code, `@/*` resolves to the **consuming app's** `src/` — this is intentional, so shared
+roots and components can bind to each app's own `store`, `engine`, and `SystemTray`.
 
 The big shared pieces:
 
@@ -70,17 +72,19 @@ The big shared pieces:
   use-cases/pricing/faq, section scroller, dot nav, FAQ accordion, settings
   modal). Each app's `WebRoot.tsx` supplies only content and theme styling.
 - **Build presets** (`config/`, `tsconfig/`, `scripts/`) — per-app config files
-  are thin re-exports; only the dev port and extension popup global differ.
+  are thin re-exports pointing at `../pop-shared`; only the dev port and extension
+  popup global differ. Shared config/script paths resolve the app root from
+  `process.cwd()` and reach `pop-shared` as a sibling.
 
-`pop-shared` is embedded as a **git submodule** at `PopJot/shared` and
-`PopKey/shared` (see each app's `.gitmodules`). This is the single, versioned
-source of truth for shared code — there is no separate copy/sync step.
+`pop-shared/` is a normal directory in this repo (an npm workspace member), not a
+submodule. It is the single source of truth for shared code — one on-disk copy, no
+copy/sync step, no submodule pointers to bump.
 
 ### Working on shared code
 
-1. Edit shared modules in `pop-shared` (the standalone repo) — or directly in an app's `shared/` working tree, which is the same submodule checkout.
-2. Commit in `pop-shared`.
-3. Update the submodule pointer in each app: `git -C PopJot/shared pull && git -C PopKey/shared pull`, then commit the bumped pointer in each app.
+Just edit files under `pop-shared/src` (or its `config/`, `scripts/`). Because both
+apps import the same directory, every app sees the change immediately — no commit
+dance, no pointer bump. Re-run the quality gates and commit once in this repo.
 
 > App-specific tests live in each app's own `src/` (e.g. `src/store/useStore.test.ts`); only app-agnostic tests belong in `pop-shared/src/test`.
 
@@ -88,14 +92,20 @@ source of truth for shared code — there is no separate copy/sync step.
 
 Shared tests live in `pop-shared/src/test` and run inside each app via Vitest (`npm run test` per app). See the per-app `AUDIT.md` for current test-wiring status.
 
-## Quality gates (per app)
+## Quality gates
+
+Run across both apps from the repo root, or per app with `--prefix PopJot` / `--prefix PopKey`:
 
 ```sh
-npm run lint     # eslint
-npm run test     # vitest
-npm run build    # vite / electron-vite
+npm run typecheck   # tsc --noEmit (both apps; clean)
+npm run lint        # eslint      (both apps; 0 errors)
+npm run test        # vitest      (both apps)
+npm run verify      # typecheck + lint + test
+npm run build       # vite build  (each app's website → dist/)
 ```
 
-`vite build` does not typecheck; run `npx tsc -p tsconfig.electron.json --noEmit`
-(clean) and `npx tsc -p tsconfig.app.json --noEmit` (some pre-existing component
-errors remain) for type validation.
+`vite build` does not typecheck, so `typecheck` is a separate gate. Each app's
+`build` also runs a `prebuild` Pro-stub guard (`guard:pro`) that fails the build
+if real Pro code is present in the public source. CI (`.github/workflows/ci.yml`
+in each app repo) runs the full gate — guard, typecheck, lint, test, build — on
+every push and PR.

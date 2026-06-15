@@ -1,0 +1,532 @@
+@import url('https://fonts.googleapis.com/css2?family=Cherry+Bomb+One&family=Comfortaa:wght@300..700&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 50 100% 96%;
+    --foreground: 0 0% 5%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 5%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 5%;
+
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 160 84% 39%;
+    --secondary-foreground: 0 0% 5%;
+
+    --muted: 45 93% 80%;
+    --muted-foreground: 0 0% 25%;
+
+    --accent: 350 89% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 5%;
+    --input: 0 0% 5%;
+    --ring: 262 83% 58%;
+    --radius: 1rem;
+
+    --neo-shadow: 4px 4px 0px hsl(0 0% 5%);
+    --neo-shadow-lg: 6px 6px 0px hsl(0 0% 5%);
+    --neo-border: 3px solid hsl(0 0% 5%);
+
+    --pop-blue: 210 100% 56%;
+    --pop-orange: 28 100% 54%;
+    --pop-pink: 330 90% 62%;
+    --pop-yellow: 45 100% 60%;
+  }
+
+  .dark {
+    --background: 220 20% 7%;
+    --foreground: 210 40% 98%;
+    --card: 220 20% 10%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 20% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 220 60% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 20% 16%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 220 20% 16%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 220 60% 55%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 20% 18%;
+    --input: 220 20% 18%;
+    --ring: 220 60% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body;
+  }
+}
+
+@layer utilities {
+  .neo-box {
+    border: 3px solid hsl(var(--foreground));
+    box-shadow: var(--neo-shadow);
+    border-radius: var(--radius);
+  }
+
+  .neo-box-lg {
+    border: 3px solid hsl(var(--foreground));
+    box-shadow: var(--neo-shadow-lg);
+    border-radius: calc(var(--radius) + 0.25rem);
+  }
+
+  .neo-box-hover {
+    @apply transition-all duration-150;
+  }
+
+  .neo-box-hover:hover,
+  .neo-box-hover[data-state="open"] {
+    box-shadow: 6px 6px 0px hsl(var(--foreground));
+    transform: translate(-2px, -2px);
+  }
+
+  .neo-box-hover:active {
+    box-shadow: 2px 2px 0px hsl(var(--foreground));
+    transform: translate(1px, 1px);
+  }
+
+  /* Hover-only variant: no data-state="open" shift (prevents menu anchoring issues) */
+  .neo-box-hover-only {
+    @apply transition-all duration-150;
+  }
+
+  .neo-box-hover-only:hover {
+    box-shadow: 6px 6px 0px hsl(var(--foreground));
+    transform: translate(-2px, -2px);
+  }
+
+  .neo-box-hover-only:active {
+    box-shadow: 2px 2px 0px hsl(var(--foreground));
+    transform: translate(1px, 1px);
+  }
+
+}
+
+/* Radial button skins — outside @layer to avoid purge (dynamic class names) */
+/* No CSS transitions here — Framer Motion owns all animation */
+
+/* DARK MODE */
+.theme-dark .radial-btn-flat,
+.radial-btn-flat {
+  background: #242424;
+  color: #E8EAED;
+  box-shadow: 2px 2px 4px rgb(0 0 0 / 0.15);
+  border: 2px solid transparent;
+}
+
+.theme-dark .radial-btn-flat:active,
+.theme-dark .radial-btn-flat[data-selected="true"],
+.radial-btn-flat:active,
+.radial-btn-flat[data-selected="true"] {
+  box-shadow: 1px 1px 2px rgb(0 0 0 / 0.15);
+}
+
+.theme-dark .radial-btn-flat-outline,
+.radial-btn-flat-outline {
+  background: #242424;
+  color: #E8EAED;
+  border: 2px solid #3D3D3D;
+  box-shadow: 2px 2px 4px rgb(0 0 0 / 0.15);
+}
+
+.theme-dark .radial-btn-flat-outline:active,
+.theme-dark .radial-btn-flat-outline[data-selected="true"],
+.radial-btn-flat-outline:active,
+.radial-btn-flat-outline[data-selected="true"] {
+  box-shadow: 1px 1px 2px rgb(0 0 0 / 0.15);
+}
+
+.theme-dark .radial-btn-pop {
+  color: #000;
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0px #000;
+}
+
+.theme-dark .radial-btn-pop:hover {
+  box-shadow: 6px 6px 0px #000;
+}
+
+.theme-dark .radial-btn-pop:active,
+.theme-dark .radial-btn-pop[data-selected="true"] {
+  box-shadow: 2px 2px 0px #000;
+}
+
+.theme-dark .radial-btn-pop-mono {
+  background: #242424;
+  color: #E8EAED;
+  border: 3px solid #3D3D3D;
+  box-shadow: 4px 4px 0px #2D2D2D;
+}
+
+.theme-dark .radial-btn-pop-mono:hover {
+  box-shadow: 6px 6px 0px #2D2D2D;
+}
+
+.theme-dark .radial-btn-pop-mono:active,
+.theme-dark .radial-btn-pop-mono[data-selected="true"] {
+  box-shadow: 2px 2px 0px #2D2D2D;
+}
+
+.theme-dark .radial-btn-pop-light {
+  background: #242424;
+  color: #000;
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0px #000;
+}
+
+.theme-dark .radial-btn-pop-light:hover {
+  box-shadow: 6px 6px 0px #000;
+}
+
+.theme-dark .radial-btn-pop-light:active,
+.theme-dark .radial-btn-pop-light[data-selected="true"] {
+  box-shadow: 2px 2px 0px #000;
+}
+
+.theme-light .radial-btn-pop-light {
+  background: #F8F8F6;
+  color: #fff;
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0px #000;
+}
+
+.theme-light .radial-btn-pop-light:hover {
+  box-shadow: 6px 6px 0px #000;
+}
+
+.theme-light .radial-btn-pop-light:active,
+.theme-light .radial-btn-pop-light[data-selected="true"] {
+  box-shadow: 2px 2px 0px #000;
+}
+
+/* LIGHT MODE */
+.theme-light .radial-btn-flat {
+  background: #F8F8F6;
+  color: #505864;
+  box-shadow: 2px 2px 4px rgb(0 0 0 / 0.08);
+  border: 2px solid transparent;
+}
+
+.theme-light .radial-btn-flat:active,
+.theme-light .radial-btn-flat[data-selected="true"] {
+  box-shadow: 1px 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.theme-light .radial-btn-flat-outline {
+  background: #F8F8F6;
+  color: #505864;
+  border: 2px solid #C9CFD8;
+  box-shadow: 2px 2px 4px rgb(0 0 0 / 0.08);
+}
+
+.theme-light .radial-btn-flat-outline:active,
+.theme-light .radial-btn-flat-outline[data-selected="true"] {
+  box-shadow: 1px 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.theme-light .radial-btn-pop {
+  color: #fff;
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0px #000;
+  background: #F8F8F6;
+}
+
+.theme-light .radial-btn-pop:hover {
+  box-shadow: 6px 6px 0px #000;
+}
+
+.theme-light .radial-btn-pop:active,
+.theme-light .radial-btn-pop[data-selected="true"] {
+  box-shadow: 2px 2px 0px #000;
+}
+
+.theme-light .radial-btn-pop-mono {
+  background: #F8F8F6;
+  color: #000;
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0px #000;
+}
+
+.theme-light .radial-btn-pop-mono:hover {
+  box-shadow: 6px 6px 0px #000;
+}
+
+.theme-light .radial-btn-pop-mono:active,
+.theme-light .radial-btn-pop-mono[data-selected="true"] {
+  box-shadow: 2px 2px 0px #000;
+}
+
+/* Landing page card skins — outside @layer to avoid purge (dynamic class names)
+ *
+ * ALL styles use border:none + inset box-shadow for visible borders.
+ * This prevents background-image (gradients) from bleeding through
+ * transparent borders and keeps the box model identical across all 4 styles
+ * so switching never causes layout shift.
+ */
+
+/* ── flat: colored bg, soft shadow, NO border ── */
+.theme-dark .landing-card-flat,
+.landing-card-flat {
+  border: none;
+  box-shadow: 2px 2px 4px rgb(0 0 0 / 0.15);
+  border-radius: var(--radius);
+}
+
+.theme-light .landing-card-flat {
+  box-shadow: 2px 2px 4px rgb(0 0 0 / 0.08);
+}
+
+/* ── flat-outline: colored bg + inset border ── */
+.theme-dark .landing-card-flat-outline,
+.landing-card-flat-outline {
+  border: none;
+  box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.25), 2px 2px 4px rgb(0 0 0 / 0.15);
+  border-radius: var(--radius);
+}
+
+.theme-light .landing-card-flat-outline {
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.25), 2px 2px 4px rgb(0 0 0 / 0.08);
+}
+
+/* ── pop: colored bg, thick border, 4px offset shadow ── */
+.landing-card-pop {
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0px #000;
+  border-radius: var(--radius);
+}
+
+.landing-card-pop.neo-box-hover:hover {
+  box-shadow: 6px 6px 0px #000;
+  transform: translate(-2px, -2px);
+}
+
+.landing-card-pop.neo-box-hover:active {
+  box-shadow: 2px 2px 0px #000;
+  transform: translate(1px, 1px);
+}
+
+/* ── pop-mono: neutral bg, border, hard shadow ── */
+/* Scoped --foreground override so text-foreground/70/80 all resolve correctly */
+.theme-dark .landing-card-pop-mono {
+  --foreground: 220 10% 91%;
+  /* #E8EAED in HSL */
+  background: #242424;
+  color: #E8EAED;
+  border: 3px solid #3D3D3D;
+  box-shadow: 4px 4px 0px #2D2D2D;
+  border-radius: var(--radius);
+}
+
+.theme-dark .landing-card-pop-mono.neo-box-hover:hover {
+  box-shadow: 6px 6px 0px #2D2D2D;
+  transform: translate(-2px, -2px);
+}
+
+.theme-dark .landing-card-pop-mono.neo-box-hover:active {
+  box-shadow: 2px 2px 0px #2D2D2D;
+  transform: translate(1px, 1px);
+}
+
+.theme-light .landing-card-pop-mono {
+  --foreground: 0 0% 0%;
+  /* #000 in HSL */
+  background: #F8F8F6;
+  color: #000;
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0px #000;
+  border-radius: var(--radius);
+}
+
+.theme-light .landing-card-pop-mono.neo-box-hover:hover {
+  box-shadow: 6px 6px 0px #000;
+  transform: translate(-2px, -2px);
+}
+
+.theme-light .landing-card-pop-mono.neo-box-hover:active {
+  box-shadow: 2px 2px 0px #000;
+  transform: translate(1px, 1px);
+}
+
+/* ── FAQ cards: always light regardless of theme ── */
+.landing-card-faq {
+  background: #F8F8F6;
+  color: #505864;
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0px #000;
+  border-radius: var(--radius);
+}
+
+.landing-card-faq.neo-box-hover:hover {
+  box-shadow: 6px 6px 0px #000;
+  transform: translate(-2px, -2px);
+}
+
+.landing-card-faq.neo-box-hover:active {
+  box-shadow: 2px 2px 0px #000;
+  transform: translate(1px, 1px);
+}
+
+/* Electron desktop mode: transparent background */
+body,
+html {
+  background-color: transparent;
+  overflow-x: hidden;
+}
+
+/* Hide scrollbar but allow scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Bouncing arrow animation */
+@keyframes bounce-arrow {
+
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  50% {
+    transform: translateY(8px);
+  }
+}
+
+.bounce-arrow {
+  animation: bounce-arrow 2s ease-in-out infinite;
+}
+
+/* Custom Scrollbars */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb-color, rgba(150, 150, 150, 0.3));
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover-color, rgba(150, 150, 150, 0.5));
+}
+
+
+input[type="range"].settings-slider:focus {
+  outline: none;
+}
+
+/* Track */
+input[type="range"].settings-slider::-webkit-slider-runnable-track {
+  background: var(--slider-track-color, #3d3d3d);
+  border-radius: 9999px;
+  height: 6px;
+}
+input[type="range"].settings-slider::-moz-range-track {
+  background: var(--slider-track-color, #3d3d3d);
+  border-radius: 9999px;
+  height: 6px;
+}
+
+/* Thumb */
+input[type="range"].settings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -5px; /* Centers thumb on the track */
+  background-color: var(--slider-thumb-color, #ececec);
+  border-radius: 9999px;
+  height: 16px;
+  width: 16px;
+  transition: transform 0.1s ease, background-color 0.1s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+input[type="range"].settings-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+input[type="range"].settings-slider::-moz-range-thumb {
+  background-color: var(--slider-thumb-color, #ececec);
+  border: none;
+  border-radius: 9999px;
+  height: 16px;
+  width: 16px;
+  transition: transform 0.1s ease, background-color 0.1s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+input[type="range"].settings-slider::-moz-range-thumb:hover {
+  transform: scale(1.15);
+}
+
+/* Custom Color Mixer Slider */
+input[type="range"].mixer-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 9999px;
+  outline: none;
+  background: transparent;
+}
+input[type="range"].mixer-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #1a1a1a;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+  cursor: pointer;
+  transition: transform 100ms ease;
+  margin-top: -4px; /* Centers thumb vertically on 8px track */
+}
+input[type="range"].mixer-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+input[type="range"].mixer-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #1a1a1a;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+  cursor: pointer;
+  transition: transform 100ms ease;
+}
+input[type="range"].mixer-slider::-moz-range-thumb:hover {
+  transform: scale(1.15);
+}
+input[type="range"].mixer-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 9999px;
+}
+input[type="range"].mixer-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 9999px;
+}
+

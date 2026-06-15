@@ -1,0 +1,26 @@
+import { contextBridge } from "electron";
+import {
+  createSettingsBridge,
+  createShortcutBridge,
+  subscribe,
+} from "@shared/settings/preload";
+import { settingsSchema } from "@/config/settingsSchema";
+
+contextBridge.exposeInMainWorld("electronAPI", {
+  // Generated from the settings schema: set<Key> senders, onTrayMenuChange,
+  // quitApp, closeWindow, open-at-login.
+  ...createSettingsBridge(settingsSchema),
+  ...createShortcutBridge(["main"]),
+
+  // Main → Renderer: global shortcut toggle
+  onShortcutToggle: subscribe("shortcut-toggle"),
+
+  // Main → Renderer: raw input events from uiohook
+  onInputKeyDown: subscribe("input:keydown"),
+  onInputKeyUp: subscribe("input:keyup"),
+  onInputClick: subscribe("input:click"),
+  onInputWheel: subscribe("input:wheel"),
+  onInputDrag: subscribe("input:drag"),
+  onInputDragMove: subscribe("input:dragmove"),
+  onInputFocusLost: subscribe("input:focus-lost"),
+});
