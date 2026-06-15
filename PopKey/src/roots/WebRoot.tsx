@@ -17,7 +17,7 @@ import SystemTray from "@/components/SystemTray";
 
 // ─── Store URLs here — swap in real links when ready ────────────────────────
 const CHROME_STORE_URL: string | null = null;     // e.g. "https://chrome.google.com/webstore/detail/..."
-const GITHUB_RELEASE_URL: string | null = null;   // e.g. "https://github.com/bradandersonjr/PopKey/releases/latest"
+const GITHUB_RELEASE_URL: string | null = "https://github.com/bradandersonjr/PopSuite/releases";  // monorepo releases (PopJot + PopKey, named per tag)
 const POPJOT_URL: string | null = null;           // e.g. "https://popjot.app"
 // ────────────────────────────────────────────────────────────────────────────
 
