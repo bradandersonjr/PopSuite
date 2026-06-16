@@ -1,8 +1,3 @@
-<!--
-  These are the GitHub Release notes for PopKey. The release workflow attaches
-  this file as the release body (see .github/workflows/release.yml). Update the
-  "What's new" section each release; the rest is evergreen.
--->
 ## PopKey — show every keystroke and click on screen
 
 **PopKey** puts your keyboard and mouse on screen so your viewers can follow along.

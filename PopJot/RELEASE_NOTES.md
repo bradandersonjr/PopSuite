@@ -1,8 +1,3 @@
-<!--
-  These are the GitHub Release notes for PopJot. The release workflow attaches
-  this file as the release body (see .github/workflows/release.yml). Update the
-  "What's new" section each release; the rest is evergreen.
--->
 ## PopJot — draw on your screen, live
 
 **PopJot** is a transparent screen-annotation overlay. Tap your hotkey and a drawing
