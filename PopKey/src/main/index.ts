@@ -1,6 +1,6 @@
 import { BrowserWindow } from "electron";
 import { createPopApp } from "@shared/main/createPopApp";
-import { settingsSchema } from "@keys/config/settingsSchema";
+import { settingsSchema, SETTINGS_NAMESPACE } from "@keys/config/settingsSchema";
 import { startInputCapture, stopInputCapture } from "./inputCapture";
 
 const isMac = process.platform === "darwin";
@@ -13,6 +13,7 @@ const popApp = createPopApp({
   appName: "PopKey",
   aboutDetail: "Key visualizer for presentations and screen recordings.",
   settingsSchema,
+  namespace: SETTINGS_NAMESPACE,
   settingsWindow: { width: 1160, height: 860, minWidth: 900, minHeight: 680, resizable: true },
   proProduct: "suite",
   onSettingChange: {

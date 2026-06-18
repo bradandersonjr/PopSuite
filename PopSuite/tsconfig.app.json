@@ -1,0 +1,24 @@
+{
+  "extends": "../pop-shared/tsconfig/app.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@shared/*": ["../pop-shared/src/*"],
+      "@keys/*": ["../PopKey/src/*"],
+      "@jot/*": ["../PopJot/src/*"],
+      "@suite/*": ["../PopSuite/src/*"]
+    }
+  },
+  // PopSuite composes the keys/jot modules by importing their renderer code;
+  // those source trees are typechecked transitively through those imports.
+  // pop-shared is included wholesale (as in the standalone apps), minus the
+  // browser-extension files, which assume a module-specific store shape.
+  "include": ["src", "../pop-shared/src"],
+  "exclude": [
+    "../pop-shared/src/roots/ExtensionRoot.tsx",
+    "../pop-shared/src/roots/ExtensionPopup.tsx",
+    "../pop-shared/src/extension",
+    "../pop-shared/src/utils/extensionStorage.ts"
+  ]
+}

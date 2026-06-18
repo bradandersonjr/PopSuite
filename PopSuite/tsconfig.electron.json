@@ -1,0 +1,25 @@
+{
+  "extends": "../pop-shared/tsconfig/electron.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@shared/*": ["../pop-shared/src/*"],
+      "@keys/*": ["../PopKey/src/*"],
+      "@jot/*": ["../PopJot/src/*"],
+      "@suite/*": ["../PopSuite/src/*"]
+    }
+  },
+  "include": [
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/config/**/*",
+    "../PopKey/src/main/**/*",
+    "../PopKey/src/config/settingsSchema.ts",
+    "../PopJot/src/config/settingsSchema.ts",
+    "../pop-shared/src/settings/schema.ts",
+    "../pop-shared/src/settings/main.ts",
+    "../pop-shared/src/settings/preload.ts",
+    "../pop-shared/src/main/**/*"
+  ]
+}

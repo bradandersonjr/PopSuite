@@ -5,12 +5,13 @@ import {
   subscribe,
 } from "@shared/settings/preload";
 import { createLicenseBridge } from "@shared/license/preload";
-import { settingsSchema } from "@keys/config/settingsSchema";
+import { settingsSchema, SETTINGS_NAMESPACE } from "@keys/config/settingsSchema";
 
 contextBridge.exposeInMainWorld("electronAPI", {
   // Generated from the settings schema: set<Key> senders, onTrayMenuChange,
-  // quitApp, closeWindow, open-at-login.
-  ...createSettingsBridge(settingsSchema),
+  // quitApp, closeWindow, open-at-login. Namespaced (setKeys<Key>) so the keys
+  // module composes cleanly into PopSuite.
+  ...createSettingsBridge(settingsSchema, SETTINGS_NAMESPACE),
   ...createShortcutBridge(["main"]),
   ...createLicenseBridge(),
 

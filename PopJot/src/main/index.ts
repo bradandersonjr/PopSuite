@@ -1,6 +1,6 @@
 import { desktopCapturer, ipcMain, screen } from "electron";
 import { createPopApp } from "@shared/main/createPopApp";
-import { settingsSchema } from "@jot/config/settingsSchema";
+import { settingsSchema, SETTINGS_NAMESPACE } from "@jot/config/settingsSchema";
 
 const isMac = process.platform === "darwin";
 
@@ -64,6 +64,7 @@ const popApp = createPopApp({
   appName: "PopJot",
   aboutDetail: "Screen annotation that stays out of your way.",
   settingsSchema,
+  namespace: SETTINGS_NAMESPACE,
   proProduct: "suite",
   onSettingChange: {
     overlayMode: (mode) => {

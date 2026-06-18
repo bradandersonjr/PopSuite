@@ -10,7 +10,7 @@ import {
   setNamedShortcut,
   type ShortcutUpdateResult,
 } from "@shared/settings/renderer";
-import { settingsSchema } from "@jot/config/settingsSchema";
+import { settingsSchema, SETTINGS_NAMESPACE } from "@jot/config/settingsSchema";
 import type {
   ThemeMode,
   ColorPalette,
@@ -34,7 +34,7 @@ export type { ShortcutUpdateResult };
 
 type Position = { x: number; y: number };
 
-const settings = createSettingsPlatform(settingsSchema);
+const settings = createSettingsPlatform(settingsSchema, SETTINGS_NAMESPACE);
 
 export const sendThemeMode = (mode: ThemeMode): void => settings.sendSetting("themeMode", mode);
 export const sendColorPalette = (palette: ColorPalette): void =>

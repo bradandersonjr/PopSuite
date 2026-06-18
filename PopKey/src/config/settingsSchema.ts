@@ -1,6 +1,15 @@
 import { setting } from "@shared/settings/schema";
 
 /**
+ * Channel namespace for the keys module. Prefixes every settings IPC channel
+ * and preload bridge member (e.g. set-keys-badge-style / setKeysBadgeStyle) so
+ * PopKey coexists with PopJot inside the combined PopSuite process. Used
+ * identically in standalone PopKey — the prefix is purely internal, so there's
+ * no external contract to break.
+ */
+export const SETTINGS_NAMESPACE = "keys";
+
+/**
  * PopKey's tray-adjustable settings — the single source of truth for
  * defaults, allowed values, IPC channel names, preload bridge setters,
  * and the store slice. Add a setting here and every layer picks it up.

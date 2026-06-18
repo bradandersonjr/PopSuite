@@ -10,7 +10,7 @@ import {
   setNamedShortcut,
   type ShortcutUpdateResult,
 } from "@shared/settings/renderer";
-import { settingsSchema } from "@keys/config/settingsSchema";
+import { settingsSchema, SETTINGS_NAMESPACE } from "@keys/config/settingsSchema";
 import type {
   ThemeMode,
   ColorPalette,
@@ -51,7 +51,7 @@ export type ClickEvent = {
 export type WheelEventData = { direction: "up" | "down"; x: number; y: number; amount: number; time: number };
 export type DragEventData = ClickEvent & { dx: number; dy: number };
 
-const settings = createSettingsPlatform(settingsSchema);
+const settings = createSettingsPlatform(settingsSchema, SETTINGS_NAMESPACE);
 
 export const sendThemeMode = (mode: ThemeMode): void => settings.sendSetting("themeMode", mode);
 export const sendColorPalette = (palette: ColorPalette): void =>
