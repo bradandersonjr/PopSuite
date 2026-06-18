@@ -19,6 +19,15 @@
       ],
       "@shared/*": [
         "../pop-shared/src/*"
+      ],
+      "@keys/*": [
+        "../PopKey/src/*"
+      ],
+      "@jot/*": [
+        "../PopJot/src/*"
+      ],
+      "@suite/*": [
+        "../PopSuite/src/*"
       ]
     },
     "noImplicitAny": true,

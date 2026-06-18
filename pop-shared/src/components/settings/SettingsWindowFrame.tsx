@@ -11,9 +11,9 @@ import { useSettingsUI } from "./primitives";
 
 const FRAME_STYLES = {
   comfortable: {
-    outer: "flex h-screen w-screen items-center justify-center p-4",
-    width: "820px",
-    height: "580px",
+    outer: "flex h-screen w-screen p-4",
+    width: "100%",
+    height: "100%",
     radius: "24px",
     header: "px-6 pb-4 pt-5",
     headerRow: "flex items-center gap-3",
@@ -26,9 +26,9 @@ const FRAME_STYLES = {
     doneButton: "rounded-[12px] px-5 py-2 text-xs font-semibold transition-all duration-200 hover:opacity-95 hover:scale-105 active:scale-95 shadow-md",
   },
   compact: {
-    outer: "flex h-screen w-screen items-center justify-center p-4",
-    width: "820px",
-    height: "580px",
+    outer: "flex h-screen w-screen p-4",
+    width: "100%",
+    height: "100%",
     radius: "24px",
     header: "px-6 pb-4 pt-5",
     headerRow: "flex items-center gap-3",
@@ -60,8 +60,6 @@ export const SettingsWindowFrame = ({
           backgroundColor: palette.panel,
           width: f.width,
           height: f.height,
-          maxHeight: "95vh",
-          maxWidth: "95vw",
           borderRadius: f.radius,
         }}
       >
@@ -115,8 +113,7 @@ export const SettingsWindowFrame = ({
 
 /** Panel chrome for the embedded (web demo) settings variant. */
 export const EmbeddedSettingsPanel = ({ children }: { children: React.ReactNode }) => {
-  const { density, palette } = useSettingsUI();
-  const f = FRAME_STYLES[density];
+  const { palette } = useSettingsUI();
   return (
     <div
       className="flex flex-col overflow-hidden"
@@ -126,8 +123,9 @@ export const EmbeddedSettingsPanel = ({ children }: { children: React.ReactNode 
         padding: "24px",
         border: "3px solid hsl(var(--foreground))",
         boxShadow: "6px 6px 0px hsl(var(--foreground))",
-        width: f.width,
-        height: f.height,
+        // Web demo keeps a fixed card size (the desktop frame fills its window).
+        width: "820px",
+        height: "580px",
         maxWidth: "100%",
         maxHeight: "90vh",
       }}

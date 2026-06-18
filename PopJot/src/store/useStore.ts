@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { isMac } from "@shared/lib/hotkeys";
 import type { SettingValue } from "@shared/settings/schema";
 import { createSettingsSlice, type SettingsState } from "@shared/settings/store";
-import { settingsSchema } from "@/config/settingsSchema";
+import { settingsSchema } from "@jot/config/settingsSchema";
 
 // Settings types derive from the schema — single source of truth.
 export type MenuStyle = SettingValue<(typeof settingsSchema)["menuStyle"]>;
@@ -12,6 +12,7 @@ export type AnimationIntensity = SettingValue<(typeof settingsSchema)["animation
 export type GridMode = SettingValue<(typeof settingsSchema)["gridMode"]>;
 export type GridSize = SettingValue<(typeof settingsSchema)["gridSize"]>;
 export type OverlayMode = SettingValue<(typeof settingsSchema)["overlayMode"]>;
+export type TextColor = SettingValue<(typeof settingsSchema)["textColor"]>;
 
 export type Tool = "history" | "marker" | "pen" | "highlighter" | "eraser" | "screen";
 export type BackgroundMode = "transparent" | "dark" | "light";
@@ -46,8 +47,10 @@ interface AppState extends SettingsState<typeof settingsSchema> {
     /** Monotonic counter — bump to invalidate memoised getEffectiveColors() results */
     paletteVersion: number;
     bumpPaletteVersion: () => void;
-    buttonRoundness: number;
-    setButtonRoundness: (roundness: number) => void;
+    /** Pro license state, mirrored from the main process. */
+    isPro: boolean;
+    licenseKey: string | null;
+    setLicense: (status: { isPro: boolean; key: string | null }) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -85,6 +88,7 @@ export const useStore = create<AppState>((set) => ({
         }),
     paletteVersion: 0,
     bumpPaletteVersion: () => set((state) => ({ paletteVersion: state.paletteVersion + 1 })),
-    buttonRoundness: 100,
-    setButtonRoundness: (buttonRoundness) => set({ buttonRoundness }),
+    isPro: false,
+    licenseKey: null,
+    setLicense: ({ isPro, key }) => set({ isPro, licenseKey: key }),
 }));

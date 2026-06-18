@@ -1,6 +1,6 @@
-import { useStore, DRAWING_TOOLS } from "@/store/useStore";
-import Canvas, { StrokeType } from "@/components/Canvas";
-import RadialMenu from "@/components/RadialMenu";
+import { useStore, DRAWING_TOOLS } from "@jot/store/useStore";
+import Canvas, { StrokeType } from "@jot/components/Canvas";
+import RadialMenu from "@jot/components/RadialMenu";
 
 const EngineShell = () => {
   const { tool, color, appEnabled, snapshotDataUrl } = useStore();

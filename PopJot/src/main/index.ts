@@ -1,6 +1,6 @@
 import { desktopCapturer, ipcMain, screen } from "electron";
 import { createPopApp } from "@shared/main/createPopApp";
-import { settingsSchema } from "@/config/settingsSchema";
+import { settingsSchema } from "@jot/config/settingsSchema";
 
 const isMac = process.platform === "darwin";
 
@@ -57,23 +57,27 @@ function warmupScreenshotCapture(): Promise<void> {
 
 // ─── App shell ───────────────────────────────────────────────────────
 
+// Whether shortcuts fire. Starts enabled; tray "Disable PopJot" suspends them.
+let enabled = true;
+
 const popApp = createPopApp({
   appName: "PopJot",
   aboutDetail: "Screen annotation that stays out of your way.",
   settingsSchema,
+  proProduct: "suite",
   onSettingChange: {
     overlayMode: (mode) => {
       if (mode === "snapshot") void warmupScreenshotCapture();
     },
   },
-  settingsWindow: { width: 1060, height: 900, minWidth: 1060, minHeight: 900, resizable: false },
+  settingsWindow: { width: 1160, height: 860, minWidth: 900, minHeight: 680, resizable: true },
   shortcuts: [
     {
       name: "main",
       default: isMac ? "Cmd+Shift+A" : "Alt+Shift+A",
       handler: async (ctx) => {
         const win = ctx.getMainWindow();
-        if (!win || shortcutFired) return;
+        if (!win || shortcutFired || !enabled) return;
         shortcutFired = true;
         // Move overlay to whichever display the cursor is on before capturing
         ctx.moveOverlayToCursorDisplay();
@@ -88,7 +92,7 @@ const popApp = createPopApp({
       default: isMac ? "Cmd+Shift+S" : "Alt+Shift+S",
       handler: async (ctx) => {
         const win = ctx.getMainWindow();
-        if (!win) return;
+        if (!win || !enabled) return;
         ctx.moveOverlayToCursorDisplay();
         const pos = ctx.getCursorDipPosition();
         const needsSnapshot = ctx.settings.overlayMode === "snapshot";
@@ -98,8 +102,16 @@ const popApp = createPopApp({
     },
   ],
   tray: { settingsLabel: "Open Settings" },
+  trayToggle: {
+    getEnabled: () => enabled,
+    onToggle: () => {
+      enabled = !enabled;
+      popApp.setTrayActive(enabled);
+    },
+  },
   secondInstance: "focus-main",
-  onReady: () => {
+  onReady: (ctx) => {
+    ctx.setTrayActive(enabled);
     void warmupScreenshotCapture();
   },
 });

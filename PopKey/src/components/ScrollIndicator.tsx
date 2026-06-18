@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronUp, ChevronDown } from "lucide-react";
-import { useStore } from "@/store/useStore";
-import { getBadgeColors } from "@/config/themes";
-import type { ScrollEvent } from "@/hooks/useInputCapture";
+import { useStore } from "@keys/store/useStore";
+import { getBadgeColors } from "@keys/config/themes";
+import type { ScrollEvent } from "@keys/hooks/useInputCapture";
 
 interface ScrollIndicatorProps {
   scrolls: ScrollEvent[];

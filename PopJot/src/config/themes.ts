@@ -54,13 +54,6 @@ export const HIGHLIGHTER_COLORS_GLITTER: [string, string, string, string] = [
     "#FFD700", "#7FFFD4", "#FF69B4", "#C0C0FF",
 ];
 
-/** Magical — enchanted wand sparkles & stardust (matches Vibrant palette) */
-export const DRAW_COLORS_MAGICAL: [string, string, string, string, string, string] = [
-    "#FF2D2D", "#FF6B00", "#FFD600", "#00E065", "#0075FF", "#A033FF",
-];
-export const HIGHLIGHTER_COLORS_MAGICAL: [string, string, string, string] = [
-    "#FFD600", "#00E065", "#FF2D2D", "#0075FF",
-];
 
 /** Tertiary colors for center circle — 3 per palette, distinct from draw & highlighter */
 export const TERTIARY_COLORS_MUTED: [string, string, string] = [
@@ -84,9 +77,6 @@ export const TERTIARY_COLORS_GRADIENT: [string, string, string] = [
 export const TERTIARY_COLORS_GLITTER: [string, string, string] = [
     "#E8A0BF", "#A0D2DB", "#D4AF37",
 ];
-export const TERTIARY_COLORS_MAGICAL: [string, string, string] = [
-    "#A033FF", "#FFD600", "#00E065",
-];
 
 /** All tertiary palettes in index order — matches ColorPalette union order */
 export const ALL_TERTIARY_PALETTES = [
@@ -97,7 +87,6 @@ export const ALL_TERTIARY_PALETTES = [
     TERTIARY_COLORS_PASTEL,
     TERTIARY_COLORS_GRADIENT,
     TERTIARY_COLORS_GLITTER,
-    TERTIARY_COLORS_MAGICAL,
 ] as const;
 
 /** Six themed gradients keyed to the 6 draw color slots */
@@ -109,7 +98,6 @@ export const DRAW_GRADIENT_VARIANTS = [
     ["#8A2BFF", "#00A3FF", "#00FFCC", "#7DFF00"], // aurora shock (reversed flow)
     ["#FF4D6D", "#FF1493", "#8A2BE2", "#00E5FF"], // vapor pop
     ["#FF69B4", "#C0C0FF", "#FFD700", "#7FFFD4"], // glitter shimmer
-    ["#7B2FBE", "#FFB830", "#00C9A7", "#FF6B9D"], // magical stardust
 ] as const;
 
 export function getGradientVariantStops(index: number): readonly string[] {
@@ -142,7 +130,6 @@ export const ALL_DRAW_PALETTES = [
     DRAW_COLORS_PASTEL,
     DRAW_COLORS_GRADIENT,
     DRAW_COLORS_GLITTER,
-    DRAW_COLORS_MAGICAL,
 ] as const;
 
 /** All highlighter palettes in index order — matches ColorPalette union order */
@@ -154,13 +141,14 @@ export const ALL_HL_PALETTES = [
     HIGHLIGHTER_COLORS_PASTEL,
     HIGHLIGHTER_COLORS_GRADIENT,
     HIGHLIGHTER_COLORS_GLITTER,
-    HIGHLIGHTER_COLORS_MAGICAL,
 ] as const;
 
-type ColorPalette = "muted" | "vibrant" | "retro" | "neon" | "pastel" | "gradient" | "glitter" | "magical";
+type ColorPalette = "muted" | "vibrant" | "retro" | "neon" | "pastel" | "gradient" | "glitter" | "solid";
 
+// "solid" is a single-color palette: it has no fixed swatch set, so it maps to a
+// dummy index (0) here and the live solidColor is injected at the component layer.
 const PALETTE_INDEX: Record<ColorPalette, number> = {
-    muted: 0, vibrant: 1, retro: 2, neon: 3, pastel: 4, gradient: 5, glitter: 6, magical: 7,
+    muted: 0, vibrant: 1, retro: 2, neon: 3, pastel: 4, gradient: 5, glitter: 6, solid: 0,
 };
 
 /** Helper to get color palettes based on ColorPalette selection */
@@ -171,7 +159,7 @@ export const getColors = (palette: ColorPalette) => {
 
 /** Palette names in display order — matches ColorPalette union order */
 export const PALETTE_NAMES: ColorPalette[] = [
-    "muted", "vibrant", "retro", "neon", "pastel", "gradient", "glitter", "magical",
+    "muted", "vibrant", "retro", "neon", "pastel", "gradient", "glitter", "solid",
 ];
 
 /** Seed palette list for the Pro settings UI */

@@ -10,7 +10,7 @@ import {
   setNamedShortcut,
   type ShortcutUpdateResult,
 } from "@shared/settings/renderer";
-import { settingsSchema } from "@/config/settingsSchema";
+import { settingsSchema } from "@jot/config/settingsSchema";
 import type {
   ThemeMode,
   ColorPalette,
@@ -19,7 +19,8 @@ import type {
   GridMode,
   GridSize,
   OverlayMode,
-} from "@/store/useStore";
+  TextColor,
+} from "@jot/store/useStore";
 
 export {
   isDesktop,
@@ -46,8 +47,18 @@ export const sendGridMode = (mode: GridMode): void => settings.sendSetting("grid
 export const sendGridSize = (size: GridSize): void => settings.sendSetting("gridSize", size);
 export const sendOverlayMode = (mode: OverlayMode): void =>
   settings.sendSetting("overlayMode", mode);
-export const sendPopMonoColor = (color: string): void =>
-  settings.sendSetting("popMonoColor", color);
+export const sendButtonRoundness = (val: number): void =>
+  settings.sendSetting("buttonRoundness", val);
+export const sendMenuTranslucency = (val: number): void =>
+  settings.sendSetting("menuTranslucency", val);
+export const sendBrandingEnabled = (val: boolean): void =>
+  settings.sendSetting("brandingEnabled", val);
+export const sendGlowIntensity = (val: number): void =>
+  settings.sendSetting("glowIntensity", val);
+export const sendTextColor = (val: TextColor): void =>
+  settings.sendSetting("textColor", val);
+export const sendSolidColor = (color: string): void =>
+  settings.sendSetting("solidColor", color);
 
 export function overlayActivated(): void {
   window.electronAPI?.overlayActivated();

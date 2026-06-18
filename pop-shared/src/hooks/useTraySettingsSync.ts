@@ -11,12 +11,13 @@ import type { SettingsState } from "@shared/settings/store";
  */
 export function useTraySettingsSync<S extends SettingsSchema>(
   schema: S,
-  store: { getState(): SettingsState<S> }
+  store: { getState(): SettingsState<S> },
+  ns?: string
 ): void {
   useEffect(() => {
     if (!isDesktop()) return;
 
-    const platform = createSettingsPlatform(schema);
+    const platform = createSettingsPlatform(schema, ns);
     const state = store.getState() as Record<string, unknown>;
     const unlisteners = (Object.keys(schema) as Array<keyof S & string>).map((key) =>
       platform.onSetting(key, (value) => {

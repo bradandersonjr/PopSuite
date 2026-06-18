@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { isMac } from "@shared/lib/hotkeys";
 import type { SettingValue } from "@shared/settings/schema";
 import { createSettingsSlice, type SettingsState } from "@shared/settings/store";
-import { settingsSchema } from "@/config/settingsSchema";
+import { settingsSchema } from "@keys/config/settingsSchema";
 
 // Settings types derive from the schema — single source of truth.
 export type ColorPalette = SettingValue<(typeof settingsSchema)["colorPalette"]>;
@@ -10,6 +10,11 @@ export type ThemeMode = SettingValue<(typeof settingsSchema)["themeMode"]>;
 export type AnimationIntensity = SettingValue<(typeof settingsSchema)["animationIntensity"]>;
 export type DisplayPosition = SettingValue<(typeof settingsSchema)["displayPosition"]>;
 export type BadgeStyle = SettingValue<(typeof settingsSchema)["badgeStyle"]>;
+export type BadgeTextColor = SettingValue<(typeof settingsSchema)["badgeTextColor"]>;
+export type ClickEffect = SettingValue<(typeof settingsSchema)["clickEffect"]>;
+export type BrandingCorner = SettingValue<(typeof settingsSchema)["brandingCorner"]>;
+export type BadgeFont = SettingValue<(typeof settingsSchema)["badgeFont"]>;
+export type BadgeAnimation = SettingValue<(typeof settingsSchema)["badgeAnimation"]>;
 
 interface AppState extends SettingsState<typeof settingsSchema> {
     appEnabled: boolean;
@@ -18,6 +23,10 @@ interface AppState extends SettingsState<typeof settingsSchema> {
     setHotkey: (hotkey: string) => void;
     pageZoomFactor: number;
     setPageZoomFactor: (zoomFactor: number) => void;
+    /** Pro license state, mirrored from the main process. */
+    isPro: boolean;
+    licenseKey: string | null;
+    setLicense: (status: { isPro: boolean; key: string | null }) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -30,4 +39,7 @@ export const useStore = create<AppState>((set) => ({
     setHotkey: (hotkey) => set({ hotkey }),
     pageZoomFactor: 1,
     setPageZoomFactor: (pageZoomFactor) => set({ pageZoomFactor }),
+    isPro: false,
+    licenseKey: null,
+    setLicense: ({ isPro, key }) => set({ isPro, licenseKey: key }),
 }));

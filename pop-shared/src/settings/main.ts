@@ -28,18 +28,21 @@ export function registerSettingsIpc<S extends SettingsSchema>(
   opts: {
     sendToRenderers: (channel: string, value: unknown) => void;
     onChange?: { [K in keyof S]?: (value: SettingValue<S[K]>) => void };
+    /** Channel namespace when composing several schemas in one process. */
+    namespace?: string;
   }
 ): SettingsController<S> {
   const values = settingsDefaults(schema);
+  const ns = opts.namespace;
 
   for (const key of Object.keys(schema) as Array<keyof S & string>) {
     const spec = schema[key];
-    ipcMain.on(setChannel(key), (_event, value: unknown) => {
+    ipcMain.on(setChannel(key, ns), (_event, value: unknown) => {
       if (!isValidSettingValue(spec, value)) return;
       if (!spec.volatile) {
         (values as Record<string, unknown>)[key] = value;
       }
-      opts.sendToRenderers(trayChannel(key), value);
+      opts.sendToRenderers(trayChannel(key, ns), value);
       opts.onChange?.[key]?.(value as SettingValue<S[typeof key]>);
     });
   }
@@ -49,7 +52,7 @@ export function registerSettingsIpc<S extends SettingsSchema>(
     syncToWindow(win) {
       for (const key of Object.keys(schema) as Array<keyof S & string>) {
         if (schema[key].volatile) continue;
-        win.webContents.send(trayChannel(key), values[key]);
+        win.webContents.send(trayChannel(key, ns), values[key]);
       }
     },
   };

@@ -90,19 +90,47 @@ export function kebabCase(key: string): string {
   return key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 }
 
-/** Renderer → main channel for a setting, e.g. "set-theme-mode". */
-export function setChannel(key: string): string {
-  return `set-${kebabCase(key)}`;
+/**
+ * Optional channel namespace. When several schemas share one Electron process
+ * (the combined PopSuite app composing the keys/jot modules), each module
+ * registers under a namespace so its IPC channels and bridge members never
+ * collide on keys that exist in both (glowIntensity, colorPalette, …). Store
+ * setter names stay bare regardless — see `setterName` vs `bridgeSetterName` —
+ * so the module's own components compose unchanged. Omit the namespace and
+ * every helper produces exactly the same names as a standalone app.
+ */
+function nsPrefix(ns?: string): string {
+  return ns ? `${kebabCase(ns)}-` : "";
+}
+
+/** Renderer → main channel for a setting, e.g. "set-theme-mode" (or "set-keys-theme-mode"). */
+export function setChannel(key: string, ns?: string): string {
+  return `set-${nsPrefix(ns)}${kebabCase(key)}`;
 }
 
 /** Main → renderers broadcast channel for a setting, e.g. "tray-set-theme-mode". */
-export function trayChannel(key: string): string {
-  return `tray-set-${kebabCase(key)}`;
+export function trayChannel(key: string, ns?: string): string {
+  return `tray-set-${nsPrefix(ns)}${kebabCase(key)}`;
 }
 
-/** Bridge/store setter name for a setting, e.g. "setThemeMode". */
+/**
+ * Bare store setter name for a setting, e.g. "setThemeMode". Used for the
+ * Zustand slice and the tray-sync hook — never namespaced, so components keep
+ * calling `setThemeMode` even when composed into the combined app.
+ */
 export function setterName(key: string): string {
   return `set${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+}
+
+/**
+ * Preload-bridge / renderer-platform setter member name. Namespaced so two
+ * modules' bridge members don't collide on `window.electronAPI`, e.g.
+ * "setThemeMode" → "setKeysThemeMode". Equals `setterName(key)` when `ns` is
+ * omitted, keeping standalone apps byte-for-byte identical.
+ */
+export function bridgeSetterName(key: string, ns?: string): string {
+  const base = ns ? `${ns}${key.charAt(0).toUpperCase()}${key.slice(1)}` : key;
+  return `set${base.charAt(0).toUpperCase()}${base.slice(1)}`;
 }
 
 export function settingsDefaults<S extends SettingsSchema>(schema: S): SettingsValues<S> {

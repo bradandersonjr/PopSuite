@@ -1,5 +1,6 @@
-import { useStore } from "@/store/useStore";
-import { getBadgeColors, getBadgeGradientStops } from "@/config/themes";
+import { useStore } from "@keys/store/useStore";
+import { getBadgeGradientStops, resolvePaletteColors } from "@keys/config/themes";
+import { fontStackFor } from "@keys/config/fonts";
 
 function withAlpha(color: string, alpha: number): string {
   const clamped = Math.max(0, Math.min(1, alpha));
@@ -31,16 +32,14 @@ interface ModifierBarProps {
 const MODIFIERS = ["Ctrl", "Shift", "Alt", "Win"];
 
 const ModifierBar = ({ heldModifiers }: ModifierBarProps) => {
-  const { colorPalette, fontSize, displayPosition, badgeStyle, themeMode, badgeTranslucency, badgeBlur, popMonoColor, badgeRoundness } = useStore();
-  const colors = getBadgeColors(colorPalette);
+  const { colorPalette, fontSize, displayPosition, badgeStyle, themeMode, badgeTranslucency, badgeRoundness, glowIntensity, badgeFont, isPro, solidColor } = useStore();
+  const gi = glowIntensity / 100;
+  const fontFamily = fontStackFor(badgeFont, isPro);
+  const colors = resolvePaletteColors(colorPalette, solidColor);
   const isDark = themeMode === "dark";
   const backgroundAlpha = 1 - badgeTranslucency / 100;
   const flatBg = isDark ? "#2c313c" : "#eef1f5";
-  const flatText = isDark ? "#e8edf5" : "#1f2937";
-  const monoBg = popMonoColor;
-  const monoText = isDark ? "#111111" : "#f5f5f5";
-  const monoBorder = isDark ? "#ffffff" : "#000000";
-  const isGradient = colorPalette === "gradient" || colorPalette === "glitter" || colorPalette === "magical";
+  const isGradient = colorPalette === "gradient" || colorPalette === "glitter";
   const popHeldBorder = isDark ? "#111111" : "#f5f5f5";
 
   // Position near the HUD
@@ -77,7 +76,7 @@ const ModifierBar = ({ heldModifiers }: ModifierBarProps) => {
 
         const chipStyle: React.CSSProperties = {
           fontSize: `${smallFontSize}px`,
-          fontFamily: "'Space Mono', monospace",
+          fontFamily,
           fontWeight: 700,
           padding: `${smallFontSize * 0.25}px ${smallFontSize * 0.55}px`,
           borderRadius: radius,
@@ -87,18 +86,14 @@ const ModifierBar = ({ heldModifiers }: ModifierBarProps) => {
           userSelect: "none",
           ...(badgeStyle === "flat"
             ? {
-                backgroundColor: withAlpha(flatBg, backgroundAlpha),
-                color: held ? flatText : withAlpha(flatText, 0.7),
-                backdropFilter: badgeBlur > 0 ? `blur(${badgeBlur}px)` : "none",
-                WebkitBackdropFilter: badgeBlur > 0 ? `blur(${badgeBlur}px)` : "none",
+                backgroundColor: withAlpha(color, backgroundAlpha),
+                color: held ? (isDark ? "#ffffff" : "#0b0b0b") : withAlpha(isDark ? "#ffffff" : "#0b0b0b", 0.7),
               }
             : badgeStyle === "flat-outline"
             ? {
                 backgroundColor: withAlpha(flatBg, backgroundAlpha),
                 color: held ? color : `${color}88`,
                 border: `2px solid ${held ? color : `${color}66`}`,
-                backdropFilter: badgeBlur > 0 ? `blur(${badgeBlur}px)` : "none",
-                WebkitBackdropFilter: badgeBlur > 0 ? `blur(${badgeBlur}px)` : "none",
               }
             : badgeStyle === "pop"
             ? (() => {
@@ -110,18 +105,17 @@ const ModifierBar = ({ heldModifiers }: ModifierBarProps) => {
                   color: isDark ? "#0b0b0b" : "#ffffff",
                   border: `2px solid ${popHeldBorder}`,
                   boxShadow: held ? `2px 2px 0 ${popHeldBorder}` : "none",
-                  backdropFilter: badgeBlur > 0 ? `blur(${badgeBlur}px)` : "none",
-                  WebkitBackdropFilter: badgeBlur > 0 ? `blur(${badgeBlur}px)` : "none",
                 };
               })()
-            : {
-                backgroundColor: withAlpha(monoBg, backgroundAlpha),
-                color: held ? monoText : `${monoText}aa`,
-                border: `2px solid ${monoBorder}`,
-                boxShadow: held ? `2px 2px 0 ${monoBorder}` : "none",
-                backdropFilter: badgeBlur > 0 ? `blur(${badgeBlur}px)` : "none",
-                WebkitBackdropFilter: badgeBlur > 0 ? `blur(${badgeBlur}px)` : "none",
-              }),
+            : (() => {
+                // Glow: filled chip with a soft colored halo (brighter when held).
+                const glowColor = isGradient ? getBadgeGradientStops(color)[0] : color;
+                return {
+                  backgroundColor: withAlpha(color, backgroundAlpha),
+                  color: held ? (isDark ? "#ffffff" : "#0b0b0b") : withAlpha(isDark ? "#ffffff" : "#0b0b0b", 0.7),
+                  boxShadow: `0 0 ${Math.round(smallFontSize * (0.35 + gi * 0.9))}px ${withAlpha(glowColor, (held ? 0.55 : 0.3) + gi * 0.4)}`,
+                };
+              })()),
         };
 
         return (

@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run dev --prefix PopJot\" \"npm run dev --prefix PopKey\"",
+    "dev:electron": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run dev:electron --prefix PopJot\" \"npm run dev:electron --prefix PopKey\"",
     "dev:popjot": "npm run dev --prefix PopJot",
     "dev:popkey": "npm run dev --prefix PopKey",
     "build": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run build --prefix PopJot\" \"npm run build --prefix PopKey\"",

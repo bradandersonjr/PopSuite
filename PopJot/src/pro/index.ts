@@ -13,11 +13,22 @@
  * with the private implementation so both builds typecheck against it.
  */
 
-import { getColors } from "@/config/themes";
-import type { ColorPalette } from "@/store/useStore";
+import { getColors } from "@jot/config/themes";
+import type { ColorPalette } from "@jot/store/useStore";
 
-/** Master switch — free build is never Pro. */
-export const IS_PRO = false;
+/**
+ * License gate. The real (private) build flips this via `setProLicensed` when a
+ * valid key is active and gates every feature on it. In this public stub there
+ * are no feature implementations, so `isPro` tracks the flag (so the UI can show
+ * "unlocked") but the getters below stay no-ops regardless.
+ */
+let licensed = false;
+
+export const setProLicensed = (value: boolean): void => {
+  licensed = value;
+};
+
+export const isPro = (): boolean => licensed;
 
 // ─── Custom Palette ───────────────────────────────────────────────────────────
 
@@ -71,7 +82,7 @@ export const setProCenterScale = (_scale: number): void => {};
 
 // ─── Pro Stroke Effect ────────────────────────────────────────────────────────
 
-export type ProEffect = "none" | "gradient" | "glitter" | "magical";
+export type ProEffect = "none" | "gradient" | "glitter";
 
 export const getProEffect = (): ProEffect => "none";
 

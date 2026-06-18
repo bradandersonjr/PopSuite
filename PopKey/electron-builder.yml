@@ -12,6 +12,12 @@ files:
 extraResources:
   - from: assets/tray-icon.png
     to: tray-icon.png
+  - from: assets/tray-icon@2x.png
+    to: tray-icon@2x.png
+  - from: assets/tray-icon-active.png
+    to: tray-icon-active.png
+  - from: assets/tray-icon-active@2x.png
+    to: tray-icon-active@2x.png
   - from: assets/icon.png
     to: icon.png
 

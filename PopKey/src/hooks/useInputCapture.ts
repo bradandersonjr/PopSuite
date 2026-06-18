@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useStore } from "@/store/useStore";
+import { useStore } from "@keys/store/useStore";
 import {
   isDesktop,
   onInputKeyDown,
@@ -10,8 +10,8 @@ import {
   onInputDragMove,
   onInputFocusLost,
   onShortcutToggle,
-} from "@/lib/platform";
-import type { KeyEvent, ClickEvent, WheelEventData } from "@/lib/platform";
+} from "@keys/lib/platform";
+import type { KeyEvent, ClickEvent, WheelEventData } from "@keys/lib/platform";
 
 export type BadgeType = "key" | "combo" | "click" | "scroll" | "drag";
 
@@ -91,6 +91,7 @@ export function useInputCapture() {
     mouseEnabled,
     showMouseClicks,
     showScrollWheel,
+    showKeyRepeat,
   } = useStore();
 
   const [badges, setBadges] = useState<Badge[]>([]);
@@ -104,6 +105,11 @@ export function useInputCapture() {
   const modifierBadgeIdRef = useRef<string | null>(null);
   const maxBadgesRef     = useRef(maxBadges);
   maxBadgesRef.current   = maxBadges;
+  const showKeyRepeatRef = useRef(showKeyRepeat);
+  showKeyRepeatRef.current = showKeyRepeat;
+  // Tracks the live badge for each held key so OS auto-repeats can bump a ×N count.
+  // Keyed by uiohook keycode (desktop) or DOM `event.code` (web).
+  const heldKeyBadgeRef = useRef<Map<string | number, { id: string; labelBase: string; count: number }>>(new Map());
 
   // Live drag badge tracking: keyed by button number
   type ActiveDrag = { id: string; colorIdx: number; labelBase: string; lastArrow: string };
@@ -162,6 +168,41 @@ export function useInputCapture() {
     });
   }, []);
 
+  // Like addBadgeWithMods, but records the resulting badge id keyed by the held
+  // key so repeats can update it. Used for the keyboard (non-modifier) path.
+  const pressKey = useCallback((keyId: string | number, base: string) => {
+    const oldModId = modifierBadgeIdRef.current;
+    modifierBadgeIdRef.current = null;
+    const mods  = Array.from(heldModifiersRef.current);
+    const label = mods.length > 0 ? `${mods.join(" + ")} + ${base}` : base;
+    const type: BadgeType = mods.length > 0 ? "combo" : "key";
+    const now = Date.now();
+    setBadges((prev) => {
+      const filtered = oldModId ? prev.filter((b) => b.id !== oldModId) : prev;
+      const last = filtered[filtered.length - 1];
+      if (last && last.label === label && last.type === type && now - last.timestamp < 400) {
+        heldKeyBadgeRef.current.set(keyId, { id: last.id, labelBase: label, count: 1 });
+        return [...filtered.slice(0, -1), { ...last, timestamp: now }];
+      }
+      const id = nextId();
+      heldKeyBadgeRef.current.set(keyId, { id, labelBase: label, count: 1 });
+      return [...filtered.slice(-(maxBadgesRef.current - 1)), {
+        id, label, type, colorIndex: colorIndexRef.current++, timestamp: now,
+      }];
+    });
+  }, []);
+
+  // OS auto-repeat of a held key: bump its badge to "<label> ×N".
+  const repeatKey = useCallback((keyId: string | number) => {
+    const entry = heldKeyBadgeRef.current.get(keyId);
+    if (!entry) return;
+    entry.count += 1;
+    const now = Date.now();
+    setBadges((prev) =>
+      prev.map((b) => (b.id === entry.id ? { ...b, label: `${entry.labelBase} ×${entry.count}`, timestamp: now } : b))
+    );
+  }, []);
+
   const removeModifierBadge = useCallback(() => {
     if (heldModifiersRef.current.size > 0) {
       showModifierBadge();
@@ -211,6 +252,7 @@ export function useInputCapture() {
   const clearAllHeld = useCallback(() => {
     heldKeysRef.current.clear();
     heldModifiersRef.current.clear();
+    heldKeyBadgeRef.current.clear();
     activeDragRef.current.clear();
     const id = modifierBadgeIdRef.current;
     if (id) { modifierBadgeIdRef.current = null; setBadges((prev) => prev.filter((b) => b.id !== id)); }
@@ -264,19 +306,25 @@ export function useInputCapture() {
 
     if (keyboardEnabled) {
       cleanups.push(onInputKeyDown((data: KeyEvent) => {
-        if (heldKeysRef.current.has(data.keycode)) return;
+        const isMod = data.modifier || MODIFIER_NAMES.has(data.key);
+        // Already held → this is an OS auto-repeat; optionally show a ×N counter.
+        if (heldKeysRef.current.has(data.keycode)) {
+          if (showKeyRepeatRef.current && !isMod) repeatKey(data.keycode);
+          return;
+        }
         heldKeysRef.current.add(data.keycode);
         // Word mode integration point: if (wordCapture.handleDesktopKeyDown(...)) return;
-        if (data.modifier || MODIFIER_NAMES.has(data.key)) {
+        if (isMod) {
           heldModifiersRef.current.add(data.key);
           showModifierBadge();
           return;
         }
-        addBadgeWithMods(data.key, "key");
+        pressKey(data.keycode, data.key);
       }));
 
       cleanups.push(onInputKeyUp((data: KeyEvent) => {
         heldKeysRef.current.delete(data.keycode);
+        heldKeyBadgeRef.current.delete(data.keycode);
         // Word mode integration point: if (wordCapture.handleDesktopKeyUp(...)) return;
         if (data.modifier || MODIFIER_NAMES.has(data.key)) {
           heldModifiersRef.current.delete(data.key);
@@ -321,7 +369,7 @@ export function useInputCapture() {
 
     return () => cleanups.forEach((fn) => fn());
   }, [appEnabled, keyboardEnabled, mouseEnabled, showMouseClicks, showScrollWheel,
-      addBadge, addBadgeWithMods, startDragBadge, updateDragBadge,
+      addBadge, addBadgeWithMods, pressKey, repeatKey, startDragBadge, updateDragBadge,
       showModifierBadge, removeModifierBadge, setAppEnabled, clearAllHeld]);
 
   // ─── Web / Extension: DOM-based fallback ──────────────────────────────────
@@ -344,9 +392,13 @@ export function useInputCapture() {
           showModifierBadge();
           return;
         }
-        if (e.repeat) return;
+        // Browser auto-repeat → optional ×N counter on the held key's badge.
+        if (e.repeat) {
+          if (showKeyRepeatRef.current) repeatKey(e.code);
+          return;
+        }
         // Word mode integration point: if (wordCapture.handleDOMKeyDown(...)) return;
-        addBadgeWithMods(e.key.length === 1 ? e.key.toUpperCase() : e.key, "key");
+        pressKey(e.code, e.key.length === 1 ? e.key.toUpperCase() : e.key);
       };
 
       const handleKeyUp = (e: KeyboardEvent) => {
@@ -355,7 +407,9 @@ export function useInputCapture() {
           heldModifiersRef.current.delete(modName);
           // Word mode integration point: if (wordCapture.handleDOMKeyUp(...)) return;
           removeModifierBadge();
+          return;
         }
+        heldKeyBadgeRef.current.delete(e.code);
       };
 
       window.addEventListener("keydown", handleKeyDown);
@@ -432,7 +486,7 @@ export function useInputCapture() {
 
     return () => cleanups.forEach((fn) => fn());
   }, [appEnabled, keyboardEnabled, mouseEnabled, showMouseClicks, showScrollWheel,
-      addBadge, addBadgeWithMods, startDragBadge, updateDragBadge,
+      addBadge, addBadgeWithMods, pressKey, repeatKey, startDragBadge, updateDragBadge,
       showModifierBadge, removeModifierBadge, clearAllHeld]);
 
   return { badges, clicks, scrolls };

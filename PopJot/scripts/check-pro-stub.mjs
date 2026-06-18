@@ -1,8 +1,8 @@
 /**
  * guard:pro — fail the build/CI if real Pro code is present in this PUBLIC repo.
  *
- * The public build must ship only the stub `src/pro/index.ts` (`IS_PRO = false`,
- * no feature logic). The real implementation lives in the private Pro source and
+ * The public build must ship only the stub `src/pro/index.ts` (no real feature
+ * logic; the license gate stays locked). The real implementation lives in the private Pro source and
  * is swapped in only to build paid binaries. This guard makes a leak impossible
  * to merge or deploy: it runs in CI and as `prebuild`, so `npm run build`
  * (including on Cloudflare) refuses to build if the real code is committed.
@@ -25,15 +25,18 @@ if (!existsSync(proFile)) {
 const src = readFileSync(proFile, "utf8");
 const problems = [];
 
-if (!/export\s+const\s+IS_PRO\s*=\s*false\b/.test(src)) {
-  problems.push("Missing `export const IS_PRO = false` — the public build must not be Pro.");
-}
-if (/export\s+const\s+IS_PRO\s*=\s*true\b/.test(src)) {
-  problems.push("Found `IS_PRO = true` — real Pro code must never be committed to a public repo.");
-}
-// The stub never touches storage; the real implementation is full of it.
+// The stub never touches storage; the real implementation is full of it. This
+// is the strongest signal that real Pro code leaked into the public repo.
 if (/\blocalStorage\b/.test(src)) {
   problems.push("Found `localStorage` usage — the public Pro stub must not read/write Pro state (real implementation leaked?).");
+}
+// The license gate must never be hard-unlocked in the public stub.
+if (/\blicensed\s*=\s*true\b/.test(src)) {
+  problems.push("Found `licensed = true` — the public stub must not hard-unlock Pro.");
+}
+// Surface sanity: the stub must still expose the license gate the app wires to.
+if (!/export\s+const\s+setProLicensed\b/.test(src) || !/export\s+const\s+isPro\b/.test(src)) {
+  problems.push("Missing `setProLicensed` / `isPro` exports — keep the stub surface in lockstep with the real module.");
 }
 
 if (problems.length) {

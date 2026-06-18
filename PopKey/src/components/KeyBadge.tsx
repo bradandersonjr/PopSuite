@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Mouse,
@@ -5,10 +6,13 @@ import {
   ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight,
   type LucideIcon,
 } from "lucide-react";
-import { useStore } from "@/store/useStore";
+import { useStore } from "@keys/store/useStore";
 import { getAnimationConfig } from "@shared/config/animations";
-import type { BadgeType } from "@/hooks/useInputCapture";
-import { getBadgeGradientStops } from "@/config/themes";
+import PaletteEffectOverlay from "@shared/components/PaletteEffectOverlay";
+import type { BadgeType } from "@keys/hooks/useInputCapture";
+import { getBadgeGradientStops } from "@keys/config/themes";
+import { fontStackFor } from "@keys/config/fonts";
+import { getBadgeMotion } from "@keys/config/badgeAnimations";
 
 function withAlpha(color: string, alpha: number): string {
   const clamped = Math.max(0, Math.min(1, alpha));
@@ -43,26 +47,26 @@ interface KeyBadgeProps {
   label: string;
   type: BadgeType;
   color: string;
-  style: "flat" | "flat-outline" | "pop" | "pop-mono";
+  style: "flat" | "flat-outline" | "pop" | "glow";
   fontSize: number;
   exitDirection: "left" | "right" | "center";
 }
 
 const KeyBadge = ({ label, type, color, style, fontSize, exitDirection }: KeyBadgeProps) => {
-  const { colorPalette, animationIntensity, themeMode, badgeTranslucency, badgeBlur, popMonoColor, badgeRoundness } = useStore();
+  const { colorPalette, animationIntensity, themeMode, badgeTranslucency, badgeRoundness, badgeTextColor, glowIntensity, badgeFont, badgeAnimation, isPro } = useStore();
+  const fontFamily = fontStackFor(badgeFont, isPro);
   const config = getAnimationConfig(animationIntensity);
+  const motion0 = getBadgeMotion(badgeAnimation, isPro, config, exitDirection);
   const isDark = themeMode === "dark";
   const backgroundAlpha = 1 - badgeTranslucency / 100;
   const flatBg = isDark ? "#2c313c" : "#eef1f5";
-  const flatText = isDark ? "#e8edf5" : "#1f2937";
-  const monoBg = popMonoColor;
-  const monoText = isDark ? "#f5f5f5" : "#111111";
-  const monoBorder = isDark ? "#000000" : "#ffffff";
+  // "auto" keeps the per-style theme text color; white/black force it everywhere.
+  const textOverride = badgeTextColor === "white" ? "#ffffff" : badgeTextColor === "black" ? "#111111" : null;
   const popBorder = isDark ? "#111111" : "#f5f5f5";
 
   const baseStyle: React.CSSProperties = {
     fontSize: `${fontSize}px`,
-    fontFamily: "'Space Mono', monospace",
+    fontFamily,
     fontWeight: 700,
     lineHeight: 1.2,
     whiteSpace: "nowrap",
@@ -73,59 +77,61 @@ const KeyBadge = ({ label, type, color, style, fontSize, exitDirection }: KeyBad
   // 0% = square, 100% = pill. Max radius is half the element height (font + padding).
   const maxRadius = fontSize * 1;
   const radius = `${(badgeRoundness / 100) * maxRadius}px`;
-  const blur = badgeBlur > 0 ? `blur(${badgeBlur}px)` : "none";
 
-  const isGradient = colorPalette === "gradient" || colorPalette === "glitter" || colorPalette === "magical";
+  const isGradient = colorPalette === "gradient" || colorPalette === "glitter";
   const gradientStops = isGradient ? getBadgeGradientStops(color) : [];
+  // Glow halo uses the badge's own color (first gradient stop for gradient palettes).
+  const glowColor = isGradient ? gradientStops[0] : color;
+  // 0 = subtle, 100 = intense — scales halo spread and opacity.
+  const gi = glowIntensity / 100;
+
+  // Glitter renders PopJot's shimmering-particle overlay on top of the badge.
+  // Measure the pill so the SVG sparkles fill its exact width/height.
+  const badgeRef = useRef<HTMLDivElement>(null);
+  const [dims, setDims] = useState({ w: 0, h: 0 });
+  const showGlitter = colorPalette === "glitter";
+  useEffect(() => {
+    if (!showGlitter) return;
+    const el = badgeRef.current;
+    if (!el) return;
+    const measure = () => setDims({ w: el.offsetWidth, h: el.offsetHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [showGlitter, label, fontSize]);
 
   const getVariantStyle = (): React.CSSProperties => {
     switch (style) {
       case "flat": {
-        // Gradient palette: use a soft gradient background tinted toward the key's color
-        if (isGradient) {
-          return {
-            ...baseStyle,
-            backgroundImage: `linear-gradient(135deg, ${withAlpha(gradientStops[0], backgroundAlpha * 0.85)}, ${withAlpha(gradientStops[1], backgroundAlpha * 0.75)})`,
-            color: isDark ? "#ffffff" : "#111111",
-            padding: `${fontSize * 0.4}px ${fontSize * 0.8}px`,
-            borderRadius: radius,
-            backdropFilter: blur,
-            WebkitBackdropFilter: blur,
-          };
-        }
+        // Flat uses palette colors (or solidColor if Solid palette is active).
         return {
           ...baseStyle,
-          backgroundColor: withAlpha(flatBg, backgroundAlpha),
-          color: flatText,
+          backgroundColor: withAlpha(color, backgroundAlpha),
+          color: textOverride ?? (isDark ? "#ffffff" : "#0b0b0b"),
           padding: `${fontSize * 0.4}px ${fontSize * 0.8}px`,
           borderRadius: radius,
-          backdropFilter: blur,
-          WebkitBackdropFilter: blur,
         };
       }
       case "flat-outline": {
-        // Gradient palette: colorful border + tinted text using gradient stops
+        // Gradient palette: colorful border + tinted text, neutral background
         if (isGradient) {
           return {
             ...baseStyle,
             backgroundColor: withAlpha(flatBg, backgroundAlpha),
-            color: gradientStops[0],
+            color: textOverride ?? gradientStops[0],
             padding: `${fontSize * 0.35}px ${fontSize * 0.75}px`,
             borderRadius: radius,
             border: `2px solid ${gradientStops[0]}`,
-            backdropFilter: blur,
-            WebkitBackdropFilter: blur,
           };
         }
         return {
           ...baseStyle,
           backgroundColor: withAlpha(flatBg, backgroundAlpha),
-          color: color,
+          color: textOverride ?? color,
           padding: `${fontSize * 0.35}px ${fontSize * 0.75}px`,
           borderRadius: radius,
           border: `2px solid ${color}`,
-          backdropFilter: blur,
-          WebkitBackdropFilter: blur,
         };
       }
       case "pop": {
@@ -134,26 +140,24 @@ const KeyBadge = ({ label, type, color, style, fontSize, exitDirection }: KeyBad
           ...(isGradient
             ? { backgroundImage: `linear-gradient(135deg, ${withAlpha(gradientStops[0], backgroundAlpha)}, ${withAlpha(gradientStops[1], backgroundAlpha)})` }
             : { backgroundColor: withAlpha(color, backgroundAlpha) }),
-          color: isDark ? "#ffffff" : "#0b0b0b",
+          color: textOverride ?? (isDark ? "#ffffff" : "#0b0b0b"),
           padding: `${fontSize * 0.35}px ${fontSize * 0.75}px`,
           borderRadius: radius,
           border: `2px solid ${popBorder}`,
           boxShadow: `3px 3px 0 ${popBorder}`,
-          backdropFilter: blur,
-          WebkitBackdropFilter: blur,
         };
       }
-      case "pop-mono":
+      case "glow":
+        // Filled like Pop, but with a soft colored halo instead of a hard shadow.
         return {
           ...baseStyle,
-          backgroundColor: withAlpha(monoBg, backgroundAlpha),
-          color: monoText,
+          ...(isGradient
+            ? { backgroundImage: `linear-gradient(135deg, ${withAlpha(gradientStops[0], backgroundAlpha)}, ${withAlpha(gradientStops[1], backgroundAlpha)})` }
+            : { backgroundColor: withAlpha(color, backgroundAlpha) }),
+          color: textOverride ?? (isDark ? "#ffffff" : "#0b0b0b"),
           padding: `${fontSize * 0.35}px ${fontSize * 0.75}px`,
           borderRadius: radius,
-          border: `2px solid ${monoBorder}`,
-          boxShadow: `3px 3px 0 ${monoBorder}`,
-          backdropFilter: blur,
-          WebkitBackdropFilter: blur,
+          boxShadow: `0 0 ${Math.round(fontSize * (0.35 + gi * 0.9))}px ${withAlpha(glowColor, 0.5 + gi * 0.45)}, 0 0 ${Math.round(fontSize * (0.8 + gi * 1.8))}px ${withAlpha(glowColor, 0.2 + gi * 0.45)}`,
         };
     }
   };
@@ -182,33 +186,24 @@ const KeyBadge = ({ label, type, color, style, fontSize, exitDirection }: KeyBad
 
   return (
     <motion.div
-      initial={{
-        opacity: 0,
-        scale: config.enterScale,
-        y: config.slideDistance,
-      }}
-      animate={{
-        opacity: 1,
-        scale: 1,
-        y: 0,
-        transition: {
-          duration: config.enterDuration,
-          ease: "easeOut",
-          type: "spring",
-          stiffness: config.springStiffness,
-          damping: config.springDamping,
-        },
-      }}
-      exit={{
-        opacity: 0,
-        x: exitDirection === "right" ? 20 : exitDirection === "center" ? 0 : -20,
-        scale: 0.95,
-        transition: { duration: config.exitDuration, ease: "easeIn" },
-      }}
-      style={{ ...getVariantStyle(), display: "inline-flex", alignItems: "center", gap: 4 }}
+      initial={motion0.initial}
+      animate={motion0.animate}
+      exit={motion0.exit}
+      ref={badgeRef}
+      style={{ ...getVariantStyle(), display: "inline-flex", alignItems: "center", gap: 4, position: "relative", overflow: "hidden" }}
     >
       {prefixIcon}
       {labelText}
+      {showGlitter && dims.w > 0 && (
+        <PaletteEffectOverlay
+          palette="glitter"
+          size={dims.h}
+          width={dims.w}
+          height={dims.h}
+          seed={label}
+          tintColor={color}
+        />
+      )}
     </motion.div>
   );
 };

@@ -1,6 +1,6 @@
 import { useTraySettingsSync as useSchemaTraySettingsSync } from "@shared/hooks/useTraySettingsSync";
-import { settingsSchema } from "@/config/settingsSchema";
-import { useStore } from "@/store/useStore";
+import { settingsSchema } from "@keys/config/settingsSchema";
+import { useStore } from "@keys/store/useStore";
 
 /**
  * Applies tray-settings IPC broadcasts to the store — fully generated from

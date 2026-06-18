@@ -5,7 +5,7 @@
  */
 
 import { ipcRenderer } from "electron";
-import { type SettingsSchema, setChannel, setterName } from "./schema";
+import { type SettingsSchema, setChannel, bridgeSetterName } from "./schema";
 
 /** `subscribe("channel")` → `(callback) => unsubscribe` bridge member. */
 export function subscribe(channel: string) {
@@ -31,7 +31,10 @@ export function invoker(channel: string) {
  * Common bridge: one `set<Key>` sender per schema setting, the tray
  * subscription entry point, window controls, and open-at-login.
  */
-export function createSettingsBridge<S extends SettingsSchema>(schema: S): Record<string, unknown> {
+export function createSettingsBridge<S extends SettingsSchema>(
+  schema: S,
+  ns?: string
+): Record<string, unknown> {
   const api: Record<string, unknown> = {
     quitApp: sender("quit-app"),
     closeWindow: sender("close-window"),
@@ -39,10 +42,15 @@ export function createSettingsBridge<S extends SettingsSchema>(schema: S): Recor
       subscribe(event)(callback as (...args: never[]) => void),
     getOpenAtLogin: invoker("get-open-at-login"),
     setOpenAtLogin: sender("set-open-at-login"),
+    openExternal: sender("open-external"),
+    readClipboard: invoker("read-clipboard"),
   };
 
+  // Namespaced bridge member + wire channel so composing two schemas in one
+  // process never collides on shared key names.
   for (const key of Object.keys(schema)) {
-    api[setterName(key)] = (value: unknown) => ipcRenderer.send(setChannel(key), value);
+    api[bridgeSetterName(key, ns)] = (value: unknown) =>
+      ipcRenderer.send(setChannel(key, ns), value);
   }
 
   return api;

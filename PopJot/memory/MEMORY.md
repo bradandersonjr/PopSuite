@@ -46,7 +46,7 @@ Tailwind 3 tree-shakes styles inside `@layer base`. If class names are dynamical
 | **Flat** | `"flat"` | Simple flat circles, adapts to dark/light theme |
 | **Flat Outline** | `"flat-outline"` | Flat + 2px border, adapts to dark/light theme |
 | **Pop** | `"pop"` | Neo-brutalist with random colors from selected palette |
-| **Pop Mono** | `"pop-mono"` | Neo-brutalist with mono colors, adapts to dark/light theme |
+| **Glow** | `"glow"` | Palette-colored fill with a soft colored halo (box-shadow) instead of a hard offset shadow |
 
 ### Color Palettes (3 options)
 - **Muted** — Soft, desaturated colors (default)

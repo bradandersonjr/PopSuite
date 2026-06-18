@@ -7,7 +7,7 @@
 import {
   type SettingsSchema,
   type SettingValue,
-  setterName,
+  bridgeSetterName,
   trayChannel,
 } from "./schema";
 
@@ -55,6 +55,22 @@ export function setOpenAtLogin(enabled: boolean): void {
   bridge()?.setOpenAtLogin?.(enabled);
 }
 
+/** Open a URL in the OS browser (desktop). On web, falls back to window.open. */
+export function openExternal(url: string): void {
+  const api = bridge() as { openExternal?: (url: string) => void } | undefined;
+  if (api?.openExternal) {
+    api.openExternal(url);
+  } else if (typeof window !== "undefined") {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
+/** Read the clipboard text (desktop only; "" elsewhere). */
+export async function readClipboard(): Promise<string> {
+  const api = bridge() as { readClipboard?: () => Promise<string> } | undefined;
+  return (await api?.readClipboard?.()) ?? "";
+}
+
 export interface SettingsPlatform<S extends SettingsSchema> {
   /** Send a setting change to the main process (no-op on web). */
   sendSetting<K extends keyof S & string>(key: K, value: SettingValue<S[K]>): void;
@@ -65,15 +81,18 @@ export interface SettingsPlatform<S extends SettingsSchema> {
   ): () => void;
 }
 
-export function createSettingsPlatform<S extends SettingsSchema>(schema: S): SettingsPlatform<S> {
+export function createSettingsPlatform<S extends SettingsSchema>(
+  schema: S,
+  ns?: string
+): SettingsPlatform<S> {
   void schema; // schema only pins the type parameter
   return {
     sendSetting(key, value) {
-      bridge()?.[setterName(key)]?.(value);
+      bridge()?.[bridgeSetterName(key, ns)]?.(value);
     },
     onSetting(key, callback) {
       return (
-        bridge()?.onTrayMenuChange?.(trayChannel(key), callback as (value: unknown) => void) ??
+        bridge()?.onTrayMenuChange?.(trayChannel(key, ns), callback as (value: unknown) => void) ??
         (() => {})
       );
     },

@@ -107,8 +107,19 @@ export function createExtensionConfig({ root, popupGlobalName }: ExtensionConfig
 }
 
 export function aliases(root: string): Record<string, string> {
+  // Apps live as siblings under the workspace root (PopKey/, PopJot/, PopSuite/,
+  // pop-shared/). Resolve every package's alias against that shared parent so the
+  // mapping is identical no matter which app is doing the building.
+  const apps = path.resolve(root, "..");
   return {
+    // "@" = the app currently being built. Shared code (pop-shared) uses it to
+    // reach into the consuming app's store/components (extension roots,
+    // animations). Each app's OWN source uses its namespaced alias below so it
+    // stays self-consistent even when another app (PopSuite) composes it.
     "@": path.resolve(root, "./src"),
-    "@shared": path.resolve(root, "../pop-shared/src"),
+    "@shared": path.resolve(apps, "pop-shared/src"),
+    "@keys": path.resolve(apps, "PopKey/src"),
+    "@jot": path.resolve(apps, "PopJot/src"),
+    "@suite": path.resolve(apps, "PopSuite/src"),
   };
 }

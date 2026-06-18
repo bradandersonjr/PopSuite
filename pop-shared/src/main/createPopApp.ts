@@ -25,10 +25,17 @@ import {
   Tray,
   nativeImage,
   ipcMain,
+  shell,
+  clipboard,
 } from "electron";
 import { join } from "path";
 import { existsSync } from "fs";
 import { registerSettingsIpc } from "../settings/main";
+import {
+  createLicenseController,
+  registerLicenseIpc,
+  type LicenseController,
+} from "./license";
 import type { SettingsSchema, SettingsValues, SettingValue } from "../settings/schema";
 
 export type ShortcutUpdateResult =
@@ -46,6 +53,20 @@ export interface PopAppContext<S extends SettingsSchema> {
   sendToRenderers(channel: string, value: unknown): void;
   /** Move the overlay window to cover the display the cursor is on. */
   moveOverlayToCursorDisplay(): void;
+  /**
+   * Pin/unpin the overlay's always-on-top state. Pass `false` to let the
+   * overlay sit in normal z-order (e.g. so OBS can capture it as its own
+   * window source rather than it being hard-layered over everything).
+   */
+  setOverlayAlwaysOnTop(onTop: boolean): void;
+  /**
+   * Reflect the app's active/idle state in the tray icon (swaps to the
+   * indicator-dot variant when active). No-ops if no active icon was shipped.
+   */
+  setTrayActive(active: boolean): void;
+  /** Whether a valid Pro license is active. False until `app` is ready, and
+   *  always false for apps that don't set `proProduct`. */
+  isPro(): boolean;
   /** Cursor position in the overlay window's coordinate space (DIPs). */
   getCursorDipPosition(): { x: number; y: number };
   openSettingsWindow(): void;
@@ -65,6 +86,25 @@ export interface PopAppOptions<S extends SettingsSchema> {
   /** One-line description shown under the version in the About box. */
   aboutDetail: string;
   settingsSchema: S;
+  /**
+   * Channel namespace for the primary schema (e.g. "keys"). Omit for a single
+   * app that owns the whole settings namespace. When set, the schema's IPC
+   * channels/bridge members are prefixed so several schemas can coexist in one
+   * process (see `extraSettings`).
+   */
+  namespace?: string;
+  /**
+   * Additional namespaced schemas to register and replay into windows — used by
+   * the combined PopSuite app to host the keys/jot module schemas alongside its
+   * own. Each is registered exactly like the primary schema but does not feed
+   * `ctx.settings`/`onSettingChange` (the composed modules own their renderer
+   * state). `onChange` side effects still fire in the main process.
+   */
+  extraSettings?: ReadonlyArray<{
+    schema: SettingsSchema;
+    namespace: string;
+    onChange?: Record<string, (value: never) => void>;
+  }>;
   /** Side effects to run when a specific setting changes. */
   onSettingChange?: { [K in keyof S]?: (value: SettingValue<S[K]>, ctx: PopAppContext<S>) => void };
   settingsWindow: {
@@ -75,10 +115,26 @@ export interface PopAppOptions<S extends SettingsSchema> {
     resizable?: boolean;
   };
   shortcuts: ReadonlyArray<PopShortcut<S>>;
+  /**
+   * Product id for the offline license layer, e.g. "popkey" / "popjot". When
+   * set, the license IPC is registered and `ctx.isPro()` reflects the active
+   * key. Omit for apps with no Pro tier.
+   */
+  proProduct?: string;
   tray?: {
     /** Label for the settings item, defaults to "Settings". */
     settingsLabel?: string;
     doubleClickOpensSettings?: boolean;
+  };
+  /**
+   * When provided, adds an Enable/Disable item to the tray right-click menu.
+   * `getEnabled` is called fresh each time the menu is built so the label is
+   * always current. `onToggle` is responsible for updating state AND calling
+   * `ctx.setTrayActive` to swap the icon.
+   */
+  trayToggle?: {
+    getEnabled: () => boolean;
+    onToggle: () => void;
   };
   /** What launching a second instance should do. Defaults to "focus-main". */
   secondInstance?: "focus-main" | "open-settings";
@@ -100,6 +156,12 @@ export function createPopApp<S extends SettingsSchema>(
   let mainWindow: BrowserWindow | null = null;
   let settingsWindow: BrowserWindow | null = null;
   let tray: Tray | null = null;
+  // Idle/active tray images. The active variant (with an indicator dot) is
+  // optional — apps that don't ship one fall back to the idle icon.
+  let trayIdleImage: Electron.NativeImage | null = null;
+  let trayActiveImage: Electron.NativeImage | null = null;
+  let trayActive = false;
+  let licenseController: LicenseController | null = null;
 
   const shortcutState: Record<string, string> = {};
   for (const sc of options.shortcuts) {
@@ -107,6 +169,13 @@ export function createPopApp<S extends SettingsSchema>(
   }
 
   function loadRendererWindow(win: BrowserWindow, query?: Record<string, string>): void {
+    // Never spawn an Electron window for links; hand http(s)/mailto to the OS
+    // browser and deny everything else.
+    win.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^(https?:|mailto:)/i.test(url)) void shell.openExternal(url);
+      return { action: "deny" };
+    });
+
     if (process.env.ELECTRON_RENDERER_URL) {
       const url = new URL(process.env.ELECTRON_RENDERER_URL);
       if (query) {
@@ -129,7 +198,20 @@ export function createPopApp<S extends SettingsSchema>(
   const settingsController = registerSettingsIpc(settingsSchema, {
     sendToRenderers,
     onChange: buildOnChange(),
+    namespace: options.namespace,
   });
+
+  // Extra namespaced schemas (combined app hosting module schemas). Registered
+  // for IPC + window replay; their values aren't surfaced on ctx.
+  const extraControllers = (options.extraSettings ?? []).map((extra) =>
+    registerSettingsIpc(extra.schema, {
+      sendToRenderers,
+      onChange: extra.onChange as
+        | { [K in keyof SettingsSchema]?: (value: SettingValue<SettingsSchema[K]>) => void }
+        | undefined,
+      namespace: extra.namespace,
+    })
+  );
 
   function buildOnChange():
     | { [K in keyof S]?: (value: SettingValue<S[K]>) => void }
@@ -145,6 +227,7 @@ export function createPopApp<S extends SettingsSchema>(
 
   function syncTraySettingsToWindow(win: BrowserWindow): void {
     settingsController.syncToWindow(win);
+    for (const controller of extraControllers) controller.syncToWindow(win);
     win.webContents.send("tray-open-at-login", app.getLoginItemSettings().openAtLogin);
     for (const name of Object.keys(shortcutState)) {
       win.webContents.send(`tray-set-${name}-shortcut`, shortcutState[name]);
@@ -159,6 +242,19 @@ export function createPopApp<S extends SettingsSchema>(
     const display = screen.getDisplayNearestPoint(cursor);
     const { x, y, width, height } = display.bounds;
     mainWindow.setBounds({ x, y, width, height });
+  }
+
+  // Overlay z-order level used when pinned on top. Kept as a constant so
+  // window creation and later re-pins stay in sync.
+  const OVERLAY_TOP_LEVEL = "screen-saver" as const;
+
+  function setOverlayAlwaysOnTop(onTop: boolean): void {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (onTop) {
+      mainWindow.setAlwaysOnTop(true, OVERLAY_TOP_LEVEL);
+    } else {
+      mainWindow.setAlwaysOnTop(false);
+    }
   }
 
   function getCursorDipPosition(): { x: number; y: number } {
@@ -195,7 +291,7 @@ export function createPopApp<S extends SettingsSchema>(
       },
     });
 
-    win.setAlwaysOnTop(true, "screen-saver");
+    win.setAlwaysOnTop(true, OVERLAY_TOP_LEVEL);
     // No { forward: true } — we don't need hover detection on the transparent window.
     // Forwarding keeps the window in the input pipeline and can intercept synthetic
     // right/middle-click events from tablet drivers (e.g. Huion stylus buttons).
@@ -216,10 +312,21 @@ export function createPopApp<S extends SettingsSchema>(
     return win;
   }
 
-  function trayIconPath(): string {
+  function trayIconPath(file = "tray-icon.png"): string {
     return app.isPackaged
-      ? join(process.resourcesPath, "tray-icon.png")
-      : join(__dirname, "../../assets/tray-icon.png");
+      ? join(process.resourcesPath, file)
+      : join(__dirname, `../../assets/${file}`);
+  }
+
+  /**
+   * Swap the tray icon between its idle and active (indicator-dot) variants.
+   * No-ops gracefully if the app didn't ship an active icon.
+   */
+  function setTrayActive(active: boolean): void {
+    trayActive = active;
+    if (!tray || tray.isDestroyed()) return;
+    const next = active && trayActiveImage ? trayActiveImage : trayIdleImage;
+    if (next) tray.setImage(next);
   }
 
   function createSettingsWindow(): BrowserWindow {
@@ -285,6 +392,9 @@ export function createPopApp<S extends SettingsSchema>(
     },
     sendToRenderers,
     moveOverlayToCursorDisplay,
+    setOverlayAlwaysOnTop,
+    setTrayActive,
+    isPro: () => licenseController?.isPro() ?? false,
     getCursorDipPosition,
     openSettingsWindow,
   };
@@ -294,6 +404,17 @@ export function createPopApp<S extends SettingsSchema>(
   ipcMain.on("quit-app", () => {
     app.quit();
   });
+
+  // Open a link in the user's default browser (not a new Electron window).
+  // Restricted to http/https/mailto so a renderer can't open arbitrary URIs.
+  ipcMain.on("open-external", (_event, url: unknown) => {
+    if (typeof url !== "string") return;
+    if (/^(https?:|mailto:)/i.test(url)) void shell.openExternal(url);
+  });
+
+  // Clipboard read lives in main: the sandboxed preload can't access the
+  // electron `clipboard` module. Used by the license field's Paste button.
+  ipcMain.handle("read-clipboard", () => clipboard.readText());
 
   ipcMain.on("close-window", () => {
     if (settingsWindow && !settingsWindow.isDestroyed()) {
@@ -392,20 +513,37 @@ export function createPopApp<S extends SettingsSchema>(
 
   function createTray(): void {
     const iconPath = trayIconPath();
-    const trayImage = existsSync(iconPath)
+    trayIdleImage = existsSync(iconPath)
       ? nativeImage.createFromPath(iconPath)
       : nativeImage.createEmpty();
 
-    tray = new Tray(trayImage);
+    const activePath = trayIconPath("tray-icon-active.png");
+    trayActiveImage = existsSync(activePath) ? nativeImage.createFromPath(activePath) : null;
+
+    tray = new Tray(trayActive && trayActiveImage ? trayActiveImage : trayIdleImage);
     tray.setToolTip(appName);
 
-    const buildTrayMenu = () =>
-      Menu.buildFromTemplate([
+    const buildTrayMenu = () => {
+      const sep: Electron.MenuItemConstructorOptions = { type: "separator" };
+      const toggleItem: Electron.MenuItemConstructorOptions[] = options.trayToggle
+        ? [
+            {
+              label: options.trayToggle.getEnabled()
+                ? `Disable ${appName}`
+                : `Enable ${appName}`,
+              click: () => options.trayToggle!.onToggle(),
+            },
+            sep,
+          ]
+        : [];
+
+      return Menu.buildFromTemplate([
         {
           label: appName,
           enabled: false,
         },
         { type: "separator" },
+        ...toggleItem,
         {
           label: options.tray?.settingsLabel ?? "Settings",
           click: () => openSettingsWindow(),
@@ -428,19 +566,30 @@ export function createPopApp<S extends SettingsSchema>(
           click: () => app.quit(),
         },
       ]);
+    };
 
     if (options.tray?.doubleClickOpensSettings) {
       tray.on("double-click", () => openSettingsWindow());
     }
+    // Build a fresh menu per click and pass it directly to popUpContextMenu.
+    // We intentionally never call setContextMenu — a persisted menu makes
+    // Windows auto-show the *previous* menu on right-click (stale by one click),
+    // so the Enable/Disable label would lag a step behind the real state.
     tray.on("right-click", () => {
-      tray?.setContextMenu(buildTrayMenu());
-      tray?.popUpContextMenu();
+      tray?.popUpContextMenu(buildTrayMenu());
     });
   }
 
   // ─── App lifecycle ───────────────────────────────────────────────────
 
   app.whenReady().then(() => {
+    if (options.proProduct) {
+      licenseController = createLicenseController(options.proProduct, (status) =>
+        sendToRenderers("license-changed", status)
+      );
+      registerLicenseIpc(licenseController, sendToRenderers);
+    }
+
     mainWindow = createWindow();
     createTray();
 

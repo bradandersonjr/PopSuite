@@ -13,6 +13,10 @@ export {
   SettingsColumns,
 } from "./primitives";
 export { SettingsWindowFrame, EmbeddedSettingsPanel } from "./SettingsWindowFrame";
+export { LicenseField } from "./LicenseField";
+export { SettingsImportExport } from "./SettingsImportExport";
+export { BrandingSettings } from "./BrandingSettings";
+export { ProSection } from "./ProSection";
 export { useOpenAtLogin, useShortcutRecorder } from "./hooks";
 // NOTE: dropdown primitives are intentionally not re-exported here — import
 // from "@shared/components/settings/dropdown" directly so apps that don't use
