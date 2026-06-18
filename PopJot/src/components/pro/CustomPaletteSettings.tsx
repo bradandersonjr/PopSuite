@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, Check, Shuffle, X } from "lucide-react";
 import { getSurfacePalette, PRO_ACCENT } from "@shared/config/desktopTheme";
-import { PALETTE_SEEDS } from "@jot/config/themes";
-import { useStore } from "@jot/store/useStore";
+import { PALETTE_SEEDS } from "@/config/themes";
+import { useStore } from "@/store/useStore";
 import {
   deleteProPreset,
   getProPalette,
@@ -15,7 +15,7 @@ import {
   getProEffect,
   setProEffect,
   type ProEffect,
-} from "@jot/pro";
+} from "@/pro";
 
 const DEFAULT_DRAW = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF"];
 const DEFAULT_HL = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00"];

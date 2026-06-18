@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import type { MenuStyle } from "@jot/store/useStore";
-import { useStore } from "@jot/store/useStore";
+import type { MenuStyle } from "@/store/useStore";
+import { useStore } from "@/store/useStore";
 import { getAnimationConfig } from "@shared/config/animations";
 import PaletteEffectOverlay from "@shared/components/PaletteEffectOverlay";
-import { withAlpha } from "@jot/lib/color";
+import { withAlpha } from "@/lib/color";
 
 // ─── Animation Constants ────────────────────────────────────────────
 

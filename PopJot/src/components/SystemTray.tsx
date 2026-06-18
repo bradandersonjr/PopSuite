@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { activateLicense, deactivateLicense } from "@shared/license/renderer";
-import CustomPaletteSettings from "@jot/components/pro/CustomPaletteSettings";
-import CenterCircleSettings from "@jot/components/pro/CenterCircleSettings";
+import CustomPaletteSettings from "@/components/pro/CustomPaletteSettings";
+import CenterCircleSettings from "@/components/pro/CenterCircleSettings";
 
 /** Ko-fi product page where buyers get a PopJot Pro key. */
 const POPJOT_PRO_URL = "https://ko-fi.com/s/264fd0031f";
@@ -25,7 +25,7 @@ import {
   sendThemeMode,
   setMainShortcut,
   setPersistentShortcut,
-} from "@jot/lib/platform";
+} from "@/lib/platform";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,11 +64,11 @@ import {
   TextColor,
   ThemeMode,
   useStore,
-} from "@jot/store/useStore";
-import { settingsSchema } from "@jot/config/settingsSchema";
-import { getEffectiveColors, getProPalette } from "@jot/pro";
+} from "@/store/useStore";
+import { settingsSchema } from "@/config/settingsSchema";
+import { getEffectiveColors, getProPalette } from "@/pro";
 import { getMenuColors, getSurfacePalette, PRO_ACCENT, type SurfacePalette } from "@shared/config/desktopTheme";
-import { getColors, getHighlighterGradientStops, PALETTE_NAMES } from "@jot/config/themes";
+import { getColors, getHighlighterGradientStops, PALETTE_NAMES } from "@/config/themes";
 import { isMac } from "@shared/lib/hotkeys";
 
 

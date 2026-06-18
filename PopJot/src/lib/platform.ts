@@ -10,7 +10,7 @@ import {
   setNamedShortcut,
   type ShortcutUpdateResult,
 } from "@shared/settings/renderer";
-import { settingsSchema, SETTINGS_NAMESPACE } from "@jot/config/settingsSchema";
+import { settingsSchema } from "@/config/settingsSchema";
 import type {
   ThemeMode,
   ColorPalette,
@@ -20,7 +20,7 @@ import type {
   GridSize,
   OverlayMode,
   TextColor,
-} from "@jot/store/useStore";
+} from "@/store/useStore";
 
 export {
   isDesktop,
@@ -34,7 +34,7 @@ export type { ShortcutUpdateResult };
 
 type Position = { x: number; y: number };
 
-const settings = createSettingsPlatform(settingsSchema, SETTINGS_NAMESPACE);
+const settings = createSettingsPlatform(settingsSchema);
 
 export const sendThemeMode = (mode: ThemeMode): void => settings.sendSetting("themeMode", mode);
 export const sendColorPalette = (palette: ColorPalette): void =>

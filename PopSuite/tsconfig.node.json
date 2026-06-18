@@ -1,4 +1,0 @@
-{
-  "extends": "../pop-shared/tsconfig/node.json",
-  "include": ["vite.config.mts", "vitest.config.ts", "electron.vite.config.ts", "../pop-shared/config"]
-}

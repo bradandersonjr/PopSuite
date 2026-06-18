@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useStore } from "@keys/store/useStore";
+import { useStore } from "@/store/useStore";
 
 describe("PopKey store actions", () => {
   beforeEach(() => {

@@ -1,12 +1,12 @@
 import { TooltipProvider } from "@shared/components/ui/tooltip";
-import { useStore } from "@jot/store/useStore";
+import { useStore } from "@/store/useStore";
 import { useScaleSync } from "@shared/hooks/useScaleSync";
-import EngineShell from "@jot/engine/EngineShell";
-import SystemTray from "@jot/components/SystemTray";
-import { isSettingsWindow } from "@jot/lib/platform";
+import EngineShell from "@/engine/EngineShell";
+import SystemTray from "@/components/SystemTray";
+import { isSettingsWindow } from "@/lib/platform";
 import { getSurfacePalette } from "@shared/config/desktopTheme";
-import { useTraySettingsSync } from "@jot/hooks/useTraySettingsSync";
-import { useLicenseSync } from "@jot/hooks/useLicenseSync";
+import { useTraySettingsSync } from "@/hooks/useTraySettingsSync";
+import { useLicenseSync } from "@/hooks/useLicenseSync";
 
 const DesktopRoot = () => {
   const settingsWindow = isSettingsWindow();

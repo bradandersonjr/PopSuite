@@ -4,21 +4,15 @@
   "workspaces": [
     "pop-shared",
     "PopJot",
-    "PopKey",
-    "PopSuite"
+    "PopKey"
   ],
   "scripts": {
     "dev": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run dev --prefix PopJot\" \"npm run dev --prefix PopKey\"",
-    "dev:electron": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run dev:electron --prefix PopJot\" \"npm run dev:electron --prefix PopKey\"",
     "dev:popjot": "npm run dev --prefix PopJot",
     "dev:popkey": "npm run dev --prefix PopKey",
-    "dev:popsuite": "npm run dev --prefix PopSuite",
-    "dev:electron:popsuite": "npm run dev:electron --prefix PopSuite",
     "build": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run build --prefix PopJot\" \"npm run build --prefix PopKey\"",
     "build:popjot": "npm run build --prefix PopJot",
     "build:popkey": "npm run build --prefix PopKey",
-    "build:popsuite": "npm run build --prefix PopSuite",
-    "typecheck:popsuite": "npm run typecheck --prefix PopSuite",
     "typecheck": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run typecheck --prefix PopJot\" \"npm run typecheck --prefix PopKey\"",
     "lint": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run lint --prefix PopJot\" \"npm run lint --prefix PopKey\"",
     "test": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run test --prefix PopJot\" \"npm run test --prefix PopKey\"",

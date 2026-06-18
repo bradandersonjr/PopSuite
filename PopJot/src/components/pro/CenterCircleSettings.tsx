@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImageIcon, Upload, Trash2 } from "lucide-react";
 import { getSurfacePalette, PRO_ACCENT } from "@shared/config/desktopTheme";
-import { useStore } from "@jot/store/useStore";
+import { useStore } from "@/store/useStore";
 import {
   clearProCenterIcon,
   getProCenterIcon,
   getProCenterScale,
   setProCenterIcon,
   setProCenterScale,
-} from "@jot/pro";
+} from "@/pro";
 
 const SCALE_PRESETS = [
   { label: "Small", value: 0.75 },

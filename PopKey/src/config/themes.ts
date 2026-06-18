@@ -1,4 +1,4 @@
-import type { ColorPalette } from "@keys/store/useStore";
+import type { ColorPalette } from "@/store/useStore";
 
 /** Badge color palettes — 6 accent colors per palette for styling key badges */
 export const BADGE_COLORS_MUTED: [string, string, string, string, string, string] = [

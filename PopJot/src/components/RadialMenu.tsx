@@ -1,15 +1,15 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Bolt, History, Pen, PenLine, Highlighter, Eraser, TvMinimal, Circle, Moon, Sun, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useStore, Tool, StrokeType, BackgroundMode, MenuStyle, ColorPalette, DRAWING_TOOLS } from "@jot/store/useStore";
+import { useStore, Tool, StrokeType, BackgroundMode, MenuStyle, ColorPalette, DRAWING_TOOLS } from "@/store/useStore";
 import { normalizeKey, isHotkeyPressed, isMac } from "@shared/lib/hotkeys";
-import { isDesktop, onShortcutActivate, onShortcutPersistent, overlayActivated, overlayDeactivated } from "@jot/lib/platform";
-import { getGradientVariantStops, getHighlighterGradientStops } from "@jot/config/themes";
+import { isDesktop, onShortcutActivate, onShortcutPersistent, overlayActivated, overlayDeactivated } from "@/lib/platform";
+import { getGradientVariantStops, getHighlighterGradientStops } from "@/config/themes";
 import { getAnimationConfig } from "@shared/config/animations";
-import { getProCenterIcon, getProCenterScale, getEffectiveColors, getProPalette } from "@jot/pro";
+import { getProCenterIcon, getProCenterScale, getEffectiveColors, getProPalette } from "@/pro";
 import RadialButton from "./RadialButton";
 import PaletteEffectOverlay from "@shared/components/PaletteEffectOverlay";
-import { withAlpha } from "@jot/lib/color";
+import { withAlpha } from "@/lib/color";
 
 const BASE_SCREEN_ITEMS = [
   { icon: X, bg: "transparent" as const, color: undefined },

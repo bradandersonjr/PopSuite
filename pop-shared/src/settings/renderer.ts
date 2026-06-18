@@ -7,7 +7,7 @@
 import {
   type SettingsSchema,
   type SettingValue,
-  bridgeSetterName,
+  setterName,
   trayChannel,
 } from "./schema";
 
@@ -81,18 +81,15 @@ export interface SettingsPlatform<S extends SettingsSchema> {
   ): () => void;
 }
 
-export function createSettingsPlatform<S extends SettingsSchema>(
-  schema: S,
-  ns?: string
-): SettingsPlatform<S> {
+export function createSettingsPlatform<S extends SettingsSchema>(schema: S): SettingsPlatform<S> {
   void schema; // schema only pins the type parameter
   return {
     sendSetting(key, value) {
-      bridge()?.[bridgeSetterName(key, ns)]?.(value);
+      bridge()?.[setterName(key)]?.(value);
     },
     onSetting(key, callback) {
       return (
-        bridge()?.onTrayMenuChange?.(trayChannel(key, ns), callback as (value: unknown) => void) ??
+        bridge()?.onTrayMenuChange?.(trayChannel(key), callback as (value: unknown) => void) ??
         (() => {})
       );
     },

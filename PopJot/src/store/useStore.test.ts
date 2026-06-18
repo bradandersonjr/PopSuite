@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useStore } from "@jot/store/useStore";
+import { useStore } from "@/store/useStore";
 
 describe("PopJot store actions", () => {
   beforeEach(() => {

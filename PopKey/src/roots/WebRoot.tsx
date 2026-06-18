@@ -4,16 +4,16 @@ import {
   MousePointer2, Keyboard, Monitor, Code2, TvMinimal, MessageSquare,
   GraduationCap, Mouse, Settings,
 } from "lucide-react";
-import { useStore } from "@keys/store/useStore";
-import { getBadgeColors } from "@keys/config/themes";
+import { useStore } from "@/store/useStore";
+import { getBadgeColors } from "@/config/themes";
 import { useScaleSync } from "@shared/hooks/useScaleSync";
 import {
   LandingPage,
   type LandingContent,
   type LandingTheme,
 } from "@shared/components/landing/LandingPage";
-import EngineShell from "@keys/engine/EngineShell";
-import SystemTray from "@keys/components/SystemTray";
+import EngineShell from "@/engine/EngineShell";
+import SystemTray from "@/components/SystemTray";
 
 // ─── Store URLs here — swap in real links when ready ────────────────────────
 const CHROME_STORE_URL: string | null = null;     // e.g. "https://chrome.google.com/webstore/detail/..."

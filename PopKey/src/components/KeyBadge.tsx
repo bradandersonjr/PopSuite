@@ -6,13 +6,13 @@ import {
   ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight,
   type LucideIcon,
 } from "lucide-react";
-import { useStore } from "@keys/store/useStore";
+import { useStore } from "@/store/useStore";
 import { getAnimationConfig } from "@shared/config/animations";
 import PaletteEffectOverlay from "@shared/components/PaletteEffectOverlay";
-import type { BadgeType } from "@keys/hooks/useInputCapture";
-import { getBadgeGradientStops } from "@keys/config/themes";
-import { fontStackFor } from "@keys/config/fonts";
-import { getBadgeMotion } from "@keys/config/badgeAnimations";
+import type { BadgeType } from "@/hooks/useInputCapture";
+import { getBadgeGradientStops } from "@/config/themes";
+import { fontStackFor } from "@/config/fonts";
+import { getBadgeMotion } from "@/config/badgeAnimations";
 
 function withAlpha(color: string, alpha: number): string {
   const clamped = Math.max(0, Math.min(1, alpha));

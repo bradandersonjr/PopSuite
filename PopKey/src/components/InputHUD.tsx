@@ -1,8 +1,8 @@
 import { AnimatePresence } from "framer-motion";
-import { useStore } from "@keys/store/useStore";
-import { resolvePaletteColors } from "@keys/config/themes";
+import { useStore } from "@/store/useStore";
+import { resolvePaletteColors } from "@/config/themes";
 import KeyBadge from "./KeyBadge";
-import type { Badge } from "@keys/hooks/useInputCapture";
+import type { Badge } from "@/hooks/useInputCapture";
 
 interface InputHUDProps {
   badges: Badge[];

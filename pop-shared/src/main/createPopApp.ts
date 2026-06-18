@@ -46,9 +46,6 @@ export interface PopAppContext<S extends SettingsSchema> {
   /** Live main-process settings state. */
   settings: SettingsValues<S>;
   getMainWindow(): BrowserWindow | null;
-  /** Get an overlay window by name (e.g. "main", or "keys"/"jot" in the
-   *  combined app). Returns the primary overlay's name "main" by default. */
-  getOverlay(name: string): BrowserWindow | null;
   getSettingsWindow(): BrowserWindow | null;
   /** Send to the overlay window only. */
   sendToMainWindow(channel: string, ...args: unknown[]): void;
@@ -89,25 +86,6 @@ export interface PopAppOptions<S extends SettingsSchema> {
   /** One-line description shown under the version in the About box. */
   aboutDetail: string;
   settingsSchema: S;
-  /**
-   * Channel namespace for the primary schema (e.g. "keys"). Omit for a single
-   * app that owns the whole settings namespace. When set, the schema's IPC
-   * channels/bridge members are prefixed so several schemas can coexist in one
-   * process (see `extraSettings`).
-   */
-  namespace?: string;
-  /**
-   * Additional namespaced schemas to register and replay into windows — used by
-   * the combined PopSuite app to host the keys/jot module schemas alongside its
-   * own. Each is registered exactly like the primary schema but does not feed
-   * `ctx.settings`/`onSettingChange` (the composed modules own their renderer
-   * state). `onChange` side effects still fire in the main process.
-   */
-  extraSettings?: ReadonlyArray<{
-    schema: SettingsSchema;
-    namespace: string;
-    onChange?: Record<string, (value: never) => void>;
-  }>;
   /** Side effects to run when a specific setting changes. */
   onSettingChange?: { [K in keyof S]?: (value: SettingValue<S[K]>, ctx: PopAppContext<S>) => void };
   settingsWindow: {
@@ -117,14 +95,6 @@ export interface PopAppOptions<S extends SettingsSchema> {
     minHeight?: number;
     resizable?: boolean;
   };
-  /**
-   * Overlay windows to create. Defaults to a single overlay named "main". The
-   * combined app passes one per module (the first is the primary returned by
-   * `getMainWindow`, e.g. the interactive jot overlay, plus a click-through keys
-   * overlay). Each window loads the renderer with its `query` so the renderer
-   * can pick which module to mount.
-   */
-  overlays?: ReadonlyArray<{ name: string; query?: Record<string, string> }>;
   shortcuts: ReadonlyArray<PopShortcut<S>>;
   /**
    * Product id for the offline license layer, e.g. "popkey" / "popjot". When
@@ -166,10 +136,6 @@ export function createPopApp<S extends SettingsSchema>(
 
   let mainWindow: BrowserWindow | null = null;
   let settingsWindow: BrowserWindow | null = null;
-  // All overlay windows by name. Single-overlay apps have just "main"; the
-  // combined app has one per module (e.g. "jot" primary + "keys"). mainWindow
-  // always points at the primary (first) overlay for back-compat.
-  const overlayWindows = new Map<string, BrowserWindow>();
   let tray: Tray | null = null;
   // Idle/active tray images. The active variant (with an indicator dot) is
   // optional — apps that don't ship one fall back to the idle icon.
@@ -204,9 +170,7 @@ export function createPopApp<S extends SettingsSchema>(
   }
 
   function sendToRenderers(channel: string, value: unknown): void {
-    for (const win of overlayWindows.values()) {
-      if (!win.isDestroyed()) win.webContents.send(channel, value);
-    }
+    mainWindow?.webContents.send(channel, value);
     settingsWindow?.webContents.send(channel, value);
   }
 
@@ -215,20 +179,7 @@ export function createPopApp<S extends SettingsSchema>(
   const settingsController = registerSettingsIpc(settingsSchema, {
     sendToRenderers,
     onChange: buildOnChange(),
-    namespace: options.namespace,
   });
-
-  // Extra namespaced schemas (combined app hosting module schemas). Registered
-  // for IPC + window replay; their values aren't surfaced on ctx.
-  const extraControllers = (options.extraSettings ?? []).map((extra) =>
-    registerSettingsIpc(extra.schema, {
-      sendToRenderers,
-      onChange: extra.onChange as
-        | { [K in keyof SettingsSchema]?: (value: SettingValue<SettingsSchema[K]>) => void }
-        | undefined,
-      namespace: extra.namespace,
-    })
-  );
 
   function buildOnChange():
     | { [K in keyof S]?: (value: SettingValue<S[K]>) => void }
@@ -244,7 +195,6 @@ export function createPopApp<S extends SettingsSchema>(
 
   function syncTraySettingsToWindow(win: BrowserWindow): void {
     settingsController.syncToWindow(win);
-    for (const controller of extraControllers) controller.syncToWindow(win);
     win.webContents.send("tray-open-at-login", app.getLoginItemSettings().openAtLogin);
     for (const name of Object.keys(shortcutState)) {
       win.webContents.send(`tray-set-${name}-shortcut`, shortcutState[name]);
@@ -285,7 +235,7 @@ export function createPopApp<S extends SettingsSchema>(
 
   // ─── Window creation ─────────────────────────────────────────────────
 
-  function createWindow(name = "main", query?: Record<string, string>): BrowserWindow {
+  function createWindow(): BrowserWindow {
     const display = screen.getPrimaryDisplay();
     const { x, y, width, height } = display.bounds;
 
@@ -314,7 +264,7 @@ export function createPopApp<S extends SettingsSchema>(
     // right/middle-click events from tablet drivers (e.g. Huion stylus buttons).
     win.setIgnoreMouseEvents(true);
 
-    loadRendererWindow(win, query);
+    loadRendererWindow(win);
 
     win.once("ready-to-show", () => {
       // Force full-display bounds after show to override OS working-area constraints
@@ -323,11 +273,9 @@ export function createPopApp<S extends SettingsSchema>(
     });
 
     win.on("closed", () => {
-      overlayWindows.delete(name);
-      if (mainWindow === win) mainWindow = null;
+      mainWindow = null;
     });
 
-    overlayWindows.set(name, win);
     return win;
   }
 
@@ -403,7 +351,6 @@ export function createPopApp<S extends SettingsSchema>(
   const ctx: PopAppContext<S> = {
     settings: settingsController.values,
     getMainWindow: () => mainWindow,
-    getOverlay: (name) => overlayWindows.get(name) ?? null,
     getSettingsWindow: () => settingsWindow,
     sendToMainWindow: (channel, ...args) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -610,12 +557,7 @@ export function createPopApp<S extends SettingsSchema>(
       registerLicenseIpc(licenseController, sendToRenderers);
     }
 
-    const overlaySpecs = options.overlays ?? [{ name: "main" }];
-    overlaySpecs.forEach((spec, i) => {
-      const win = createWindow(spec.name, spec.query);
-      // The first overlay is the primary one (getMainWindow, cursor helpers).
-      if (i === 0) mainWindow = win;
-    });
+    mainWindow = createWindow();
     createTray();
 
     const shortcutRegistration = registerShortcutHandlers(shortcutState);
@@ -631,14 +573,10 @@ export function createPopApp<S extends SettingsSchema>(
     if (process.platform !== "darwin") app.quit();
   });
 
-  // macOS: re-create overlay windows when the dock icon is clicked and none are open.
+  // macOS: re-create the overlay window when the dock icon is clicked and no windows are open.
   app.on("activate", () => {
-    if (overlayWindows.size === 0) {
-      const overlaySpecs = options.overlays ?? [{ name: "main" }];
-      overlaySpecs.forEach((spec, i) => {
-        const win = createWindow(spec.name, spec.query);
-        if (i === 0) mainWindow = win;
-      });
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      mainWindow = createWindow();
     }
   });
 

@@ -1,6 +1,6 @@
 import type { SettingsSetters } from "@shared/settings/schema";
 import type { LicenseStatus } from "@shared/license/types";
-import type { settingsSchema } from "@jot/config/settingsSchema";
+import type { settingsSchema } from "@/config/settingsSchema";
 
 type Position = { x: number; y: number };
 type ShortcutUpdateResult =

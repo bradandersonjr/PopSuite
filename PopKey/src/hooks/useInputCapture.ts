@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useStore } from "@keys/store/useStore";
+import { useStore } from "@/store/useStore";
 import {
   isDesktop,
   onInputKeyDown,
@@ -10,8 +10,8 @@ import {
   onInputDragMove,
   onInputFocusLost,
   onShortcutToggle,
-} from "@keys/lib/platform";
-import type { KeyEvent, ClickEvent, WheelEventData } from "@keys/lib/platform";
+} from "@/lib/platform";
+import type { KeyEvent, ClickEvent, WheelEventData } from "@/lib/platform";
 
 export type BadgeType = "key" | "combo" | "click" | "scroll" | "drag";
 

@@ -32,7 +32,7 @@ import {
   sendShowScrollWheel,
   sendThemeMode,
   setMainShortcut,
-} from "@keys/lib/platform";
+} from "@/lib/platform";
 import {
   type Option,
   OptionGrid,
@@ -50,9 +50,9 @@ import {
   useOpenAtLogin,
   useShortcutRecorder,
 } from "@shared/components/settings";
-import { settingsSchema } from "@keys/config/settingsSchema";
-import { BADGE_FONTS, fontStackFor } from "@keys/config/fonts";
-import { BADGE_ANIMATIONS } from "@keys/config/badgeAnimations";
+import { settingsSchema } from "@/config/settingsSchema";
+import { BADGE_FONTS, fontStackFor } from "@/config/fonts";
+import { BADGE_ANIMATIONS } from "@/config/badgeAnimations";
 import { activateLicense, deactivateLicense } from "@shared/license/renderer";
 import { LogOut, Lock, Settings } from "lucide-react";
 import {
@@ -66,15 +66,15 @@ import {
   DisplayPosition,
   ThemeMode,
   useStore,
-} from "@keys/store/useStore";
+} from "@/store/useStore";
 import { getMenuColors, getSurfacePalette, type SurfacePalette } from "@shared/config/desktopTheme";
-import { getBadgeColors, getBadgeGradientStops, PALETTE_NAMES, isProPalette, resolvePaletteColors } from "@keys/config/themes";
-import BrandingSettings from "@keys/components/BrandingSettings";
+import { getBadgeColors, getBadgeGradientStops, PALETTE_NAMES, isProPalette, resolvePaletteColors } from "@/config/themes";
+import BrandingSettings from "@/components/BrandingSettings";
 
 /** Ko-fi product page where buyers get a PopKey Pro key. */
 const POPKEY_PRO_URL = "https://ko-fi.com/s/264fd0031f";
 import { isMac } from "@shared/lib/hotkeys";
-import { useTraySettingsSync } from "@keys/hooks/useTraySettingsSync";
+import { useTraySettingsSync } from "@/hooks/useTraySettingsSync";
 
 // ─── Custom Color Mixer Helpers ──────────────────────────────────────
 

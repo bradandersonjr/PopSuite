@@ -1,6 +1,6 @@
-import { useStore } from "@keys/store/useStore";
+import { useStore } from "@/store/useStore";
 import { BrandingOverlay as SharedBrandingOverlay } from "@shared/components/BrandingOverlay";
-import { blockedBrandingCorner } from "@keys/lib/branding";
+import { blockedBrandingCorner } from "@/lib/branding";
 
 /** PopKey branding overlay — keystroke badges block their own corner. */
 const BrandingOverlay = () => {

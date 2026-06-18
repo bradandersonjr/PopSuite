@@ -1,8 +1,8 @@
-import { useStore } from "@keys/store/useStore";
-import type { BrandingCorner } from "@keys/store/useStore";
+import { useStore } from "@/store/useStore";
+import type { BrandingCorner } from "@/store/useStore";
 import { BrandingSettings as SharedBrandingSettings } from "@shared/components/settings";
 import { getSurfacePalette } from "@shared/config/desktopTheme";
-import { blockedBrandingCorner } from "@keys/lib/branding";
+import { blockedBrandingCorner } from "@/lib/branding";
 import {
   sendBrandingEnabled,
   sendBrandingImage,
@@ -10,7 +10,7 @@ import {
   sendBrandingSize,
   sendBrandingOpacity,
   sendBrandingRadius,
-} from "@keys/lib/platform";
+} from "@/lib/platform";
 
 const BrandingSettings = () => {
   const s = useStore();

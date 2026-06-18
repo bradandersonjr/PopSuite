@@ -1,6 +1,6 @@
-import { useStore } from "@keys/store/useStore";
-import { getBadgeGradientStops, resolvePaletteColors } from "@keys/config/themes";
-import { fontStackFor } from "@keys/config/fonts";
+import { useStore } from "@/store/useStore";
+import { getBadgeGradientStops, resolvePaletteColors } from "@/config/themes";
+import { fontStackFor } from "@/config/fonts";
 
 function withAlpha(color: string, alpha: number): string {
   const clamped = Math.max(0, Math.min(1, alpha));

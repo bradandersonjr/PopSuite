@@ -3,9 +3,9 @@ import {
   MousePointer2, Palette, Keyboard, Bolt, Pen, Monitor, Code2, TvMinimal,
   MessageSquare, GraduationCap,
 } from "lucide-react";
-import { useStore } from "@jot/store/useStore";
-import type { MenuStyle } from "@jot/store/useStore";
-import { getColors, getGradientVariantStops } from "@jot/config/themes";
+import { useStore } from "@/store/useStore";
+import type { MenuStyle } from "@/store/useStore";
+import { getColors, getGradientVariantStops } from "@/config/themes";
 import { useScaleSync } from "@shared/hooks/useScaleSync";
 import {
   LandingPage,
@@ -13,8 +13,8 @@ import {
   type LandingTheme,
 } from "@shared/components/landing/LandingPage";
 import { Kbd, HotkeyBadge } from "@shared/components/landing/Kbd";
-import EngineShell from "@jot/engine/EngineShell";
-import SystemTray from "@jot/components/SystemTray";
+import EngineShell from "@/engine/EngineShell";
+import SystemTray from "@/components/SystemTray";
 
 // ─── Store URLs here — swap in real links when ready ────────────────────────
 const CHROME_STORE_URL: string | null = null;     // e.g. "https://chrome.google.com/webstore/detail/..."

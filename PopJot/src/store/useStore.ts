@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { isMac } from "@shared/lib/hotkeys";
 import type { SettingValue } from "@shared/settings/schema";
 import { createSettingsSlice, type SettingsState } from "@shared/settings/store";
-import { settingsSchema } from "@jot/config/settingsSchema";
+import { settingsSchema } from "@/config/settingsSchema";
 
 // Settings types derive from the schema — single source of truth.
 export type MenuStyle = SettingValue<(typeof settingsSchema)["menuStyle"]>;

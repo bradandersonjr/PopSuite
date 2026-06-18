@@ -1,4 +1,4 @@
-import type { BadgeFont } from "@keys/store/useStore";
+import type { BadgeFont } from "@/store/useStore";
 
 /** Pro badge fonts — system font stacks (nothing bundled). */
 export const BADGE_FONTS: { key: BadgeFont; label: string }[] = [

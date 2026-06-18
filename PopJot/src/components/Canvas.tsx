@@ -1,20 +1,20 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { getStroke } from "perfect-freehand";
-import { useStore } from "@jot/store/useStore";
+import { useStore } from "@/store/useStore";
 import {
     ALL_DRAW_PALETTES,
     ALL_HL_PALETTES,
     DRAW_COLORS_GRADIENT,
     getGradientVariantStops,
     getHighlighterGradientStops,
-} from "@jot/config/themes";
-import { getEffectiveColors, getProPalette, getProEffect } from "@jot/pro";
+} from "@/config/themes";
+import { getEffectiveColors, getProPalette, getProEffect } from "@/pro";
 import { CANVAS_BG } from "@shared/config/desktopTheme";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-export type { StrokeType } from "@jot/store/useStore";
-import type { StrokeType } from "@jot/store/useStore";
+export type { StrokeType } from "@/store/useStore";
+import type { StrokeType } from "@/store/useStore";
 
 export type Stroke = {
     id: string;

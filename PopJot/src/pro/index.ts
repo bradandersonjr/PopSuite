@@ -13,8 +13,8 @@
  * with the private implementation so both builds typecheck against it.
  */
 
-import { getColors } from "@jot/config/themes";
-import type { ColorPalette } from "@jot/store/useStore";
+import { getColors } from "@/config/themes";
+import type { ColorPalette } from "@/store/useStore";
 
 /**
  * License gate. The real (private) build flips this via `setProLicensed` when a

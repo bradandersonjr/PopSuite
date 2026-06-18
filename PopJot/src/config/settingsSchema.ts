@@ -1,14 +1,6 @@
 import { setting } from "@shared/settings/schema";
 
 /**
- * Channel namespace for the jot module. Prefixes every settings IPC channel
- * and preload bridge member (e.g. set-jot-menu-style / setJotMenuStyle) so
- * PopJot coexists with PopKey inside the combined PopSuite process. Used
- * identically in standalone PopJot — the prefix is purely internal.
- */
-export const SETTINGS_NAMESPACE = "jot";
-
-/**
  * PopJot's tray-adjustable settings — the single source of truth for
  * defaults, allowed values, IPC channel names, preload bridge setters,
  * and the store slice. Add a setting here and every layer picks it up.

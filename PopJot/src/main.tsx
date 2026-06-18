@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
-import WebRoot from "@jot/roots/WebRoot";
-import DesktopRoot from "@jot/roots/DesktopRoot";
+import WebRoot from "@/roots/WebRoot";
+import DesktopRoot from "@/roots/DesktopRoot";
 import DocsRoot from "@shared/roots/DocsRoot";
 import PrivacyRoot from "@shared/roots/PrivacyRoot";
 import TermsRoot from "@shared/roots/TermsRoot";

@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useStore } from "@keys/store/useStore";
-import { getBadgeColors } from "@keys/config/themes";
-import type { ClickRipple } from "@keys/hooks/useInputCapture";
+import { useStore } from "@/store/useStore";
+import { getBadgeColors } from "@/config/themes";
+import type { ClickRipple } from "@/hooks/useInputCapture";
 
 interface MouseRippleProps {
   clicks: ClickRipple[];
