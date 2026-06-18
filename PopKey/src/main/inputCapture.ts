@@ -89,6 +89,15 @@ function isModifier(keycode: number): boolean {
   return MODIFIER_KEYS.has(rawName);
 }
 
+// When paused, every hook callback returns immediately. The global hook stays
+// installed (so resume is instant) but does no work, keeping it from adding
+// latency to the system mouse pipeline. PopSuite pauses this while a PopJot
+// annotation session owns the overlay; standalone PopKey never pauses.
+let capturePaused = false;
+export function setInputCapturePaused(paused: boolean): void {
+  capturePaused = paused;
+}
+
 const DRAG_THRESHOLD = 8; // pixels — below this is a click, above is a drag
 
 // Map dx/dy to one of 8 sectors (0–7) for direction-change dedup
@@ -104,6 +113,7 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
   const lastDragSector: Record<number, number> = {}; // last emitted direction sector per button
 
   uIOhook.on("mousedown", (e) => {
+    if (capturePaused) return;
     const button = Number(e.button); // uiohook-napi types button as unknown
     downPos[button] = { x: e.x, y: e.y };
     wasDrag.delete(button);
@@ -112,6 +122,7 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
   });
 
   uIOhook.on("mousemove", (e) => {
+    if (capturePaused) return;
     for (const [btn, down] of Object.entries(downPos)) {
       const button = Number(btn);
       const dx = e.x - down.x;
@@ -156,6 +167,7 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
   });
 
   uIOhook.on("mouseup", (e) => {
+    if (capturePaused) return;
     const button = Number(e.button);
     delete downPos[button];
     delete lastDragSector[button];
@@ -166,6 +178,7 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
   const WIN_KEYCODES = new Set<number>([UiohookKey.Meta, UiohookKey.MetaRight]);
 
   uIOhook.on("keydown", (e) => {
+    if (capturePaused) return;
     const key = getKeyName(e.keycode);
     const modifier = isModifier(e.keycode);
     for (const win of getWindows()) {
@@ -190,6 +203,7 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
   });
 
   uIOhook.on("keyup", (e) => {
+    if (capturePaused) return;
     const key = getKeyName(e.keycode);
     const modifier = isModifier(e.keycode);
     for (const win of getWindows()) {
@@ -205,6 +219,7 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
   });
 
   uIOhook.on("click", (e) => {
+    if (capturePaused) return;
     const button = Number(e.button);
     if (wasDrag.has(button)) {
       wasDrag.delete(button);
@@ -227,6 +242,7 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
   });
 
   uIOhook.on("wheel", (e) => {
+    if (capturePaused) return;
     for (const win of getWindows()) {
       if (!win.isDestroyed()) {
         win.webContents.send("input:wheel", {

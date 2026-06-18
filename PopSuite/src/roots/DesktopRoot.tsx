@@ -1,9 +1,10 @@
 import { TooltipProvider } from "@shared/components/ui/tooltip";
 import { useScaleSync } from "@shared/hooks/useScaleSync";
+import { useTraySettingsSync as useSchemaTraySync } from "@shared/hooks/useTraySettingsSync";
 import { getSurfacePalette } from "@shared/config/desktopTheme";
 
+import { settingsSchema as suiteSchema } from "@suite/config/settingsSchema";
 import { useStore as useSuiteStore } from "@suite/store/useStore";
-import { isSettingsWindow } from "@suite/lib/platform";
 
 // keys module — composed unchanged via its namespaced aliases.
 import KeysEngineShell from "@keys/engine/EngineShell";
@@ -18,53 +19,76 @@ import { useTraySettingsSync as useJotTraySync } from "@jot/hooks/useTraySetting
 import { useLicenseSync as useJotLicenseSync } from "@jot/hooks/useLicenseSync";
 
 /**
- * Single overlay window hosting both module layers. The keys HUD is always
- * click-through; the jot layer toggles click-through on activation (handled in
- * the main process via overlay-activated/-deactivated). Each module keeps its
- * own store, synced from its namespaced tray broadcasts.
+ * PopSuite runs ONE process but a SEPARATE overlay window per module, so each
+ * keeps the exact input/cursor behavior it has standalone (no shared-window
+ * coordination). The window's `?module=` query decides which module mounts;
+ * `?settings=1` is the shared settings window. Each sub-root calls only its own
+ * sync hooks so windows stay isolated.
  */
-const DesktopRoot = () => {
-  const settingsWindow = isSettingsWindow();
-  const { themeMode, keysEnabled, jotEnabled } = useSuiteStore();
 
-  // Per-monitor scale is derived locally per store (each module's components
-  // read their own scaleFactor).
-  const setKeysScale = useKeysStore((s) => s.setScaleFactor);
-  const setJotScale = useJotStore((s) => s.setScaleFactor);
-  useScaleSync(setKeysScale, !settingsWindow);
-  useScaleSync(setJotScale, !settingsWindow);
+const KeysOverlay = () => {
+  const themeMode = useKeysStore((s) => s.themeMode);
+  const setScale = useKeysStore((s) => s.setScaleFactor);
+  useScaleSync(setScale, true);
+  useKeysTraySync();
+  useKeysLicenseSync();
+  return (
+    <div className={`h-screen w-screen overflow-hidden bg-transparent theme-${themeMode}`}>
+      <KeysEngineShell />
+    </div>
+  );
+};
 
-  // Apply each module's namespaced tray-settings + license broadcasts.
+const JotOverlay = () => {
+  const themeMode = useJotStore((s) => s.themeMode);
+  const setScale = useJotStore((s) => s.setScaleFactor);
+  useScaleSync(setScale, true);
+  useJotTraySync();
+  useJotLicenseSync();
+  return (
+    <div className={`h-screen w-screen overflow-hidden bg-transparent theme-${themeMode}`}>
+      <JotEngineShell />
+    </div>
+  );
+};
+
+const SuiteSettings = () => {
+  const themeMode = useSuiteStore((s) => s.themeMode);
+  // The settings window hosts both modules' controls, so it syncs all three
+  // stores (suite chrome + both module previews).
+  useSchemaTraySync(suiteSchema, useSuiteStore);
   useKeysTraySync();
   useJotTraySync();
   useKeysLicenseSync();
   useJotLicenseSync();
 
-  if (settingsWindow) {
-    const surface = getSurfacePalette(themeMode === "dark");
-    return (
-      <TooltipProvider>
-        <div
-          className={`h-screen w-screen overflow-hidden theme-${themeMode}`}
-          style={{ backgroundColor: surface.panel }}
-        >
-          {/* Phase 4: tabbed Keystrokes / Annotation / General settings. */}
-          <div style={{ color: "#9ca3af", padding: 24, fontFamily: "system-ui" }}>
-            PopSuite settings — coming soon
-          </div>
-        </div>
-      </TooltipProvider>
-    );
+  const surface = getSurfacePalette(themeMode === "dark");
+  return (
+    <div
+      className={`h-screen w-screen overflow-hidden theme-${themeMode}`}
+      style={{ backgroundColor: surface.panel }}
+    >
+      {/* Phase 4: tabbed Keystrokes / Annotation / General settings. */}
+      <div style={{ color: "#9ca3af", padding: 24, fontFamily: "system-ui" }}>
+        PopSuite settings — coming soon
+      </div>
+    </div>
+  );
+};
+
+const DesktopRoot = () => {
+  const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+
+  let body: JSX.Element | null = null;
+  if (params?.get("settings") === "1") {
+    body = <SuiteSettings />;
+  } else if (params?.get("module") === "keys") {
+    body = <KeysOverlay />;
+  } else if (params?.get("module") === "jot") {
+    body = <JotOverlay />;
   }
 
-  return (
-    <TooltipProvider>
-      <div className={`h-screen w-screen overflow-hidden bg-transparent theme-${themeMode}`}>
-        {keysEnabled && <KeysEngineShell />}
-        {jotEnabled && <JotEngineShell />}
-      </div>
-    </TooltipProvider>
-  );
+  return <TooltipProvider>{body}</TooltipProvider>;
 };
 
 export default DesktopRoot;
