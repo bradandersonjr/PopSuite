@@ -11,7 +11,7 @@
 import { ipcMain } from "electron";
 import type { SettingsSchema, SettingsValues } from "../settings/schema";
 import { isValidSettingValue, trayChannel } from "../settings/schema";
-import { syncableKeysFor } from "../settings/syncable";
+import { syncableKeysFor, localKeyForSyncable } from "../settings/syncable";
 import {
   ensureSettingsDir,
   loadAppSettings,
@@ -46,12 +46,22 @@ export function createSettingsSync<S extends SettingsSchema>(
   ensureSettingsDir();
 
   const syncable = syncableKeysFor(schema);
-  const syncableKeys = new Set(syncable.map((d) => d.key));
+  // Map the shared identifier (def.key — used in shared.json + Sync-tab toggles)
+  // to this app's local schema key, e.g. shared "style" ↔ local "badgeStyle"
+  // (PopKey) or "menuStyle" (PopJot). Same name for keys without an alias.
+  const localKeyByShared = new Map<string, string>();
+  const sharedKeyByLocal = new Map<string, string>();
+  for (const def of syncable) {
+    const local = localKeyForSyncable(def, schema as Record<string, unknown>);
+    if (!local) continue;
+    localKeyByShared.set(def.key, local);
+    sharedKeyByLocal.set(local, def.key);
+  }
   const nonVolatileKeys = (Object.keys(schema) as Array<keyof S & string>).filter(
     (k) => !schema[k].volatile
   );
 
-  // Live sync prefs for this app's syncable keys (default opt-out).
+  // Live sync prefs, keyed by the shared identifier (default opt-out).
   const prefs: Record<string, boolean> = {};
   for (const def of syncable) prefs[def.key] = false;
 
@@ -66,10 +76,11 @@ export function createSettingsSync<S extends SettingsSchema>(
   }
   const shared = loadSharedSync();
   for (const def of syncable) {
+    const localKey = localKeyByShared.get(def.key)!;
     prefs[def.key] = shared.prefs[def.key] ?? false;
     if (prefs[def.key] && def.key in shared.values) {
       const v = shared.values[def.key];
-      if (isValidSettingValue(schema[def.key], v)) initialValues[def.key] = v;
+      if (isValidSettingValue(schema[localKey], v)) initialValues[localKey] = v;
     }
   }
 
@@ -108,7 +119,8 @@ export function createSettingsSync<S extends SettingsSchema>(
 
   function onLocalChange(key: string, value: unknown): void {
     scheduleAppSave();
-    if (syncableKeys.has(key) && prefs[key]) scheduleSharedValueWrite(key, value);
+    const sharedKey = sharedKeyByLocal.get(key);
+    if (sharedKey && prefs[sharedKey]) scheduleSharedValueWrite(sharedKey, value);
   }
 
   // ─── Applying the other app's changes ──────────────────────────────────
@@ -123,12 +135,12 @@ export function createSettingsSync<S extends SettingsSchema>(
     sendToRenderers("sync-prefs-changed", prefsForRenderer());
   }
 
-  function applySyncedValue(key: string, value: unknown): void {
-    if (!isValidSettingValue(schema[key as keyof S & string], value)) return;
+  function applySyncedValue(localKey: string, value: unknown): void {
+    if (!isValidSettingValue(schema[localKey as keyof S & string], value)) return;
     const values = getValues() as Record<string, unknown>;
-    if (values[key] === value) return;
-    values[key] = value;
-    sendToRenderers(trayChannel(key), value);
+    if (values[localKey] === value) return;
+    values[localKey] = value;
+    sendToRenderers(trayChannel(localKey), value);
   }
 
   function onSharedChanged(): void {
@@ -144,23 +156,24 @@ export function createSettingsSync<S extends SettingsSchema>(
     }
     if (prefsChanged) broadcastPrefs();
 
-    // Adopt synced values for every enabled key.
+    // Adopt synced values for every enabled key (mapped to the local schema key).
     for (const def of syncable) {
       if (prefs[def.key] && def.key in file.values) {
-        applySyncedValue(def.key, file.values[def.key]);
+        applySyncedValue(localKeyByShared.get(def.key)!, file.values[def.key]);
       }
     }
   }
 
   // ─── Toggle handling (from the Sync tab) ───────────────────────────────
 
-  function setPref(key: string, enabled: boolean): void {
-    if (!syncableKeys.has(key)) return;
-    prefs[key] = enabled;
+  function setPref(sharedKey: string, enabled: boolean): void {
+    const localKey = localKeyByShared.get(sharedKey);
+    if (!localKey) return;
+    prefs[sharedKey] = enabled;
     updateSharedSync((file) => {
-      file.prefs[key] = enabled;
+      file.prefs[sharedKey] = enabled;
       // Enabling seeds the shared value from THIS app, so the other adopts ours.
-      if (enabled) file.values[key] = (getValues() as Record<string, unknown>)[key];
+      if (enabled) file.values[sharedKey] = (getValues() as Record<string, unknown>)[localKey];
     });
     broadcastPrefs();
   }
@@ -170,7 +183,9 @@ export function createSettingsSync<S extends SettingsSchema>(
     updateSharedSync((file) => {
       for (const def of syncable) {
         file.prefs[def.key] = enabled;
-        if (enabled) file.values[def.key] = (getValues() as Record<string, unknown>)[def.key];
+        if (enabled) {
+          file.values[def.key] = (getValues() as Record<string, unknown>)[localKeyByShared.get(def.key)!];
+        }
       }
     });
     broadcastPrefs();

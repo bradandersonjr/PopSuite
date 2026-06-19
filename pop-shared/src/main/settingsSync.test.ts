@@ -137,7 +137,10 @@ describe("cross-app sync", () => {
     // PopJot's watcher fires → it adopts PopKey's value and re-broadcasts.
     B.watchCb();
     expect(B.vals.themeMode).toBe("dark");
-    expect(B.sent).toContainEqual(["sync-prefs-changed", { themeMode: true, colorPalette: false }]);
+    expect(B.sent).toContainEqual([
+      "sync-prefs-changed",
+      { themeMode: true, colorPalette: false, style: false },
+    ]);
     expect(B.sent.some(([ch, v]) => ch === "tray-set-theme-mode" && v === "dark")).toBe(true);
   });
 
@@ -153,7 +156,7 @@ describe("cross-app sync", () => {
     // PopKey changes a SYNCED key.
     A.vals.themeMode = "light";
     A.sync.onLocalChange("themeMode", "light");
-    // PopKey changes an UNSYNCED app-specific key.
+    // PopKey changes badgeStyle while its "Style" sync toggle is OFF.
     A.vals.badgeStyle = "pop";
     A.sync.onLocalChange("badgeStyle", "pop");
 
@@ -161,7 +164,7 @@ describe("cross-app sync", () => {
 
     const shared = loadSharedSync();
     expect(shared.values.themeMode).toBe("light"); // synced value written
-    expect("badgeStyle" in shared.values).toBe(false); // unsynced never enters shared file
+    expect("style" in shared.values).toBe(false); // Style toggle off → badgeStyle never syncs
 
     // PopJot adopts the synced value; nothing about badgeStyle reaches it.
     B.watchCb();
@@ -169,5 +172,29 @@ describe("cross-app sync", () => {
 
     // PopKey's own file persisted the unsynced key.
     expect(loadAppSettings("PopKey")).toMatchObject({ badgeStyle: "pop", themeMode: "light" });
+  });
+
+  it("syncs aliased keys: PopKey badgeStyle <-> PopJot menuStyle via shared 'style'", () => {
+    const A = makeApp("PopKey", keySchema, { themeMode: "dark", colorPalette: "retro", badgeStyle: "flat" });
+    const B = makeApp("PopJot", jotSchema, { themeMode: "dark", colorPalette: "retro", menuStyle: "pop" });
+
+    // Enable "Style" sync in PopKey → seeds the shared "style" from badgeStyle.
+    A.handlers.get("set-sync-pref")!(null, "style", true);
+    expect(loadSharedSync()).toMatchObject({ prefs: { style: true }, values: { style: "flat" } });
+
+    // PopJot adopts it into its differently-named local key (menuStyle).
+    B.watchCb();
+    expect(B.vals.menuStyle).toBe("flat");
+    expect(B.sent.some(([ch, v]) => ch === "tray-set-menu-style" && v === "flat")).toBe(true);
+
+    // A later badgeStyle change in PopKey propagates to PopJot's menuStyle.
+    vi.useFakeTimers();
+    A.vals.badgeStyle = "pop";
+    A.sync.onLocalChange("badgeStyle", "pop");
+    vi.advanceTimersByTime(500); // flush the debounced shared write
+    vi.useRealTimers();
+    expect(loadSharedSync().values.style).toBe("pop");
+    B.watchCb();
+    expect(B.vals.menuStyle).toBe("pop");
   });
 });
