@@ -79,6 +79,36 @@ function modsFromEvent(e: { ctrlKey?: boolean; shiftKey?: boolean; altKey?: bool
   return mods;
 }
 
+// US-layout shifted glyphs for digits and punctuation. The desktop (uiohook)
+// path reports the unshifted key name (e.g. "1", "/"), so when Shift is held we
+// substitute the glyph the user actually typed ("!", "?") and drop the now-
+// redundant Shift modifier. Letters are intentionally absent — they already
+// render uppercase, and keeping "Shift + A" still reads correctly.
+export const SHIFT_SYMBOLS: Record<string, string> = {
+  "1": "!", "2": "@", "3": "#", "4": "$", "5": "%",
+  "6": "^", "7": "&", "8": "*", "9": "(", "0": ")",
+  "-": "_", "=": "+", "[": "{", "]": "}", "\\": "|",
+  ";": ":", "'": "\"", "`": "~", ",": "<", ".": ">", "/": "?",
+};
+
+// The glyphs themselves — the web/DOM path already delivers these via
+// `event.key` (e.g. "!"), so we only need to drop the redundant Shift there.
+const SHIFTED_GLYPHS = new Set(Object.values(SHIFT_SYMBOLS));
+
+/**
+ * When Shift is the only held modifier, turn a shiftable key into the glyph it
+ * produces and consume the Shift (so "Shift + 1" becomes "!"). Combos with other
+ * modifiers (e.g. Ctrl+Shift+1) are left intact so shortcuts still read fully.
+ */
+export function applyShiftSymbol(base: string, mods: string[]): { base: string; mods: string[] } {
+  if (mods.length === 1 && mods[0] === "Shift") {
+    const shifted = SHIFT_SYMBOLS[base];
+    if (shifted) return { base: shifted, mods: [] };
+    if (SHIFTED_GLYPHS.has(base)) return { base, mods: [] };
+  }
+  return { base, mods };
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useInputCapture() {
@@ -170,10 +200,10 @@ export function useInputCapture() {
 
   // Like addBadgeWithMods, but records the resulting badge id keyed by the held
   // key so repeats can update it. Used for the keyboard (non-modifier) path.
-  const pressKey = useCallback((keyId: string | number, base: string) => {
+  const pressKey = useCallback((keyId: string | number, rawBase: string) => {
     const oldModId = modifierBadgeIdRef.current;
     modifierBadgeIdRef.current = null;
-    const mods  = Array.from(heldModifiersRef.current);
+    const { base, mods } = applyShiftSymbol(rawBase, Array.from(heldModifiersRef.current));
     const label = mods.length > 0 ? `${mods.join(" + ")} + ${base}` : base;
     const type: BadgeType = mods.length > 0 ? "combo" : "key";
     const now = Date.now();
