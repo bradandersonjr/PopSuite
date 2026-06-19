@@ -15,7 +15,7 @@
  */
 
 import { join } from "path";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, watch } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, watch, statSync } from "fs";
 import { homedir } from "os";
 
 export interface SharedSyncFile {
@@ -60,7 +60,11 @@ function readJson(path: string): Record<string, unknown> | null {
 function writeJson(path: string, data: unknown): void {
   try {
     ensureSettingsDir();
-    writeFileSync(path, JSON.stringify(data, null, 2), "utf-8");
+    // Write to a temp file then rename — rename is atomic, so a reader (the
+    // sibling app's watcher/poll) never sees a half-written file.
+    const tmp = `${path}.tmp`;
+    writeFileSync(tmp, JSON.stringify(data, null, 2), "utf-8");
+    renameSync(tmp, path);
   } catch (err) {
     console.error(`Failed to write ${path}:`, err);
   }
@@ -105,12 +109,21 @@ export function updateSharedSync(mutate: (file: SharedSyncFile) => void): Shared
 // ─── Watching ──────────────────────────────────────────────────────────
 
 /**
- * Watch a file in ~/.popsuite for changes by name, debounced. Watches the
- * directory (not the inode) so it survives delete/recreate. Returns unwatch.
+ * Watch a file in ~/.popsuite for changes (from this or the sibling app),
+ * debounced. Uses two mechanisms so cross-process changes are caught reliably:
+ *
+ *  1. fs.watch on the directory — instant, but its `filename` arg can be null
+ *     and directory watching is unreliable for another process's writes on some
+ *     platforms (notably Windows), so we fire on any reported change.
+ *  2. mtime polling — a guaranteed fallback that catches the sibling app's
+ *     writes within the poll interval even when fs.watch misses them entirely.
+ *
+ * Returns an unwatch function.
  */
 export function watchSettingsFile(filename: string, onChange: () => void): () => void {
   ensureSettingsDir();
   const dir = settingsDir();
+  const filePath = join(dir, filename);
 
   let timer: ReturnType<typeof setTimeout> | null = null;
   const fire = () => {
@@ -118,18 +131,41 @@ export function watchSettingsFile(filename: string, onChange: () => void): () =>
     timer = setTimeout(() => {
       timer = null;
       onChange();
-    }, 150);
+    }, 120);
   };
 
+  const mtimeOf = (): number => {
+    try {
+      return existsSync(filePath) ? statSync(filePath).mtimeMs : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  // fs.watch — instant when it works. `changed` may be null, so don't insist on
+  // an exact filename match; the cheap mtime guard in the poll dedupes anyway.
+  let watcher: ReturnType<typeof watch> | null = null;
   try {
-    const watcher = watch(dir, { persistent: false }, (_event, changed) => {
-      if (changed === filename) fire();
+    watcher = watch(dir, { persistent: false }, (_event, changed) => {
+      if (!changed || changed === filename) fire();
     });
-    return () => {
-      watcher.close();
-      if (timer) clearTimeout(timer);
-    };
   } catch {
-    return () => {};
+    watcher = null;
   }
+
+  // Polling fallback — reliable across processes.
+  let lastMtime = mtimeOf();
+  const poll = setInterval(() => {
+    const m = mtimeOf();
+    if (m !== lastMtime) {
+      lastMtime = m;
+      fire();
+    }
+  }, 700);
+
+  return () => {
+    watcher?.close();
+    clearInterval(poll);
+    if (timer) clearTimeout(timer);
+  };
 }
