@@ -903,6 +903,11 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
         <SettingGroup key="translucency" title="Translucency" description="Badge background opacity">
           <SliderRow value={badgeTranslucency} min={0} max={95} step={5} onChange={applyBadgeTranslucency} valueSuffix="%" defaultValue={0} />
         </SettingGroup>,
+      ],
+    },
+    {
+      title: "Branding",
+      items: [
         <SettingGroup key="branding" title="Branding" description="Pin a logo or watermark to a screen corner" pro locked={!isPro} buyUrl={POPKEY_PRO_URL}>
           <BrandingSettings />
         </SettingGroup>,

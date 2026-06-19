@@ -8,7 +8,7 @@
  */
 
 import React, { createContext, useContext, useState } from "react";
-import { AlertCircle, Check, Keyboard, RotateCcw, Paintbrush, SlidersHorizontal, MousePointer, Sparkles, RefreshCw, Settings as SettingsIcon } from "lucide-react";
+import { AlertCircle, Check, Keyboard, RotateCcw, Paintbrush, SlidersHorizontal, MousePointer, Sparkles, RefreshCw, Image as ImageIcon, Settings as SettingsIcon } from "lucide-react";
 import { ERROR_COLORS, PRO_ACCENT, type SurfacePalette } from "../../config/desktopTheme";
 import { formatHotkey } from "../../lib/hotkeys";
 import { closeWindow, isDesktop, isSettingsWindow, openExternal } from "../../settings/renderer";
@@ -368,6 +368,9 @@ const getCategoryIcon = (title: string, className?: string) => {
   }
   if (t.includes("sync")) {
     return <RefreshCw className={className} />;
+  }
+  if (t.includes("brand")) {
+    return <ImageIcon className={className} />;
   }
   return <SettingsIcon className={className} />;
 };
