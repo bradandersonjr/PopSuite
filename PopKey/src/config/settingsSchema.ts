@@ -60,6 +60,7 @@ export const settingsSchema = {
   brandingSize: setting.number(80, { positive: true }), // max width/height in px
   brandingOpacity: setting.number(100),
   brandingRadius: setting.number(0), // corner rounding 0–50%
+  brandingGrayscale: setting.boolean(false), // render the logo black & white
 } as const;
 
 export type SettingsSchema = typeof settingsSchema;

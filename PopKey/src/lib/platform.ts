@@ -108,6 +108,8 @@ export const sendBrandingOpacity = (val: number): void =>
   settings.sendSetting("brandingOpacity", val);
 export const sendBrandingRadius = (val: number): void =>
   settings.sendSetting("brandingRadius", val);
+export const sendBrandingGrayscale = (val: boolean): void =>
+  settings.sendSetting("brandingGrayscale", val);
 export const sendScaleFactor = (scale: number): void => settings.sendSetting("scaleFactor", scale);
 export const sendObsMode = (val: boolean): void => settings.sendSetting("obsMode", val);
 

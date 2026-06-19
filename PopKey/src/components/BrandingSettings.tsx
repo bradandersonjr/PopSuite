@@ -10,6 +10,7 @@ import {
   sendBrandingSize,
   sendBrandingOpacity,
   sendBrandingRadius,
+  sendBrandingGrayscale,
 } from "@/lib/platform";
 
 const BrandingSettings = () => {
@@ -24,6 +25,7 @@ const BrandingSettings = () => {
       size={s.brandingSize}
       opacity={s.brandingOpacity}
       radius={s.brandingRadius}
+      grayscale={s.brandingGrayscale}
       blockedCorner={blockedBrandingCorner(s.displayPosition)}
       // No separate toggle now that Branding is its own tab: the overlay is
       // active whenever a logo image is set.
@@ -35,6 +37,7 @@ const BrandingSettings = () => {
       onSize={(px) => { s.setBrandingSize(px); sendBrandingSize(px); }}
       onOpacity={(v) => { s.setBrandingOpacity(v); sendBrandingOpacity(v); }}
       onRadius={(v) => { s.setBrandingRadius(v); sendBrandingRadius(v); }}
+      onGrayscale={(v) => { s.setBrandingGrayscale(v); sendBrandingGrayscale(v); }}
     />
   );
 };

@@ -23,6 +23,11 @@ export const SYNCABLE_KEYS: readonly SyncableKeyDef[] = [
     description: "How animated interactions feel",
   },
   { key: "glowIntensity", label: "Glow Intensity", description: "Strength of the glow halo" },
+  {
+    key: "brandingEnabled",
+    label: "Branding",
+    description: "Keep the logo branding on/off in step (each app uses its own logo)",
+  },
 ] as const;
 
 /** The syncable keys this app actually has, in display order. */

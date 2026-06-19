@@ -143,6 +143,7 @@ const RadialMenu = () => {
   const textColor = useStore(state => state.textColor);
   const themeMode = useStore(state => state.themeMode);
   const menuTranslucency = useStore(state => state.menuTranslucency);
+  const brandingEnabled = useStore(state => state.brandingEnabled);
   const menuBgAlpha = 1 - menuTranslucency / 100;
   const menuFlatBase = themeMode === "dark" ? "#242424" : "#F8F8F6";
   const scaleFactor = useStore(state => state.scaleFactor);
@@ -616,7 +617,8 @@ const RadialMenu = () => {
             {/* Center circle */}
             {(() => {
               const proScale = activeIndex === null ? getProCenterScale() : 1;
-              const proIcon = getProCenterIcon();
+              // Branding logo replaces the center shape only while branding is on.
+              const proIcon = brandingEnabled ? getProCenterIcon() : null;
               const circleSize = 48 * scaleFactor * proScale;
               const iconSize = 22 * scaleFactor * proScale;
               const centerBorderRadius = `${buttonRoundness / 2}%`;

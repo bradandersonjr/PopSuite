@@ -18,6 +18,7 @@ export function BrandingOverlay({
   radius = 0,
   scaleFactor,
   blockedCorner,
+  grayscale = false,
 }: {
   image: string;
   corner: BrandingCorner;
@@ -27,6 +28,8 @@ export function BrandingOverlay({
   radius?: number;
   scaleFactor: number;
   blockedCorner?: BrandingCorner | null;
+  /** Render the logo black & white. */
+  grayscale?: boolean;
 }) {
   if (!image) return null;
 
@@ -59,6 +62,7 @@ export function BrandingOverlay({
         opacity: opacity / 100,
         objectFit: "contain",
         borderRadius: `${radius}%`,
+        filter: grayscale ? "grayscale(1)" : undefined,
       }}
     />
   );

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo } from "react";
 import { activateLicense, deactivateLicense } from "@shared/license/renderer";
 import CustomPaletteSettings from "@/components/pro/CustomPaletteSettings";
 import CenterCircleSettings from "@/components/pro/CenterCircleSettings";
-import BrandingSettings from "@/components/BrandingSettings";
 
 /** Ko-fi product page where buyers get a PopJot Pro key. */
 const POPJOT_PRO_URL = "https://ko-fi.com/s/264fd0031f";
@@ -600,21 +599,16 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     {
       title: "Branding",
       items: [
-        <SettingGroup key="branding" title="Branding" description="Logo/watermark, custom palette, stroke effects & center circle" pro locked={!isPro} buyUrl={POPJOT_PRO_URL}>
+        <SettingGroup key="branding" title="Branding" description="Replace the menu's center shape with your logo, plus a custom palette" pro locked={!isPro} buyUrl={POPJOT_PRO_URL}>
           <div className="space-y-5">
             <div>
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Logo / Watermark</div>
-              <BrandingSettings />
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Logo</div>
+              <CenterCircleSettings />
             </div>
             <div className="h-px" style={{ backgroundColor: surfacePalette.divider }} />
             <div>
               <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Custom Palette</div>
               <CustomPaletteSettings />
-            </div>
-            <div className="h-px" style={{ backgroundColor: surfacePalette.divider }} />
-            <div>
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Center Circle</div>
-              <CenterCircleSettings />
             </div>
           </div>
         </SettingGroup>,

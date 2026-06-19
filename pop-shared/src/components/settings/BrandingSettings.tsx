@@ -7,7 +7,7 @@ import { useRef } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
 import type { SurfacePalette } from "../../config/desktopTheme";
 import type { BrandingCorner } from "../BrandingOverlay";
-import { SliderRow } from "./primitives";
+import { SliderRow, ToggleRow } from "./primitives";
 
 const CORNERS: { value: BrandingCorner; label: string }[] = [
   { value: "top-left", label: "Top Left" },
@@ -23,12 +23,14 @@ export function BrandingSettings({
   size,
   opacity,
   radius,
+  grayscale,
   blockedCorner,
   onImage,
   onCorner,
   onSize,
   onOpacity,
   onRadius,
+  onGrayscale,
 }: {
   palette: SurfacePalette;
   image: string;
@@ -36,12 +38,14 @@ export function BrandingSettings({
   size: number;
   opacity: number;
   radius: number;
+  grayscale: boolean;
   blockedCorner: BrandingCorner | null;
   onImage: (dataUrl: string) => void;
   onCorner: (c: BrandingCorner) => void;
   onSize: (px: number) => void;
   onOpacity: (v: number) => void;
   onRadius: (v: number) => void;
+  onGrayscale: (v: boolean) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -131,6 +135,12 @@ export function BrandingSettings({
             <div className="mb-1 text-xs font-medium" style={{ color: palette.text }}>Corner Radius</div>
             <SliderRow value={radius} min={0} max={50} step={2} onChange={onRadius} valueSuffix="%" defaultValue={0} />
           </div>
+          <ToggleRow
+            label="Black & white"
+            description="Render the logo desaturated"
+            checked={grayscale}
+            onChange={() => onGrayscale(!grayscale)}
+          />
     </div>
   );
 }

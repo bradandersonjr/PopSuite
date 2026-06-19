@@ -12,6 +12,7 @@ const BrandingOverlay = () => {
     brandingSize,
     brandingOpacity,
     brandingRadius,
+    brandingGrayscale,
     displayPosition,
     scaleFactor,
   } = useStore();
@@ -25,6 +26,7 @@ const BrandingOverlay = () => {
       size={brandingSize}
       opacity={brandingOpacity}
       radius={brandingRadius}
+      grayscale={brandingGrayscale}
       scaleFactor={scaleFactor}
       blockedCorner={blockedBrandingCorner(displayPosition)}
     />

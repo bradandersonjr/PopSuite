@@ -23,14 +23,9 @@ export const settingsSchema = {
   buttonRoundness: setting.number(100),
   // Menu button background opacity: 0 = opaque, higher = more see-through.
   menuTranslucency: setting.number(0),
-  // Branding: a logo/watermark pinned to a screen corner (shared with PopKey).
-  // Active whenever an image is set; brandingEnabled mirrors that.
+  // Branding: replaces the radial-menu center shape with a custom logo (Pro).
+  // Active whenever a center logo is set; synced with PopKey's branding toggle.
   brandingEnabled: setting.boolean(false),
-  brandingImage: setting.string(""), // data URL of the chosen image
-  brandingCorner: setting.enum(["top-left", "top-right", "bottom-left", "bottom-right"], "top-right"),
-  brandingSize: setting.number(80, { positive: true }), // max width/height in px
-  brandingOpacity: setting.number(100),
-  brandingRadius: setting.number(0), // corner rounding 0–50%
   gridMode: setting.enum(["none", "grid", "dots"], "none"),
   gridSize: setting.enum(["small", "large"], "small"),
   overlayMode: setting.enum(["live", "snapshot"], "live"),
