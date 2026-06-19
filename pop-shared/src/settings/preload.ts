@@ -41,6 +41,13 @@ export function createSettingsBridge<S extends SettingsSchema>(schema: S): Recor
     setOpenAtLogin: sender("set-open-at-login"),
     openExternal: sender("open-external"),
     readClipboard: invoker("read-clipboard"),
+    // Cross-app settings sync: per-key toggle map (shared with the sibling app)
+    // plus a live subscription so the Sync tab reflects the other app's flips.
+    getSyncPrefs: invoker("get-sync-prefs"),
+    setSyncPref: sender("set-sync-pref"),
+    setSyncAll: sender("set-sync-all"),
+    onSyncPrefsChanged: (callback: (prefs: Record<string, boolean>) => void) =>
+      subscribe("sync-prefs-changed")(callback as (...args: never[]) => void),
   };
 
   for (const key of Object.keys(schema)) {

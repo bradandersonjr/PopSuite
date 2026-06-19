@@ -21,8 +21,12 @@ export interface SettingsController<S extends SettingsSchema> {
   values: SettingsValues<S>;
   /** Replay current non-volatile settings into a (new) window. */
   syncToWindow(win: BrowserWindow): void;
-  /** Callback fired when any setting changes (can be set after creation). */
-  onAnyChange?: () => void;
+  /**
+   * Fired for every non-volatile setting change, with the key and new value.
+   * Assignable after creation (the persistence/sync layer needs the controller
+   * to exist first). Volatile settings (e.g. per-monitor scale) don't fire it.
+   */
+  onKeyChange?: (key: keyof S & string, value: unknown) => void;
 }
 
 export function registerSettingsIpc<S extends SettingsSchema>(
@@ -32,15 +36,15 @@ export function registerSettingsIpc<S extends SettingsSchema>(
     onChange?: { [K in keyof S]?: (value: SettingValue<S[K]>) => void };
     /** Optional initial values to merge with defaults (e.g. from disk). */
     initialValues?: Partial<SettingsValues<S>>;
-    /** Optional callback fired when any setting changes (after onChange, for saving). */
-    onAnyChange?: () => void;
+    /** Fired (with key + value) for every non-volatile change, after onChange. */
+    onKeyChange?: (key: keyof S & string, value: unknown) => void;
   }
 ): SettingsController<S> {
   const values = { ...settingsDefaults(schema), ...opts.initialValues };
 
   const controller: SettingsController<S> = {
     values,
-    onAnyChange: opts.onAnyChange,
+    onKeyChange: opts.onKeyChange,
     syncToWindow(win) {
       for (const key of Object.keys(schema) as Array<keyof S & string>) {
         if (schema[key].volatile) continue;
@@ -58,7 +62,7 @@ export function registerSettingsIpc<S extends SettingsSchema>(
       }
       opts.sendToRenderers(trayChannel(key), value);
       opts.onChange?.[key]?.(value as SettingValue<S[typeof key]>);
-      controller.onAnyChange?.();
+      if (!spec.volatile) controller.onKeyChange?.(key, value);
     });
   }
 

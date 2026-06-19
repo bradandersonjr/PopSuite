@@ -44,6 +44,7 @@ import {
   SettingsWindowFrame,
   EmbeddedSettingsPanel,
   SettingsImportExport,
+  SyncSettings,
   ProSection,
   ShortcutButton,
   ShortcutErrorBanner,
@@ -638,6 +639,18 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
         </SettingGroup>,
         <SettingGroup key="scale" title="UI Scale" description="Adjust interface size for your screen resolution">
           <OptionGrid options={scaleOptions} columns="grid-cols-2" />
+        </SettingGroup>,
+      ],
+    },
+    {
+      title: "Sync",
+      items: [
+        <SettingGroup
+          key="sync"
+          title="Sync with PopKey"
+          description="Keep these settings identical across PopJot and PopKey. Toggles are shared, so changes here appear in PopKey instantly."
+        >
+          <SyncSettings schema={settingsSchema} />
         </SettingGroup>,
       ],
     },

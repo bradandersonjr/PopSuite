@@ -71,6 +71,35 @@ export async function readClipboard(): Promise<string> {
   return (await api?.readClipboard?.()) ?? "";
 }
 
+// ─── Cross-app settings sync ───────────────────────────────────────────
+
+type SyncBridge = {
+  getSyncPrefs?: () => Promise<Record<string, boolean>>;
+  setSyncPref?: (key: string, enabled: boolean) => void;
+  setSyncAll?: (enabled: boolean) => void;
+  onSyncPrefsChanged?: (cb: (prefs: Record<string, boolean>) => void) => () => void;
+};
+
+/** Current per-key sync on/off map (empty on web). */
+export async function getSyncPrefs(): Promise<Record<string, boolean>> {
+  return (await (bridge() as SyncBridge | undefined)?.getSyncPrefs?.()) ?? {};
+}
+
+/** Enable/disable syncing a single setting key with the sibling app. */
+export function setSyncPref(key: string, enabled: boolean): void {
+  (bridge() as SyncBridge | undefined)?.setSyncPref?.(key, enabled);
+}
+
+/** Enable/disable syncing for every syncable key at once. */
+export function setSyncAll(enabled: boolean): void {
+  (bridge() as SyncBridge | undefined)?.setSyncAll?.(enabled);
+}
+
+/** Subscribe to sync-toggle changes (from this or the sibling app). */
+export function onSyncPrefsChanged(cb: (prefs: Record<string, boolean>) => void): () => void {
+  return (bridge() as SyncBridge | undefined)?.onSyncPrefsChanged?.(cb) ?? (() => {});
+}
+
 export interface SettingsPlatform<S extends SettingsSchema> {
   /** Send a setting change to the main process (no-op on web). */
   sendSetting<K extends keyof S & string>(key: K, value: SettingValue<S[K]>): void;

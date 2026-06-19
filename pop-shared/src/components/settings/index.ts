@@ -15,6 +15,7 @@ export {
 export { SettingsWindowFrame, EmbeddedSettingsPanel } from "./SettingsWindowFrame";
 export { LicenseField } from "./LicenseField";
 export { SettingsImportExport } from "./SettingsImportExport";
+export { SyncSettings } from "./SyncSettings";
 export { BrandingSettings } from "./BrandingSettings";
 export { ProSection } from "./ProSection";
 export { useOpenAtLogin, useShortcutRecorder } from "./hooks";

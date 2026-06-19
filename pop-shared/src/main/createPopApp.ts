@@ -31,18 +31,13 @@ import {
 import { join } from "path";
 import { existsSync } from "fs";
 import { registerSettingsIpc } from "../settings/main";
-import {
-  loadSharedSettingsSync,
-  createSettingsSaver,
-  watchSharedSettings,
-} from "../settings/persistence";
+import { createSettingsSync } from "./settingsSync";
 import {
   createLicenseController,
   registerLicenseIpc,
   type LicenseController,
 } from "./license";
 import type { SettingsSchema, SettingsValues, SettingValue } from "../settings/schema";
-import { trayChannel } from "../settings/schema";
 
 export type ShortcutUpdateResult =
   | { ok: true; shortcut: string }
@@ -180,23 +175,24 @@ export function createPopApp<S extends SettingsSchema>(
     settingsWindow?.webContents.send(channel, value);
   }
 
-  // ─── Settings IPC (schema-driven) ────────────────────────────────────
+  // ─── Settings IPC + cross-app sync ───────────────────────────────────
 
-  // Load settings from shared file; defaults are used for missing keys
-  const sharedSettings = loadSharedSettingsSync(settingsSchema);
+  // Two-tier persistence: this app's own settings file, plus the shared file
+  // for keys the user opted to sync with the sibling app. `initialValues`
+  // already merges per-app values with any enabled synced overrides.
+  const settingsSync = createSettingsSync({
+    appName,
+    schema: settingsSchema,
+    sendToRenderers,
+    getValues: (): SettingsValues<S> => settingsController.values,
+  });
 
   const settingsController = registerSettingsIpc(settingsSchema, {
     sendToRenderers,
-    initialValues: sharedSettings,
+    initialValues: settingsSync.initialValues,
     onChange: buildOnChange(),
-    // Placeholder; will be replaced after controller creation
-    onAnyChange: undefined,
+    onKeyChange: (key, value) => settingsSync.onLocalChange(key, value),
   });
-
-  // Debounced save to shared settings file when any setting changes
-  const saveSettings = createSettingsSaver(settingsSchema, () => settingsController.values);
-  // Register the actual save callback (can't pass it above due to circular ref)
-  settingsController.onAnyChange = saveSettings;
 
   function buildOnChange():
     | { [K in keyof S]?: (value: SettingValue<S[K]>) => void }
@@ -577,20 +573,9 @@ export function createPopApp<S extends SettingsSchema>(
     mainWindow = createWindow();
     createTray();
 
-    // Watch for settings changes from other apps and reload
-    watchSharedSettings(() => {
-      const updatedSettings = loadSharedSettingsSync(settingsSchema);
-      // Merge updated settings into controller.values
-      for (const key of Object.keys(updatedSettings)) {
-        (settingsController.values as Record<string, unknown>)[key] = updatedSettings[key as keyof typeof updatedSettings];
-      }
-      // Broadcast all settings to renderers
-      for (const key of Object.keys(settingsSchema) as Array<keyof S & string>) {
-        if (!settingsSchema[key].volatile) {
-          sendToRenderers(trayChannel(key), settingsController.values[key]);
-        }
-      }
-    });
+    // Register sync IPC + start watching the shared file for the sibling app's
+    // changes (applies enabled synced values and live-updates toggle state).
+    settingsSync.start();
 
     const shortcutRegistration = registerShortcutHandlers(shortcutState);
     if (!shortcutRegistration.ok) {
@@ -614,6 +599,7 @@ export function createPopApp<S extends SettingsSchema>(
 
   app.on("will-quit", () => {
     options.onWillQuit?.();
+    settingsSync.dispose();
     globalShortcut.unregisterAll();
     settingsWindow?.destroy();
     settingsWindow = null;

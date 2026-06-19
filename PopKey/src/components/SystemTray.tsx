@@ -42,6 +42,7 @@ import {
   SettingsWindowFrame,
   EmbeddedSettingsPanel,
   SettingsImportExport,
+  SyncSettings,
   ProSection,
   ShortcutButton,
   ShortcutErrorBanner,
@@ -976,6 +977,18 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
               </div>
             )}
           </div>
+        </SettingGroup>,
+      ],
+    },
+    {
+      title: "Sync",
+      items: [
+        <SettingGroup
+          key="sync"
+          title="Sync with PopJot"
+          description="Keep these settings identical across PopKey and PopJot. Toggles are shared, so changes here appear in PopJot instantly."
+        >
+          <SyncSettings schema={settingsSchema} />
         </SettingGroup>,
       ],
     },

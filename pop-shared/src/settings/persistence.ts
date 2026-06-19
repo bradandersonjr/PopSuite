@@ -1,140 +1,135 @@
 /**
- * Shared settings persistence layer.
- * Both PopKey and PopJot read/write to ~/.popsuite/settings.json.
- * File watcher notifies the app when the file changes externally.
+ * Low-level settings persistence — file IO for the two-tier model.
+ *
+ *   ~/.popsuite/<app>.json   — one file per app, the app's full non-volatile
+ *                              settings. Never touched by the other app, so
+ *                              app-specific keys are safe and unsynced settings
+ *                              stay independent.
+ *   ~/.popsuite/shared.json  — { prefs, values } for the syncable keys only.
+ *                              `prefs` is the per-key on/off map (the Sync tab
+ *                              choices, shared so both apps agree); `values`
+ *                              holds the synced value for each enabled key.
+ *
+ * The orchestration that decides what to read/write lives in
+ * main/settingsSync.ts; this module only does typed file IO + watching.
  */
 
 import { join } from "path";
-import { mkdir, writeFile, readFile } from "fs/promises";
-import { existsSync, watch, readFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, watch } from "fs";
 import { homedir } from "os";
-import type { SettingsSchema, SettingsValues } from "./schema";
 
-function getSharedSettingsDir(): string {
+export interface SharedSyncFile {
+  /** Per-key sync on/off. Missing key = use the app's opt-in default (false). */
+  prefs: Record<string, boolean>;
+  /** Latest synced value per enabled key. */
+  values: Record<string, unknown>;
+}
+
+function settingsDir(): string {
   return join(homedir(), ".popsuite");
 }
 
-export function getSharedSettingsPath(): string {
-  return join(getSharedSettingsDir(), "settings.json");
-}
-
-/** Load settings from the shared file synchronously, or return empty object if missing. */
-export function loadSharedSettingsSync<S extends SettingsSchema>(
-  schema: S
-): Partial<SettingsValues<S>> {
-  const path = getSharedSettingsPath();
-  if (!existsSync(path)) return {};
-
+/** Create ~/.popsuite if missing so reads/writes/watches are reliable. */
+export function ensureSettingsDir(): string {
+  const dir = settingsDir();
   try {
-    const content = readFileSync(path, "utf-8");
-    const parsed = JSON.parse(content);
-    // Only return keys that exist in the schema (ignore stale/unknown settings)
-    const filtered: Record<string, unknown> = {};
-    for (const key of Object.keys(schema)) {
-      if (key in parsed) filtered[key] = parsed[key];
-    }
-    return filtered as Partial<SettingsValues<S>>;
-  } catch {
-    return {};
-  }
-}
-
-/** Load settings from the shared file asynchronously, or return empty object if missing. */
-export async function loadSharedSettings<S extends SettingsSchema>(
-  schema: S
-): Promise<Partial<SettingsValues<S>>> {
-  const path = getSharedSettingsPath();
-  if (!existsSync(path)) return {};
-
-  try {
-    const content = await readFile(path, "utf-8");
-    const parsed = JSON.parse(content);
-    // Only return keys that exist in the schema (ignore stale/unknown settings)
-    const filtered: Record<string, unknown> = {};
-    for (const key of Object.keys(schema)) {
-      if (key in parsed) filtered[key] = parsed[key];
-    }
-    return filtered as Partial<SettingsValues<S>>;
-  } catch {
-    return {};
-  }
-}
-
-/** Save settings to the shared file. Creates directory if needed. */
-export async function saveSharedSettings<S extends SettingsSchema>(
-  values: SettingsValues<S>,
-  schema: S
-): Promise<void> {
-  const dir = getSharedSettingsDir();
-  const path = getSharedSettingsPath();
-
-  // Only save non-volatile settings
-  const toSave: Record<string, unknown> = {};
-  for (const key of Object.keys(schema) as Array<keyof S & string>) {
-    if (!schema[key].volatile) {
-      toSave[key] = values[key];
-    }
-  }
-
-  try {
-    await mkdir(dir, { recursive: true });
-    await writeFile(path, JSON.stringify(toSave, null, 2), "utf-8");
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   } catch (err) {
-    console.error("Failed to save shared settings:", err);
+    console.error("Failed to create settings dir:", err);
+  }
+  return dir;
+}
+
+export function appSettingsPath(appName: string): string {
+  return join(settingsDir(), `${appName.toLowerCase()}.json`);
+}
+
+export function sharedSyncPath(): string {
+  return join(settingsDir(), "shared.json");
+}
+
+function readJson(path: string): Record<string, unknown> | null {
+  if (!existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, "utf-8")) as Record<string, unknown>;
+  } catch {
+    return null;
   }
 }
 
-/**
- * Create a debounced save handler for settings.
- * Batches rapid changes and saves once per 500ms.
- */
-export function createSettingsSaver<S extends SettingsSchema>(
-  schema: S,
-  getValues: () => SettingsValues<S>
-): () => void {
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+function writeJson(path: string, data: unknown): void {
+  try {
+    ensureSettingsDir();
+    writeFileSync(path, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err) {
+    console.error(`Failed to write ${path}:`, err);
+  }
+}
 
-  return () => {
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      void saveSharedSettings(getValues(), schema);
-      saveTimer = null;
-    }, 500);
-  };
+// ─── Per-app settings ──────────────────────────────────────────────────
+
+/** Load this app's persisted settings (raw object; caller filters by schema). */
+export function loadAppSettings(appName: string): Record<string, unknown> {
+  return readJson(appSettingsPath(appName)) ?? {};
+}
+
+export function saveAppSettings(appName: string, values: Record<string, unknown>): void {
+  writeJson(appSettingsPath(appName), values);
+}
+
+// ─── Shared sync file ──────────────────────────────────────────────────
+
+export function loadSharedSync(): SharedSyncFile {
+  const raw = readJson(sharedSyncPath());
+  const prefs = (raw?.prefs as Record<string, boolean> | undefined) ?? {};
+  const values = (raw?.values as Record<string, unknown> | undefined) ?? {};
+  return { prefs, values };
+}
+
+export function saveSharedSync(data: SharedSyncFile): void {
+  writeJson(sharedSyncPath(), data);
 }
 
 /**
- * Watch the shared settings file for external changes.
- * Calls `onExternalChange()` when the file is written by another app.
- * Returns an unwatch function.
+ * Read-modify-write the shared file under a mutator. Minimises the clobber
+ * window when both apps touch shared.json (writes are debounced and
+ * human-driven, so a full lock isn't warranted).
  */
-export function watchSharedSettings(onExternalChange: () => void): () => void {
-  const dir = getSharedSettingsDir();
+export function updateSharedSync(mutate: (file: SharedSyncFile) => void): SharedSyncFile {
+  const file = loadSharedSync();
+  mutate(file);
+  saveSharedSync(file);
+  return file;
+}
 
-  // Debounce: file might be written multiple times in quick succession
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  const debouncedCallback = () => {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      onExternalChange();
-      debounceTimer = null;
-    }, 200);
+// ─── Watching ──────────────────────────────────────────────────────────
+
+/**
+ * Watch a file in ~/.popsuite for changes by name, debounced. Watches the
+ * directory (not the inode) so it survives delete/recreate. Returns unwatch.
+ */
+export function watchSettingsFile(filename: string, onChange: () => void): () => void {
+  ensureSettingsDir();
+  const dir = settingsDir();
+
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const fire = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      onChange();
+    }, 150);
   };
 
-  // Watch the directory (not the file itself, in case it's deleted/recreated)
   try {
-    const watcher = watch(dir, { persistent: false }, (eventType, filename) => {
-      if (filename === "settings.json" && eventType === "change") {
-        debouncedCallback();
-      }
+    const watcher = watch(dir, { persistent: false }, (_event, changed) => {
+      if (changed === filename) fire();
     });
-
     return () => {
       watcher.close();
-      if (debounceTimer) clearTimeout(debounceTimer);
+      if (timer) clearTimeout(timer);
     };
   } catch {
-    // Directory doesn't exist yet; return no-op unwatch
     return () => {};
   }
 }
