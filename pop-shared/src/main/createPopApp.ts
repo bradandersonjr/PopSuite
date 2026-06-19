@@ -32,11 +32,17 @@ import { join } from "path";
 import { existsSync } from "fs";
 import { registerSettingsIpc } from "../settings/main";
 import {
+  loadSharedSettingsSync,
+  createSettingsSaver,
+  watchSharedSettings,
+} from "../settings/persistence";
+import {
   createLicenseController,
   registerLicenseIpc,
   type LicenseController,
 } from "./license";
 import type { SettingsSchema, SettingsValues, SettingValue } from "../settings/schema";
+import { trayChannel } from "../settings/schema";
 
 export type ShortcutUpdateResult =
   | { ok: true; shortcut: string }
@@ -176,10 +182,21 @@ export function createPopApp<S extends SettingsSchema>(
 
   // ─── Settings IPC (schema-driven) ────────────────────────────────────
 
+  // Load settings from shared file; defaults are used for missing keys
+  const sharedSettings = loadSharedSettingsSync(settingsSchema);
+
   const settingsController = registerSettingsIpc(settingsSchema, {
     sendToRenderers,
+    initialValues: sharedSettings,
     onChange: buildOnChange(),
+    // Placeholder; will be replaced after controller creation
+    onAnyChange: undefined,
   });
+
+  // Debounced save to shared settings file when any setting changes
+  const saveSettings = createSettingsSaver(settingsSchema, () => settingsController.values);
+  // Register the actual save callback (can't pass it above due to circular ref)
+  settingsController.onAnyChange = saveSettings;
 
   function buildOnChange():
     | { [K in keyof S]?: (value: SettingValue<S[K]>) => void }
@@ -559,6 +576,21 @@ export function createPopApp<S extends SettingsSchema>(
 
     mainWindow = createWindow();
     createTray();
+
+    // Watch for settings changes from other apps and reload
+    watchSharedSettings(() => {
+      const updatedSettings = loadSharedSettingsSync(settingsSchema);
+      // Merge updated settings into controller.values
+      for (const key of Object.keys(updatedSettings)) {
+        (settingsController.values as Record<string, unknown>)[key] = updatedSettings[key as keyof typeof updatedSettings];
+      }
+      // Broadcast all settings to renderers
+      for (const key of Object.keys(settingsSchema) as Array<keyof S & string>) {
+        if (!settingsSchema[key].volatile) {
+          sendToRenderers(trayChannel(key), settingsController.values[key]);
+        }
+      }
+    });
 
     const shortcutRegistration = registerShortcutHandlers(shortcutState);
     if (!shortcutRegistration.ok) {
