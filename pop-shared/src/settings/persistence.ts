@@ -4,14 +4,14 @@
  * File watcher notifies the app when the file changes externally.
  */
 
-import { app } from "electron";
 import { join } from "path";
 import { mkdir, writeFile, readFile } from "fs/promises";
 import { existsSync, watch, readFileSync } from "fs";
+import { homedir } from "os";
 import type { SettingsSchema, SettingsValues } from "./schema";
 
 function getSharedSettingsDir(): string {
-  return join(app.getPath("home"), ".popsuite");
+  return join(homedir(), ".popsuite");
 }
 
 export function getSharedSettingsPath(): string {
