@@ -665,7 +665,7 @@ const RadialMenu = () => {
                 >
                   {activeIndex === null ? (
                     proIcon ? (
-                      <img src={proIcon} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "50%" }} />
+                      <img src={proIcon} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: centerBorderRadius }} />
                     ) : (
                       <Bolt size={iconSize} strokeWidth={2} />
                     )

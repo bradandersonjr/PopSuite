@@ -42,6 +42,12 @@ export const SYNCABLE_KEYS: readonly SyncableKeyDef[] = [
     localKeys: ["badgeStyle", "menuStyle"],
   },
   {
+    key: "roundness",
+    label: "Roundness",
+    description: "Corner roundness (square → pill / circle)",
+    localKeys: ["badgeRoundness", "buttonRoundness"],
+  },
+  {
     key: "brandingEnabled",
     label: "Branding",
     description: "Keep the logo branding on/off in step (each app uses its own logo)",
