@@ -21,6 +21,10 @@ export interface Badge {
   type: BadgeType;
   colorIndex: number;
   timestamp: number;
+  /** Undecorated label (without the " ×N" suffix), used to coalesce repeats. */
+  labelBase?: string;
+  /** How many times this key/combo fired into this badge (1 = single press). */
+  count?: number;
 }
 
 export interface ClickRipple {
@@ -204,20 +208,23 @@ export function useInputCapture() {
     const oldModId = modifierBadgeIdRef.current;
     modifierBadgeIdRef.current = null;
     const { base, mods } = applyShiftSymbol(rawBase, Array.from(heldModifiersRef.current));
-    const label = mods.length > 0 ? `${mods.join(" + ")} + ${base}` : base;
+    const labelBase = mods.length > 0 ? `${mods.join(" + ")} + ${base}` : base;
     const type: BadgeType = mods.length > 0 ? "combo" : "key";
     const now = Date.now();
     setBadges((prev) => {
       const filtered = oldModId ? prev.filter((b) => b.id !== oldModId) : prev;
       const last = filtered[filtered.length - 1];
-      if (last && last.label === label && last.type === type && now - last.timestamp < 400) {
-        heldKeyBadgeRef.current.set(keyId, { id: last.id, labelBase: label, count: 1 });
-        return [...filtered.slice(0, -1), { ...last, timestamp: now }];
+      // Same key tapped again quickly: bump a ×N count so rapid spam ("...") is
+      // visible instead of collapsing into a single static badge.
+      if (last && last.labelBase === labelBase && last.type === type && now - last.timestamp < 400) {
+        const count = (last.count ?? 1) + 1;
+        heldKeyBadgeRef.current.set(keyId, { id: last.id, labelBase, count });
+        return [...filtered.slice(0, -1), { ...last, label: `${labelBase} ×${count}`, count, timestamp: now }];
       }
       const id = nextId();
-      heldKeyBadgeRef.current.set(keyId, { id, labelBase: label, count: 1 });
+      heldKeyBadgeRef.current.set(keyId, { id, labelBase, count: 1 });
       return [...filtered.slice(-(maxBadgesRef.current - 1)), {
-        id, label, type, colorIndex: colorIndexRef.current++, timestamp: now,
+        id, label: labelBase, labelBase, count: 1, type, colorIndex: colorIndexRef.current++, timestamp: now,
       }];
     });
   }, []);
@@ -229,7 +236,11 @@ export function useInputCapture() {
     entry.count += 1;
     const now = Date.now();
     setBadges((prev) =>
-      prev.map((b) => (b.id === entry.id ? { ...b, label: `${entry.labelBase} ×${entry.count}`, timestamp: now } : b))
+      prev.map((b) =>
+        b.id === entry.id
+          ? { ...b, label: `${entry.labelBase} ×${entry.count}`, count: entry.count, timestamp: now }
+          : b
+      )
     );
   }, []);
 
