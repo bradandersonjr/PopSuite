@@ -39,6 +39,8 @@ const settings = createSettingsPlatform(settingsSchema);
 export const sendThemeMode = (mode: ThemeMode): void => settings.sendSetting("themeMode", mode);
 export const sendColorPalette = (palette: ColorPalette): void =>
   settings.sendSetting("colorPalette", palette);
+export const sendLastColorPalette = (palette: ColorPalette): void =>
+  settings.sendSetting("lastColorPalette", palette);
 export const sendAnimationIntensity = (intensity: AnimationIntensity): void =>
   settings.sendSetting("animationIntensity", intensity);
 export const sendMenuStyle = (style: MenuStyle): void => settings.sendSetting("menuStyle", style);

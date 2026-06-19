@@ -138,6 +138,7 @@ const RadialMenu = () => {
   const persistentHotkey = useStore(state => state.persistentHotkey);
   const menuStyle = useStore(state => state.menuStyle);
   const colorPalette = useStore(state => state.colorPalette);
+  const lastColorPalette = useStore(state => state.lastColorPalette);
   const solidColor = useStore(state => state.solidColor);
   const glowIntensity = useStore(state => state.glowIntensity);
   const textColor = useStore(state => state.textColor);
@@ -162,11 +163,13 @@ const RadialMenu = () => {
   const paletteVersion = useStore(state => state.paletteVersion);
 
   const SUB_MENUS = useMemo(() => {
-    const { draw: drawColors, highlighter: highlighterColors } = colorPalette === "solid"
-      ? { draw: [solidColor, solidColor, solidColor, solidColor, solidColor, solidColor], highlighter: [solidColor, solidColor, solidColor, solidColor] }
-      : getEffectiveColors(colorPalette);
+    // Solid only restyles the menu chrome — strokes keep real, multi-color
+    // swatches from the last non-Solid palette so you can still draw in any color.
+    const strokePalette: ColorPalette =
+      colorPalette === "solid" ? (lastColorPalette === "solid" ? "retro" : lastColorPalette) : colorPalette;
+    const { draw: drawColors, highlighter: highlighterColors } = getEffectiveColors(strokePalette);
     // Only use gradient rendering when the built-in gradient palette is active with no custom Pro override
-    const useGradient = colorPalette === "gradient" && getProPalette(colorPalette) === null;
+    const useGradient = strokePalette === "gradient" && getProPalette(strokePalette) === null;
 
     const drawItems = toColorItems(drawColors, useGradient ? "gradient" : "muted", "draw");
     const highlighterItems = toColorItems(highlighterColors, useGradient ? "gradient" : "muted", "highlighter");
@@ -183,7 +186,7 @@ const RadialMenu = () => {
       { offset: 180, items: screenItems },
     ];
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colorPalette, solidColor, paletteVersion]); // paletteVersion invalidates when Pro palette changes
+  }, [colorPalette, lastColorPalette, paletteVersion]); // paletteVersion invalidates when Pro palette changes
 
   const checkHotkey = useCallback(
     () => isHotkeyPressed(hotkey, keysDown.current),

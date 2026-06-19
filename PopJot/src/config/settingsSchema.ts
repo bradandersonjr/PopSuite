@@ -13,6 +13,12 @@ export const settingsSchema = {
   ),
   // Solid palette: single-color menu. Uses a custom color instead of palette colors.
   solidColor: setting.string("#fcbf47"),
+  // Remembers the last non-Solid palette so stroke colors stay multi-color while
+  // the Solid palette is active (Solid only restyles the menu chrome).
+  lastColorPalette: setting.enum(
+    ["muted", "vibrant", "retro", "neon", "pastel", "gradient", "glitter", "solid"],
+    "retro"
+  ),
   animationIntensity: setting.enum(["low", "medium", "high"], "medium"),
   menuStyle: setting.enum(["flat", "flat-outline", "pop", "glow"], "pop"),
   // Glow style: halo intensity (0 = subtle, 100 = intense).
