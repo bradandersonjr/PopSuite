@@ -9,7 +9,7 @@
 
 import { Check, X } from "lucide-react";
 import type { SettingsSchema } from "../../settings/schema";
-import { syncableKeysFor } from "../../settings/syncable";
+import { syncableKeysFor, syncLabelFor } from "../../settings/syncable";
 import { isDesktop } from "../../settings/renderer";
 import { useSyncPrefs } from "../../hooks/useSyncPrefs";
 import { ToggleRow, useSettingsUI } from "./primitives";
@@ -59,7 +59,7 @@ export function SyncSettings({ schema }: { schema: SettingsSchema }) {
         {keys.map((def) => (
           <ToggleRow
             key={def.key}
-            label={def.label}
+            label={syncLabelFor(def, schema as Record<string, unknown>)}
             description={def.description}
             checked={!!prefs[def.key]}
             onChange={() => setPref(def.key, !prefs[def.key])}

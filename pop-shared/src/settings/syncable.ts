@@ -23,6 +23,12 @@ export interface SyncableKeyDef {
    * matches `key` in both apps.
    */
   localKeys?: readonly string[];
+  /**
+   * Per-app label overrides, keyed by local schema key (e.g. PopJot calls its
+   * text color "Icon Color"). Falls back to `label` when the app's local key
+   * isn't listed.
+   */
+  localLabels?: Readonly<Record<string, string>>;
 }
 
 export const SYNCABLE_KEYS: readonly SyncableKeyDef[] = [
@@ -48,6 +54,13 @@ export const SYNCABLE_KEYS: readonly SyncableKeyDef[] = [
     localKeys: ["badgeRoundness", "buttonRoundness"],
   },
   {
+    key: "textColor",
+    label: "Text Color",
+    description: "Force white / black, or follow the style",
+    localKeys: ["badgeTextColor", "textColor"],
+    localLabels: { textColor: "Icon Color" },
+  },
+  {
     key: "brandingEnabled",
     label: "Branding",
     description: "Keep the logo branding on/off in step (each app uses its own logo)",
@@ -67,6 +80,12 @@ export function localKeyForSyncable(
 /** The syncable keys this app actually has, in display order. */
 export function syncableKeysFor(schema: Record<string, unknown>): SyncableKeyDef[] {
   return SYNCABLE_KEYS.filter((def) => localKeyForSyncable(def, schema) !== null);
+}
+
+/** The Sync-tab label for a def in this app (honours per-app `localLabels`). */
+export function syncLabelFor(def: SyncableKeyDef, schema: Record<string, unknown>): string {
+  const local = localKeyForSyncable(def, schema);
+  return (local && def.localLabels?.[local]) || def.label;
 }
 
 /** All-false preferences map for the given app's syncable keys (opt-in default). */

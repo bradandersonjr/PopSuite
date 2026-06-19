@@ -561,7 +561,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
             <SliderRow value={glowIntensity} min={0} max={100} step={5} onChange={applyGlowIntensity} valueSuffix="%" defaultValue={50} />
           </SettingGroup>
         ),
-        <SettingGroup key="text-color" title="Text Color" description="Force menu icons white or black, or follow the style">
+        <SettingGroup key="text-color" title="Icon Color" description="Force menu icons white or black, or follow the style">
           <OptionGrid options={textColorOptions} columns="grid-cols-3" compact />
         </SettingGroup>,
         <SettingGroup key="theme" title="Theme Mode" description="Switch between dark and light themes">
