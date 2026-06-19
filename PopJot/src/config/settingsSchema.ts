@@ -24,8 +24,12 @@ export const settingsSchema = {
   // Menu button background opacity: 0 = opaque, higher = more see-through.
   menuTranslucency: setting.number(0),
   // Branding: replaces the radial-menu center shape with a custom logo (Pro).
-  // Active whenever a center logo is set; synced with PopKey's branding toggle.
+  // Active whenever a center logo is set; brandingEnabled is synced with
+  // PopKey's branding toggle (the image/scale stay per-app). Stored in settings
+  // — not the @/pro stub — so the logo actually renders in every build.
   brandingEnabled: setting.boolean(false),
+  brandingImage: setting.string(""), // data URL of the center logo
+  brandingScale: setting.number(1, { positive: true }), // size multiplier (1 = 100%)
   gridMode: setting.enum(["none", "grid", "dots"], "none"),
   gridSize: setting.enum(["small", "large"], "small"),
   overlayMode: setting.enum(["live", "snapshot"], "live"),

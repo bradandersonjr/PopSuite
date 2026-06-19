@@ -53,6 +53,10 @@ export const sendMenuTranslucency = (val: number): void =>
   settings.sendSetting("menuTranslucency", val);
 export const sendBrandingEnabled = (val: boolean): void =>
   settings.sendSetting("brandingEnabled", val);
+export const sendBrandingImage = (dataUrl: string): void =>
+  settings.sendSetting("brandingImage", dataUrl);
+export const sendBrandingScale = (val: number): void =>
+  settings.sendSetting("brandingScale", val);
 export const sendGlowIntensity = (val: number): void =>
   settings.sendSetting("glowIntensity", val);
 export const sendTextColor = (val: TextColor): void =>

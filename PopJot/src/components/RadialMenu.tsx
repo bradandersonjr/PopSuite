@@ -6,7 +6,7 @@ import { normalizeKey, isHotkeyPressed, isMac } from "@shared/lib/hotkeys";
 import { isDesktop, onShortcutActivate, onShortcutPersistent, overlayActivated, overlayDeactivated } from "@/lib/platform";
 import { getGradientVariantStops, getHighlighterGradientStops } from "@/config/themes";
 import { getAnimationConfig } from "@shared/config/animations";
-import { getProCenterIcon, getProCenterScale, getEffectiveColors, getProPalette } from "@/pro";
+import { getEffectiveColors, getProPalette } from "@/pro";
 import RadialButton from "./RadialButton";
 import PaletteEffectOverlay from "@shared/components/PaletteEffectOverlay";
 import { withAlpha } from "@/lib/color";
@@ -144,6 +144,9 @@ const RadialMenu = () => {
   const themeMode = useStore(state => state.themeMode);
   const menuTranslucency = useStore(state => state.menuTranslucency);
   const brandingEnabled = useStore(state => state.brandingEnabled);
+  const brandingImage = useStore(state => state.brandingImage);
+  const brandingScale = useStore(state => state.brandingScale);
+  const isPro = useStore(state => state.isPro);
   const menuBgAlpha = 1 - menuTranslucency / 100;
   const menuFlatBase = themeMode === "dark" ? "#242424" : "#F8F8F6";
   const scaleFactor = useStore(state => state.scaleFactor);
@@ -616,9 +619,11 @@ const RadialMenu = () => {
 
             {/* Center circle */}
             {(() => {
-              const proScale = activeIndex === null ? getProCenterScale() : 1;
-              // Branding logo replaces the center shape only while branding is on.
-              const proIcon = brandingEnabled ? getProCenterIcon() : null;
+              // Branding logo replaces the center shape (Pro). Stored in
+              // settings so it renders in every build, gated on Pro + enabled.
+              const brandingActive = isPro && brandingEnabled && brandingImage !== "";
+              const proScale = activeIndex === null && brandingActive ? brandingScale : 1;
+              const proIcon = brandingActive ? brandingImage : null;
               const circleSize = 48 * scaleFactor * proScale;
               const iconSize = 22 * scaleFactor * proScale;
               const centerBorderRadius = `${buttonRoundness / 2}%`;
