@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { activateLicense, deactivateLicense } from "@shared/license/renderer";
 import CustomPaletteSettings from "@/components/pro/CustomPaletteSettings";
 import CenterCircleSettings from "@/components/pro/CenterCircleSettings";
+import BrandingSettings from "@/components/BrandingSettings";
 
 /** Ko-fi product page where buyers get a PopJot Pro key. */
 const POPJOT_PRO_URL = "https://ko-fi.com/s/264fd0031f";
@@ -19,7 +20,6 @@ import {
   sendTextColor,
   sendButtonRoundness,
   sendMenuTranslucency,
-  sendBrandingEnabled,
   sendSolidColor,
   sendScaleFactor,
   sendThemeMode,
@@ -217,8 +217,6 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     setButtonRoundness: setButtonRoundnessLocal,
     menuTranslucency,
     setMenuTranslucency: setMenuTranslucencyLocal,
-    brandingEnabled,
-    setBrandingEnabled: setBrandingEnabledLocal,
     isPro,
   } = useStore();
 
@@ -323,11 +321,6 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     sendMenuTranslucency(val);
   };
 
-  const toggleBranding = () => {
-    const v = !brandingEnabled;
-    setBrandingEnabledLocal(v);
-    sendBrandingEnabled(v);
-  };
 
   const applySolidColor = (color: string) => {
     setSolidColorLocal(color);
@@ -602,22 +595,27 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
         <SettingGroup key="translucency" title="Translucency" description="Menu button background opacity">
           <SliderRow value={menuTranslucency} min={0} max={95} step={5} onChange={applyMenuTranslucency} valueSuffix="%" defaultValue={0} />
         </SettingGroup>,
-        <SettingGroup key="branding" title="Branding" description="Custom palette, stroke effects & center circle" pro locked={!isPro} buyUrl={POPJOT_PRO_URL}>
-          <div className="space-y-2.5">
-            <ToggleRow label="Show branding" description="Custom palette & center circle" checked={brandingEnabled} onChange={toggleBranding} />
-            {brandingEnabled && (
-              <div className="space-y-5">
-                <div>
-                  <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Custom Palette</div>
-                  <CustomPaletteSettings />
-                </div>
-                <div className="h-px" style={{ backgroundColor: surfacePalette.divider }} />
-                <div>
-                  <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Center Circle</div>
-                  <CenterCircleSettings />
-                </div>
-              </div>
-            )}
+      ],
+    },
+    {
+      title: "Branding",
+      items: [
+        <SettingGroup key="branding" title="Branding" description="Logo/watermark, custom palette, stroke effects & center circle" pro locked={!isPro} buyUrl={POPJOT_PRO_URL}>
+          <div className="space-y-5">
+            <div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Logo / Watermark</div>
+              <BrandingSettings />
+            </div>
+            <div className="h-px" style={{ backgroundColor: surfacePalette.divider }} />
+            <div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Custom Palette</div>
+              <CustomPaletteSettings />
+            </div>
+            <div className="h-px" style={{ backgroundColor: surfacePalette.divider }} />
+            <div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Center Circle</div>
+              <CenterCircleSettings />
+            </div>
           </div>
         </SettingGroup>,
       ],

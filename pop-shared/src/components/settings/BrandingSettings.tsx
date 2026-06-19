@@ -7,7 +7,7 @@ import { useRef } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
 import type { SurfacePalette } from "../../config/desktopTheme";
 import type { BrandingCorner } from "../BrandingOverlay";
-import { SliderRow, ToggleRow } from "./primitives";
+import { SliderRow } from "./primitives";
 
 const CORNERS: { value: BrandingCorner; label: string }[] = [
   { value: "top-left", label: "Top Left" },
@@ -18,14 +18,12 @@ const CORNERS: { value: BrandingCorner; label: string }[] = [
 
 export function BrandingSettings({
   palette,
-  enabled,
   image,
   corner,
   size,
   opacity,
   radius,
   blockedCorner,
-  onToggle,
   onImage,
   onCorner,
   onSize,
@@ -33,14 +31,12 @@ export function BrandingSettings({
   onRadius,
 }: {
   palette: SurfacePalette;
-  enabled: boolean;
   image: string;
   corner: BrandingCorner;
   size: number;
   opacity: number;
   radius: number;
   blockedCorner: BrandingCorner | null;
-  onToggle: () => void;
   onImage: (dataUrl: string) => void;
   onCorner: (c: BrandingCorner) => void;
   onSize: (px: number) => void;
@@ -57,10 +53,6 @@ export function BrandingSettings({
 
   return (
     <div className="space-y-2.5">
-      <ToggleRow label="Show branding" description="Pin a logo/image to a screen corner" checked={enabled} onChange={onToggle} />
-
-      {enabled && (
-        <>
           <div className="flex items-center gap-2 rounded-[12px] px-3 py-2" style={{ backgroundColor: palette.card }}>
             {image ? (
               <img src={image} alt="" className="h-8 w-8 rounded object-contain" style={{ backgroundColor: palette.panel }} />
@@ -139,8 +131,6 @@ export function BrandingSettings({
             <div className="mb-1 text-xs font-medium" style={{ color: palette.text }}>Corner Radius</div>
             <SliderRow value={radius} min={0} max={50} step={2} onChange={onRadius} valueSuffix="%" defaultValue={0} />
           </div>
-        </>
-      )}
     </div>
   );
 }

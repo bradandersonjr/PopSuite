@@ -20,6 +20,7 @@ import type {
   GridSize,
   OverlayMode,
   TextColor,
+  BrandingCorner,
 } from "@/store/useStore";
 
 export {
@@ -53,6 +54,15 @@ export const sendMenuTranslucency = (val: number): void =>
   settings.sendSetting("menuTranslucency", val);
 export const sendBrandingEnabled = (val: boolean): void =>
   settings.sendSetting("brandingEnabled", val);
+export const sendBrandingImage = (dataUrl: string): void =>
+  settings.sendSetting("brandingImage", dataUrl);
+export const sendBrandingCorner = (corner: BrandingCorner): void =>
+  settings.sendSetting("brandingCorner", corner);
+export const sendBrandingSize = (px: number): void => settings.sendSetting("brandingSize", px);
+export const sendBrandingOpacity = (val: number): void =>
+  settings.sendSetting("brandingOpacity", val);
+export const sendBrandingRadius = (val: number): void =>
+  settings.sendSetting("brandingRadius", val);
 export const sendGlowIntensity = (val: number): void =>
   settings.sendSetting("glowIntensity", val);
 export const sendTextColor = (val: TextColor): void =>

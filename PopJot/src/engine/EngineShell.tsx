@@ -1,6 +1,7 @@
 import { useStore, DRAWING_TOOLS } from "@/store/useStore";
 import Canvas, { StrokeType } from "@/components/Canvas";
 import RadialMenu from "@/components/RadialMenu";
+import BrandingOverlay from "@/components/BrandingOverlay";
 
 const EngineShell = () => {
   const { tool, color, appEnabled, snapshotDataUrl } = useStore();
@@ -17,6 +18,7 @@ const EngineShell = () => {
         />
       )}
       {appEnabled && <Canvas tool={canvasTool} color={color} />}
+      {appEnabled && <BrandingOverlay />}
       <RadialMenu />
     </>
   );

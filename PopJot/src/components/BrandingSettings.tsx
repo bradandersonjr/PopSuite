@@ -2,16 +2,16 @@ import { useStore } from "@/store/useStore";
 import type { BrandingCorner } from "@/store/useStore";
 import { BrandingSettings as SharedBrandingSettings } from "@shared/components/settings";
 import { getSurfacePalette } from "@shared/config/desktopTheme";
-import { blockedBrandingCorner } from "@/lib/branding";
 import {
-  sendBrandingEnabled,
   sendBrandingImage,
   sendBrandingCorner,
   sendBrandingSize,
   sendBrandingOpacity,
   sendBrandingRadius,
+  sendBrandingEnabled,
 } from "@/lib/platform";
 
+/** PopJot branding overlay settings — logo/watermark, shared with PopKey. */
 const BrandingSettings = () => {
   const s = useStore();
   const palette = getSurfacePalette(s.themeMode === "dark");
@@ -24,9 +24,9 @@ const BrandingSettings = () => {
       size={s.brandingSize}
       opacity={s.brandingOpacity}
       radius={s.brandingRadius}
-      blockedCorner={blockedBrandingCorner(s.displayPosition)}
-      // No separate toggle now that Branding is its own tab: the overlay is
-      // active whenever a logo image is set.
+      // PopJot has no fixed badge corner to avoid, so nothing is blocked.
+      blockedCorner={null}
+      // No separate toggle: the watermark is active whenever an image is set.
       onImage={(url) => {
         s.setBrandingImage(url); sendBrandingImage(url);
         const on = url !== ""; s.setBrandingEnabled(on); sendBrandingEnabled(on);

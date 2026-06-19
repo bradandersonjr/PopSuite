@@ -13,6 +13,7 @@ export type GridMode = SettingValue<(typeof settingsSchema)["gridMode"]>;
 export type GridSize = SettingValue<(typeof settingsSchema)["gridSize"]>;
 export type OverlayMode = SettingValue<(typeof settingsSchema)["overlayMode"]>;
 export type TextColor = SettingValue<(typeof settingsSchema)["textColor"]>;
+export type BrandingCorner = SettingValue<(typeof settingsSchema)["brandingCorner"]>;
 
 export type Tool = "history" | "marker" | "pen" | "highlighter" | "eraser" | "screen";
 export type BackgroundMode = "transparent" | "dark" | "light";
