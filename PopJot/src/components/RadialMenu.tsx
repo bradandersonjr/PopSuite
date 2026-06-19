@@ -514,6 +514,11 @@ const RadialMenu = () => {
                     hasActiveSelection={hasActiveSelection}
                     menuOpen={menuOpen}
                     title={MAIN_LABELS[i]}
+                    ringColor={
+                      menuStyle === "flat-outline"
+                        ? popColorsRef.current.colors[i % popColorsRef.current.colors.length]
+                        : undefined
+                    }
                     popColor={
                       isPop && !popColorsRef.current.gradientStops
                         ? popColorsRef.current.colors[i % popColorsRef.current.colors.length]
