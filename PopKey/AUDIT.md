@@ -22,8 +22,8 @@ Same root cause as PopJot: `vitest.config.ts` had pointed `include`/`setupFiles`
 ### 2. Lint warnings (Resolved 2026-05-30)
 The 9 app-side warnings were cleared: removed unused vars in `SystemTray.tsx`/`WebRoot.tsx`, and **fixed the `react-hooks/exhaustive-deps` stale-closure** at `SystemTray.tsx:178` by adding `setScaleFactorLocal`. One pre-existing warning remains in the shared `button.tsx` (shadcn `buttonVariants` exported alongside the component) — fix belongs in `pop-shared`.
 
-### 3. Default-hotkey inconsistency (Low)
-`src/main/index.ts` `getDefaultShortcut()` returns `Alt+Shift+K`, while `src/store/useStore.ts` initializes `hotkey` to `Alt + Shift + A`. The main process owns the global accelerator, so the effective toggle is `Alt+Shift+K`; align the store default to avoid a misleading settings display.
+### 3. Default-hotkey inconsistency (Resolved 2026-07-02)
+The main process owns the global accelerator (`Alt+Shift+K` / `Cmd+Shift+K`), while `src/store/useStore.ts` had initialized `hotkey` to `Alt + Shift + A`. On desktop the store value is overwritten by the synced accelerator, but the pre-sync placeholder briefly showed the wrong key. Fixed: the store default now matches the main default (`Alt+Shift+K` / `Cmd+Shift+K`).
 
 ### 4. Documentation drift (Resolved)
 The previous `README.md` and `AUDIT.md` were copies of PopJot/"QuickInk" docs and described a screen-annotation tool, not PopKey. Both have been rewritten to describe the actual app.
@@ -37,5 +37,4 @@ The previous `README.md` and `AUDIT.md` were copies of PopJot/"QuickInk" docs an
 ## Recommended next steps
 
 1. Add coverage for the `useInputCapture` badge lifecycle (test wiring is now working).
-2. Reconcile the default hotkey between main and store (Finding #3, still open).
-3. Move the shared `button.tsx` `buttonVariants` export to its own module in `pop-shared`.
+2. Move the shared `button.tsx` `buttonVariants` export to its own module in `pop-shared`.

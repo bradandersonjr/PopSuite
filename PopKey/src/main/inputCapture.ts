@@ -10,6 +10,11 @@ for (const [name, code] of Object.entries(UiohookKey)) {
   }
 }
 
+// Platform-appropriate label for the Meta/OS key: "Cmd" on macOS, "Super" on
+// Linux (X11/desktop convention), "Win" on Windows.
+const META_KEY_LABEL =
+  process.platform === "darwin" ? "Cmd" : process.platform === "linux" ? "Super" : "Win";
+
 // Friendly display overrides
 const DISPLAY_NAMES: Record<string, string> = {
   Space: "Space",
@@ -40,8 +45,8 @@ const DISPLAY_NAMES: Record<string, string> = {
   CtrlRight: "Ctrl",
   AltLeft: "Alt",
   AltRight: "Alt",
-  MetaLeft: "Win",
-  MetaRight: "Win",
+  MetaLeft: META_KEY_LABEL,
+  MetaRight: META_KEY_LABEL,
   // Number keys
   "0": "0", "1": "1", "2": "2", "3": "3", "4": "4",
   "5": "5", "6": "6", "7": "7", "8": "8", "9": "9",
@@ -179,8 +184,11 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
       }
     }
 
-    // Win key causes OS focus loss — clear all held state in the renderer after a short delay
-    if (WIN_KEYCODES.has(e.keycode)) {
+    // Windows-only: pressing the Win key opens the Start menu and steals focus,
+    // so we clear all held state in the renderer after a short delay. On macOS,
+    // Cmd is the primary chord modifier — clearing here would wipe held state
+    // mid-chord — so this behavior is gated to win32.
+    if (process.platform === "win32" && WIN_KEYCODES.has(e.keycode)) {
       setTimeout(() => {
         for (const win of getWindows()) {
           if (!win.isDestroyed()) win.webContents.send("input:focus-lost");
@@ -240,7 +248,13 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
     }
   });
 
-  uIOhook.start();
+  try {
+    uIOhook.start();
+  } catch (err) {
+    // A native hook failure (missing macOS permission, Wayland session on Linux,
+    // etc.) must not crash the main process — the rest of the app stays usable.
+    console.error(`Failed to start input capture (uIOhook): ${String(err)}`);
+  }
 }
 
 export function stopInputCapture(): void {

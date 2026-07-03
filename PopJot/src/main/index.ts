@@ -113,6 +113,15 @@ const popApp = createPopApp({
   onReady: (ctx) => {
     ctx.setTrayActive(enabled);
     void warmupScreenshotCapture();
+
+    // The overlay clears shortcutFired via "overlay-deactivated". If its
+    // webContents reloads or crashes while active, that event never arrives and
+    // the flag sticks — wedging the main hotkey until restart. Resetting on
+    // did-finish-load recovers the gate whenever the overlay (re)loads.
+    const main = ctx.getMainWindow();
+    main?.webContents.on("did-finish-load", () => {
+      shortcutFired = false;
+    });
   },
 });
 

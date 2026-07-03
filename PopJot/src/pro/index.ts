@@ -11,6 +11,11 @@
  *
  * Keep this file's exported surface (names, signatures, types) in lockstep
  * with the private implementation so both builds typecheck against it.
+ *
+ * NOTE: The web demo (embedded/WebRoot) bypasses the license gate via
+ * `effectiveIsPro` in SystemTray, so the UI is fully unlocked. The in-memory
+ * state below makes the features actually functional during a web session
+ * without requiring the private Pro build.
  */
 
 import { getColors } from "@/config/themes";
@@ -32,19 +37,29 @@ export const isPro = (): boolean => licensed;
 
 // ─── Custom Palette ───────────────────────────────────────────────────────────
 
+let _palette: { draw: string[]; highlighter: string[] } | null = null;
+
 export const getProPalette = (
-  _palette: ColorPalette | null,
-): { draw: readonly string[]; highlighter: readonly string[] } | null => null;
+  _p: ColorPalette | null,
+): { draw: readonly string[]; highlighter: readonly string[] } | null => _palette;
 
-export const setProPalette = (_draw: string[], _highlighter: string[]): void => {};
+export const setProPalette = (draw: string[], highlighter: string[]): void => {
+  _palette = { draw, highlighter };
+};
 
-export const clearProPalette = (): void => {};
+export const clearProPalette = (): void => {
+  _palette = null;
+};
 
 // ─── Palette Active Toggle ────────────────────────────────────────────────────
 
-export const isProPaletteActive = (): boolean => false;
+let _paletteActive = false;
 
-export const setProPaletteActive = (_active: boolean): void => {};
+export const isProPaletteActive = (): boolean => _paletteActive && _palette !== null;
+
+export const setProPaletteActive = (active: boolean): void => {
+  _paletteActive = active;
+};
 
 // ─── Presets ──────────────────────────────────────────────────────────────────
 
@@ -55,16 +70,19 @@ export type PalettePreset = {
   highlighter: string[];
 };
 
-export const getProPresets = (): PalettePreset[] => [];
+let _presets: PalettePreset[] = [];
 
-export const saveProPreset = (name: string, draw: string[], highlighter: string[]): PalettePreset => ({
-  id: Date.now().toString(),
-  name,
-  draw,
-  highlighter,
-});
+export const getProPresets = (): PalettePreset[] => [..._presets];
 
-export const deleteProPreset = (_id: string): void => {};
+export const saveProPreset = (name: string, draw: string[], highlighter: string[]): PalettePreset => {
+  const p: PalettePreset = { id: Date.now().toString(), name, draw, highlighter };
+  _presets.push(p);
+  return p;
+};
+
+export const deleteProPreset = (id: string): void => {
+  _presets = _presets.filter((p) => p.id !== id);
+};
 
 // ─── Custom Center Icon ───────────────────────────────────────────────────────
 
@@ -84,14 +102,35 @@ export const setProCenterScale = (_scale: number): void => {};
 
 export type ProEffect = "none" | "gradient" | "glitter";
 
-export const getProEffect = (): ProEffect => "none";
+let _effect: ProEffect = "none";
 
-export const setProEffect = (_effect: ProEffect): void => {};
+export const getProEffect = (): ProEffect => _effect;
+
+export const setProEffect = (effect: ProEffect): void => {
+  _effect = effect;
+};
 
 // ─── Effective Colors ─────────────────────────────────────────────────────────
 
 /**
- * Free build: always the built-in palette (no Pro overrides). Mirrors the
- * private implementation's signature so callers are identical in both builds.
+ * Returns the active custom palette when set, otherwise falls back to the
+ * built-in palette. Mirrors the private implementation's signature.
+ *
+ * Always returns the same shape — { draw, highlighter, tertiary } — so callers
+ * can destructure any slot without a discriminated union. A custom Pro palette
+ * only overrides draw/highlighter; the center-circle tertiary colors always come
+ * from the built-in palette so the center still has a sensible accent color.
  */
-export const getEffectiveColors = (palette: ColorPalette) => getColors(palette);
+export const getEffectiveColors = (
+  palette: ColorPalette,
+): { draw: readonly string[]; highlighter: readonly string[]; tertiary: readonly string[] } => {
+  const base = getColors(palette);
+  if (_paletteActive && _palette) {
+    return {
+      draw: _palette.draw as readonly string[],
+      highlighter: _palette.highlighter as readonly string[],
+      tertiary: base.tertiary,
+    };
+  }
+  return base;
+};

@@ -76,15 +76,18 @@ PopKey runs from the system tray. Toggle the on-screen overlay with the global s
 
 ### Configuration (tray / settings)
 
-- **Color palette**: muted, vibrant, retro, neon, pastel
+- **Color palette**: muted, vibrant, retro, neon, pastel, gradient, glitter, and solid (8 total)
+- **Badge style**: flat, flat-outline, pop, glow (default **pop**) — with translucency and roundness controls
+- **Font**: mono, sans, serif free; any installed system font via a searchable picker (Pro)
+- **Text color**: follow the theme, or force white / black
 - **Theme**: dark or light
-- **Animation intensity**: low, medium, high
+- **Animation intensity**: low, medium, high — plus Pro badge enter/exit animations (slide, bounce, fade, rise)
 - **Display position**: any of six screen anchors, with fine X/Y offset
 - **Scale**: overall size multiplier (auto-scales to monitor DPI)
-- **Badge style**: flat, flat-outline, pop, pop-mono — with translucency, blur, and roundness controls
 - **Badge behavior**: on-screen duration and maximum simultaneous badges
 - **Inputs**: independently toggle keyboard, mouse clicks, and scroll-wheel visualization
 - **Colors**: per-feature override colors for clicks and scrolls (or follow the palette)
+- **Branding** (Pro): pin a logo / watermark to a screen corner for screencasts
 
 ## Notes
 
@@ -92,3 +95,8 @@ PopKey runs from the system tray. Toggle the on-screen overlay with the global s
 - Overlay/position behavior is centered on the primary display.
 - Global shortcut registration can fail if another app already owns the accelerator.
 - The web root is a functional demo surface, so some desktop settings are exposed there intentionally.
+
+### Known platform limitations
+
+- **Linux**: `uiohook-napi` requires an X11 session. It does not support Wayland, so global key/mouse capture will not work under a native Wayland session (use an X11/Xorg session, or XWayland where available).
+- **macOS**: input capture requires both Accessibility and Input Monitoring permission in System Settings > Privacy & Security. PopKey prompts on first launch; you may need to restart the app after granting permission.

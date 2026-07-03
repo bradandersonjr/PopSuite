@@ -29,7 +29,8 @@ import {
   clipboard,
 } from "electron";
 import { join } from "path";
-import { existsSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync, unlinkSync } from "fs";
+import { homedir } from "os";
 import { registerSettingsIpc } from "../settings/main";
 import { createSettingsSync } from "./settingsSync";
 import {
@@ -124,15 +125,42 @@ export interface PopAppOptions<S extends SettingsSchema> {
   onWillQuit?: () => void;
 }
 
+/**
+ * Minimal no-op context returned by the losing instance after it fails the
+ * single-instance lock and calls app.quit(). Every method is inert so the
+ * app's module-level `createPopApp(...)` call still resolves to a valid object
+ * without running any side effects (no windows, no IPC, no file IO).
+ */
+function createInertContext<S extends SettingsSchema>(): PopAppContext<S> {
+  return {
+    settings: {} as SettingsValues<S>,
+    getMainWindow: () => null,
+    getSettingsWindow: () => null,
+    sendToMainWindow: () => {},
+    sendToRenderers: () => {},
+    moveOverlayToCursorDisplay: () => {},
+    setOverlayAlwaysOnTop: () => {},
+    setTrayActive: () => {},
+    isPro: () => false,
+    getCursorDipPosition: () => ({ x: 0, y: 0 }),
+    openSettingsWindow: () => {},
+  };
+}
+
 export function createPopApp<S extends SettingsSchema>(
   options: PopAppOptions<S>
 ): PopAppContext<S> {
   const { appName, settingsSchema } = options;
 
   // ─── Single instance lock ────────────────────────────────────────────
+  // When we lose the lock a sibling instance is already running: quit and
+  // return an inert context immediately. Registering IPC, creating settingsSync
+  // (which does file IO), or scheduling whenReady work in the losing instance
+  // would race the primary and touch the same settings files before quit lands.
   const gotTheLock = app.requestSingleInstanceLock();
   if (!gotTheLock) {
     app.quit();
+    return createInertContext<S>();
   }
 
   let mainWindow: BrowserWindow | null = null;
@@ -206,9 +234,55 @@ export function createPopApp<S extends SettingsSchema>(
     return wrapped as { [K in keyof S]?: (value: SettingValue<S[K]>) => void };
   }
 
+  // ─── Open-at-login (platform-aware) ──────────────────────────────────
+
+  // app.setLoginItemSettings / getLoginItemSettings are no-ops on Linux, so
+  // there we manage an XDG autostart .desktop file by hand. Routing every
+  // platform through these two helpers keeps the IPC + tray-sync read paths on
+  // a single code path.
+
+  function linuxAutostartPath(): string {
+    return join(homedir(), ".config", "autostart", `${appName.toLowerCase()}.desktop`);
+  }
+
+  function getOpenAtLoginState(): boolean {
+    if (process.platform === "linux") {
+      return existsSync(linuxAutostartPath());
+    }
+    return app.getLoginItemSettings().openAtLogin;
+  }
+
+  function setOpenAtLoginState(enabled: boolean): void {
+    if (process.platform === "linux") {
+      const file = linuxAutostartPath();
+      try {
+        if (enabled) {
+          // Prefer the AppImage path when running packaged as one; fall back to
+          // the current executable. Quote it so paths with spaces still launch.
+          const exec = process.env.APPIMAGE ?? process.execPath;
+          const contents =
+            "[Desktop Entry]\n" +
+            "Type=Application\n" +
+            `Name=${appName}\n` +
+            `Exec="${exec}"\n` +
+            "X-GNOME-Autostart-enabled=true\n";
+          mkdirSync(join(homedir(), ".config", "autostart"), { recursive: true });
+          writeFileSync(file, contents, "utf-8");
+        } else if (existsSync(file)) {
+          unlinkSync(file);
+        }
+      } catch (err) {
+        // Best-effort, consistent with settings persistence.
+        console.error(`Failed to update Linux autostart entry: ${String(err)}`);
+      }
+      return;
+    }
+    app.setLoginItemSettings({ openAtLogin: enabled });
+  }
+
   function syncTraySettingsToWindow(win: BrowserWindow): void {
     settingsController.syncToWindow(win);
-    win.webContents.send("tray-open-at-login", app.getLoginItemSettings().openAtLogin);
+    win.webContents.send("tray-open-at-login", getOpenAtLoginState());
     for (const name of Object.keys(shortcutState)) {
       win.webContents.send(`tray-set-${name}-shortcut`, shortcutState[name]);
     }
@@ -272,6 +346,13 @@ export function createPopApp<S extends SettingsSchema>(
     });
 
     win.setAlwaysOnTop(true, OVERLAY_TOP_LEVEL);
+    // macOS: show the overlay over fullscreen apps and on every Space. Marking it
+    // non-fullscreenable keeps it from ever entering its own fullscreen Space
+    // (which would hide it behind the app the user is drawing over).
+    if (process.platform === "darwin") {
+      win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      win.setFullScreenable(false);
+    }
     // No { forward: true } — we don't need hover detection on the transparent window.
     // Forwarding keeps the window in the input pipeline and can intercept synthetic
     // right/middle-click events from tablet drivers (e.g. Huion stylus buttons).
@@ -307,7 +388,14 @@ export function createPopApp<S extends SettingsSchema>(
     if (!tray || tray.isDestroyed()) return;
     const next = active && trayActiveImage ? trayActiveImage : trayIdleImage;
     if (next) tray.setImage(next);
+    // Linux uses a persisted context menu (see createTray), so the Enable/Disable
+    // label must be rebuilt whenever the active state — and thus the label — changes.
+    refreshLinuxTrayMenu();
   }
+
+  // Assigned in createTray on Linux; a no-op elsewhere (where the menu is built
+  // fresh per right-click instead of persisted).
+  let refreshLinuxTrayMenu: () => void = () => {};
 
   function createSettingsWindow(): BrowserWindow {
     const iconPath = trayIconPath();
@@ -403,11 +491,11 @@ export function createPopApp<S extends SettingsSchema>(
   });
 
   ipcMain.handle("get-open-at-login", () => {
-    return app.getLoginItemSettings().openAtLogin;
+    return getOpenAtLoginState();
   });
 
   ipcMain.on("set-open-at-login", (_event, enabled: boolean) => {
-    app.setLoginItemSettings({ openAtLogin: Boolean(enabled) });
+    setOpenAtLoginState(Boolean(enabled));
     sendToRenderers("tray-open-at-login", Boolean(enabled));
   });
 
@@ -511,7 +599,12 @@ export function createPopApp<S extends SettingsSchema>(
               label: options.trayToggle.getEnabled()
                 ? `Disable ${appName}`
                 : `Enable ${appName}`,
-              click: () => options.trayToggle!.onToggle(),
+              click: () => {
+                options.trayToggle!.onToggle();
+                // Keep the persisted Linux menu label current even if an app's
+                // onToggle didn't route through setTrayActive.
+                refreshLinuxTrayMenu();
+              },
             },
             sep,
           ]
@@ -551,10 +644,23 @@ export function createPopApp<S extends SettingsSchema>(
     if (options.tray?.doubleClickOpensSettings) {
       tray.on("double-click", () => openSettingsWindow());
     }
-    // Build a fresh menu per click and pass it directly to popUpContextMenu.
-    // We intentionally never call setContextMenu — a persisted menu makes
-    // Windows auto-show the *previous* menu on right-click (stale by one click),
-    // so the Enable/Disable label would lag a step behind the real state.
+
+    if (process.platform === "linux") {
+      // Linux (libappindicator) does not emit "right-click" and does not support
+      // popUpContextMenu, so the per-click approach below leaves the menu
+      // unreachable. Use a persisted context menu instead, and rebuild it via
+      // refreshLinuxTrayMenu whenever the Enable/Disable label would change.
+      refreshLinuxTrayMenu = () => {
+        if (tray && !tray.isDestroyed()) tray.setContextMenu(buildTrayMenu());
+      };
+      refreshLinuxTrayMenu();
+      return;
+    }
+
+    // win32 / darwin: build a fresh menu per click and pass it directly to
+    // popUpContextMenu. We intentionally never call setContextMenu — a persisted
+    // menu makes Windows auto-show the *previous* menu on right-click (stale by
+    // one click), so the Enable/Disable label would lag a step behind the real state.
     tray.on("right-click", () => {
       tray?.popUpContextMenu(buildTrayMenu());
     });

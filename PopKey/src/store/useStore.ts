@@ -35,7 +35,10 @@ export const useStore = create<AppState>((set) => ({
 
     appEnabled: true,
     setAppEnabled: (appEnabled) => set({ appEnabled }),
-    hotkey: isMac() ? "Cmd + Shift + A" : "Alt + Shift + A",
+    // Placeholder until the main process syncs the real accelerator (which owns
+    // the global shortcut). Must match the main default "Alt+Shift+K" /
+    // "Cmd+Shift+K" so the settings display doesn't flash a wrong key.
+    hotkey: isMac() ? "Cmd + Shift + K" : "Alt + Shift + K",
     setHotkey: (hotkey) => set({ hotkey }),
     pageZoomFactor: 1,
     setPageZoomFactor: (pageZoomFactor) => set({ pageZoomFactor }),

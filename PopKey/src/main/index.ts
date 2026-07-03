@@ -1,4 +1,4 @@
-import { BrowserWindow } from "electron";
+import { BrowserWindow, dialog, systemPreferences } from "electron";
 import { createPopApp } from "@shared/main/createPopApp";
 import { settingsSchema } from "@/config/settingsSchema";
 import { startInputCapture, stopInputCapture } from "./inputCapture";
@@ -44,6 +44,27 @@ const popApp = createPopApp({
   onReady: (ctx) => {
     // Reflect the initial active state (visualizer on by default) in the tray.
     ctx.setTrayActive(active);
+
+    // macOS: global input capture needs Accessibility + Input Monitoring
+    // permission. If we aren't trusted yet, show a non-blocking heads-up and
+    // trigger the OS prompt (passing `true`). We still attempt to start capture
+    // below — it may begin working once the user grants permission (sometimes
+    // after a restart).
+    if (isMac && !systemPreferences.isTrustedAccessibilityClient(false)) {
+      void dialog.showMessageBox({
+        type: "info",
+        title: "PopKey needs permission",
+        message: "PopKey needs Accessibility and Input Monitoring permission",
+        detail:
+          "To visualize your keys and clicks, grant PopKey permission in " +
+          "System Settings > Privacy & Security (Accessibility and Input " +
+          "Monitoring), then restart PopKey.",
+        buttons: ["OK"],
+      });
+      // Passing `true` prompts the OS to open the Accessibility grant dialog.
+      systemPreferences.isTrustedAccessibilityClient(true);
+    }
+
     startInputCapture(() => {
       const windows: BrowserWindow[] = [];
       const main = ctx.getMainWindow();
