@@ -11,13 +11,13 @@ call where you want to point at things instead of saying "the button on the left
 the other one."
 
 ### Highlights
-- ✏️ **Marker, pen & highlighter** — three tools with pressure-style strokes (powered by perfect-freehand)
-- 🎯 **Radial tool menu** — pop a wheel under your cursor to switch tool, color, and size without leaving the canvas
-- 🎨 **8 color palettes & 4 menu styles** — make it yours
-- 🌗 **Dark / light themes & animations**
-- ⌨️ **Custom keyboard shortcuts** — bind the overlay toggle and tools to whatever fits your muscle memory
-- 🪟 **Transparent overlay over any app** — works on top of browsers, editors, slides, video calls
-- 💻 **Windows, macOS & Linux** — native Electron builds for all three
+- **Marker, pen & highlighter** — three tools with pressure-style strokes (powered by perfect-freehand)
+- **Radial tool menu** — pop a wheel under your cursor to switch tool, color, and size without leaving the canvas
+- **8 color palettes & 4 menu styles** — make it yours
+- **Dark / light themes & animations**
+- **Custom keyboard shortcuts** — bind the overlay toggle and tools to whatever fits your muscle memory
+- **Transparent overlay over any app** — works on top of browsers, editors, slides, video calls
+- **Windows, macOS & Linux** — native Electron builds for all three
 
 ### Getting started
 1. Download the installer for your platform below.
@@ -39,7 +39,7 @@ the other one."
 
 ---
 
-## ⚠️ "Windows protected your PC" / "macOS can't open this" — and how to install anyway
+## "Windows protected your PC" / "macOS can't open this" — and how to install anyway
 
 **This is expected, and the app is safe.** PopJot is free and open source, but the
 installers are **not code-signed yet.** Code-signing certificates cost money every
@@ -85,6 +85,6 @@ xattr -dr com.apple.quarantine /Applications/PopJot.app
 PopJot is free forever. If it saves you time, **PopSuite Pro** ($7 one-time) unlocks
 extra perks — custom color palettes, a custom radial-menu center icon, and a scalable
 center shape — and includes its sister app **PopKey**. It's open core: you *can* build
-the desktop app yourself, and buying Pro is mostly a way to support development. 💛
+the desktop app yourself, and buying Pro is mostly a way to support development.
 
 Found a bug or have an idea? [Open an issue](https://github.com/bradandersonjr/PopSuite/issues).

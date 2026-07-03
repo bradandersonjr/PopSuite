@@ -9,14 +9,14 @@ It draws over your entire screen, so the badges show up in any recording or
 screen-share, on top of whatever app you're using.
 
 ### Highlights
-- ⌨️ **Global keyboard capture** — every key and shortcut shown as a badge, system-wide (powered by uiohook)
-- 🖱️ **Mouse click & scroll visualization** — click ripples and a scroll-direction indicator
-- 🅰️ **Persistent modifier bar** — see Ctrl / Alt / Shift / ⌘ held state at a glance
-- 🎨 **4 badge styles & 8 color palettes** — plus font and roundness controls
-- 🌗 **Dark / light themes**
-- ⌨️ **Custom toggle shortcut**
-- 🪟 **Transparent overlay over any app**
-- 💻 **Windows, macOS & Linux** — native Electron builds for all three
+- **Global keyboard capture** — every key and shortcut shown as a badge, system-wide (powered by uiohook)
+- **Mouse click & scroll visualization** — click ripples and a scroll-direction indicator
+- **Persistent modifier bar** — see Ctrl / Alt / Shift / Cmd held state at a glance
+- **4 badge styles & 8 color palettes** — plus font and roundness controls
+- **Dark / light themes**
+- **Custom toggle shortcut**
+- **Transparent overlay over any app**
+- **Windows, macOS & Linux** — native Electron builds for all three
 
 ### Getting started
 1. Download the installer for your platform below.
@@ -43,7 +43,7 @@ screen-share, on top of whatever app you're using.
 
 ---
 
-## ⚠️ "Windows protected your PC" / "macOS can't open this" — and how to install anyway
+## "Windows protected your PC" / "macOS can't open this" — and how to install anyway
 
 **This is expected, and the app is safe.** PopKey is free and open source, but the
 installers are **not code-signed yet.** Code-signing certificates cost money every
@@ -91,6 +91,6 @@ xattr -dr com.apple.quarantine /Applications/PopKey.app
 PopKey is free forever. If it earns a spot in your recording setup, **PopSuite Pro**
 ($7 one-time) unlocks extra perks — custom color palettes, any system font, badge
 enter/exit animations, and a branding watermark — and includes its sister app **PopJot**. It's open core: you *can* build the desktop app
-yourself, and buying Pro is mostly a way to support development. 💛
+yourself, and buying Pro is mostly a way to support development.
 
 Found a bug or have an idea? [Open an issue](https://github.com/bradandersonjr/PopSuite/issues).
