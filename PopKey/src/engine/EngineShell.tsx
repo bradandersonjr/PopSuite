@@ -3,6 +3,7 @@ import { useInputCapture } from "@/hooks/useInputCapture";
 import InputHUD from "@/components/InputHUD";
 import MouseRipple from "@/components/MouseRipple";
 import ScrollIndicator from "@/components/ScrollIndicator";
+import BrandingOverlay from "@/components/BrandingOverlay";
 
 const EngineShell = () => {
   const { appEnabled, showMouseClicks, showScrollWheel } = useStore();
@@ -13,6 +14,7 @@ const EngineShell = () => {
       {appEnabled && <InputHUD badges={badges} />}
       {appEnabled && showMouseClicks && <MouseRipple clicks={clicks} />}
       {appEnabled && showScrollWheel && <ScrollIndicator scrolls={scrolls} />}
+      {appEnabled && <BrandingOverlay />}
     </>
   );
 };

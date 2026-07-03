@@ -5,6 +5,7 @@ import {
   sender,
   subscribe,
 } from "@shared/settings/preload";
+import { createLicenseBridge } from "@shared/license/preload";
 import { settingsSchema } from "@/config/settingsSchema";
 
 contextBridge.exposeInMainWorld("electronAPI", {
@@ -12,6 +13,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // quitApp, closeWindow, open-at-login.
   ...createSettingsBridge(settingsSchema),
   ...createShortcutBridge(["main", "persistent"]),
+  ...createLicenseBridge(),
 
   // Main → Renderer: global shortcut was pressed
   onShortcutActivate: subscribe("shortcut-activate"),

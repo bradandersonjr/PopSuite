@@ -158,106 +158,6 @@ function renderGlitterSpecs(specs: GlitterSpec[], strokeId: string) {
     ));
 }
 
-// ─── Magical Effect ─────────────────────────────────────────────────
-// Magical = Tinkerbell arch — luminous core + dense star-trail sparkles + bloom aura
-
-/** Build a magical sparkle palette from a base hex color: whites + progressively deeper tints */
-function buildMagicalColors(baseHex: string): string[] {
-    const r = parseInt(baseHex.slice(1, 3), 16);
-    const g = parseInt(baseHex.slice(3, 5), 16);
-    const b = parseInt(baseHex.slice(5, 7), 16);
-    const toHex = (n: number) => Math.round(Math.min(255, n)).toString(16).padStart(2, "0");
-    const tint = (factor: number) =>
-        `#${toHex(r + (255 - r) * factor)}${toHex(g + (255 - g) * factor)}${toHex(b + (255 - b) * factor)}`;
-    return [
-        "#FFFFFF", "#FFFFFF",   // pure white (most common)
-        tint(0.9),              // near-white tint
-        tint(0.7),              // light tint
-        tint(0.45),             // mid tint
-        tint(0.2),              // deep tint
-        baseHex,                // full stroke color
-    ];
-}
-
-type MagicalSparkle = {
-    x: number; y: number;
-    r: number;
-    color: string;
-    opacity: number;
-    isStar: boolean; // true = render as cross/star, false = circle
-    armLen: number;  // cross arm length (only used when isStar)
-};
-
-function generateMagicalDust(strokeId: string, points: { x: number; y: number }[], strokeSize: number, baseColor: string): MagicalSparkle[] {
-    if (points.length < 2) return [];
-    const rand = seededRandom(hashSeed(strokeId + "_dust"));
-    const sparkles: MagicalSparkle[] = [];
-    const halfSize = Math.max(strokeSize / 2, 4);
-    const magicalColors = buildMagicalColors(baseColor);
-
-    for (let i = 1; i < points.length; i++) {
-        const dx = points[i].x - points[i - 1].x;
-        const dy = points[i].y - points[i - 1].y;
-        const segLen = Math.sqrt(dx * dx + dy * dy);
-        if (segLen < 0.5) continue;
-        const nx = -dy / segLen;
-        const ny = dx / segLen;
-
-        // Adaptive: fewer sparkles + tighter scatter on fast segments
-        const count = Math.min(Math.ceil(segLen / 2.5), 6);
-        const scatter = halfSize * 1.6 * Math.min(1, 8 / Math.max(segLen, 1));
-
-        for (let j = 0; j < count; j++) {
-            const t = rand();
-            const px = points[i - 1].x + dx * t;
-            const py = points[i - 1].y + dy * t;
-            // Gaussian-ish offset: sum of two randoms → bell curve, biased toward path center
-            const offset = ((rand() + rand()) * 0.5 - 0.5) * 2 * scatter;
-            const dist = Math.abs(offset) / scatter; // 0=center, 1=edge
-            const isStar = rand() < 0.3; // 30% chance of star/cross shape
-            const r = isStar ? (0.8 + rand() * 1.4) : (0.4 + rand() * 1.8);
-            sparkles.push({
-                x: px + nx * offset,
-                y: py + ny * offset,
-                r,
-                color: magicalColors[Math.floor(rand() * magicalColors.length)],
-                opacity: (0.75 + rand() * 0.25) * (1 - dist * 0.4),
-                isStar,
-                armLen: r * (2 + rand() * 2.5),
-            });
-        }
-    }
-    return sparkles;
-}
-
-function renderMagicalDust(sparkles: MagicalSparkle[], strokeId: string, _fillColor: string) {
-    return sparkles.map((d, i) => (
-        <g key={`md-${strokeId}-${i}`} opacity={d.opacity}>
-            {d.isStar ? (
-                // Sharp 4-pointed star — no blur, crisp lines
-                <g>
-                    <line x1={d.x - d.armLen} y1={d.y} x2={d.x + d.armLen} y2={d.y}
-                        stroke={d.color} strokeWidth={d.r * 0.7} strokeLinecap="round" />
-                    <line x1={d.x} y1={d.y - d.armLen} x2={d.x} y2={d.y + d.armLen}
-                        stroke={d.color} strokeWidth={d.r * 0.7} strokeLinecap="round" />
-                    <line x1={d.x - d.armLen * 0.55} y1={d.y - d.armLen * 0.55} x2={d.x + d.armLen * 0.55} y2={d.y + d.armLen * 0.55}
-                        stroke={d.color} strokeWidth={d.r * 0.35} strokeLinecap="round" />
-                    <line x1={d.x + d.armLen * 0.55} y1={d.y - d.armLen * 0.55} x2={d.x - d.armLen * 0.55} y2={d.y + d.armLen * 0.55}
-                        stroke={d.color} strokeWidth={d.r * 0.35} strokeLinecap="round" />
-                    {/* White center hotspot */}
-                    <circle cx={d.x} cy={d.y} r={d.r * 0.5} fill="#FFFFFF" />
-                </g>
-            ) : (
-                // Crisp dot with white center — no halo
-                <>
-                    <circle cx={d.x} cy={d.y} r={d.r} fill={d.color} />
-                    <circle cx={d.x} cy={d.y} r={d.r * 0.45} fill="#FFFFFF" opacity={0.95} />
-                </>
-            )}
-        </g>
-    ));
-}
-
 function getStraightLineWidth(stroke: Stroke) {
     return stroke.size;
 }
@@ -369,21 +269,18 @@ function renderDotsPattern(isDark: boolean, size: "small" | "large", scale: numb
 
 // ─── Stroke Rendering ───────────────────────────────────────────────
 
-type PaletteEffect = "none" | "glitter" | "magical";
+type PaletteEffect = "none" | "glitter";
 
 /** Shared effect state derived from palette effect + stroke type */
 function getEffectState(effect: PaletteEffect, stroke: Stroke) {
     const hasEffect = effect !== "none" && stroke.type !== "eraser";
-    const hasGlow = hasEffect && (effect === "glitter" || effect === "magical");
-    const isMagical = hasEffect && effect === "magical";
+    const hasGlow = hasEffect && effect === "glitter";
     const glitterParticles = hasEffect && effect === "glitter"
         ? generateGlitterSpecs(stroke.id, stroke.points, stroke.size, stroke.color) : null;
-    const magicalDust = isMagical
-        ? generateMagicalDust(stroke.id, stroke.points, stroke.size, stroke.color) : null;
-    return { hasEffect, hasGlow, isMagical, glitterParticles, magicalDust };
+    return { hasEffect, hasGlow, glitterParticles };
 }
 
-/** Build getStroke options — shared between main stroke and magical core */
+/** Build getStroke options for a stroke. */
 function buildStrokeOptions(stroke: Stroke, sizeOverride?: number) {
     const isFlat = stroke.type === "pen" || stroke.type === "eraser";
     const isStylus = stroke.pointerType === "pen" || stroke.pointerType === "touch";
@@ -403,46 +300,9 @@ function buildStrokeOptions(stroke: Stroke, sizeOverride?: number) {
 
 function renderStraightStroke(stroke: Stroke, fillColor: string, opacity: number, effect: PaletteEffect = "none") {
     const [p1, p2] = stroke.points;
-    const { hasGlow, isMagical, glitterParticles, magicalDust } = getEffectState(effect, stroke);
+    const { hasGlow, glitterParticles } = getEffectState(effect, stroke);
     const lineWidth = getStraightLineWidth(stroke);
     const lineCap = stroke.type === "highlighter" ? "butt" as const : "round" as const;
-
-    // Magical straight lines get a fade gradient from p1 (dim) to p2 (bright)
-    if (isMagical) {
-        const fadeGradId = `magical-fade-grad-${stroke.id}`;
-        const fadeMaskId = `magical-fade-mask-${stroke.id}`;
-        const pad = lineWidth * 3;
-        const minX = Math.min(p1.x, p2.x) - pad;
-        const minY = Math.min(p1.y, p2.y) - pad;
-        const w = Math.abs(p2.x - p1.x) + pad * 2;
-        const h = Math.abs(p2.y - p1.y) + pad * 2;
-
-        return (
-            <g key={`stroke-${stroke.id}`}>
-                <defs>
-                    <linearGradient id={fadeGradId} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} gradientUnits="userSpaceOnUse">
-                        <stop offset="0%" stopColor="white" stopOpacity={0.15} />
-                        <stop offset="100%" stopColor="white" stopOpacity={1} />
-                    </linearGradient>
-                    <mask id={fadeMaskId}>
-                        <rect x={minX} y={minY} width={w} height={h} fill={`url(#${fadeGradId})`} />
-                    </mask>
-                </defs>
-                <g mask={`url(#${fadeMaskId})`}>
-                    <line key={`aura-${stroke.id}`} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
-                        stroke={fillColor} strokeWidth={lineWidth * 3} strokeLinecap={lineCap}
-                        opacity={opacity * 0.25} filter="url(#palette-glow)" />
-                    <line key={`line-${stroke.id}`} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
-                        stroke={fillColor} strokeWidth={lineWidth} strokeLinecap={lineCap}
-                        opacity={opacity * 0.9} filter="url(#magical-core-blur)" />
-                    <line key={`core-${stroke.id}`} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
-                        stroke="#FFFFFF" strokeWidth={Math.max(lineWidth * 0.8, 1.5)} strokeLinecap={lineCap}
-                        opacity={opacity * 0.95} />
-                    {magicalDust && renderMagicalDust(magicalDust, stroke.id, fillColor)}
-                </g>
-            </g>
-        );
-    }
 
     return (
         <g key={`stroke-${stroke.id}`}>
@@ -478,87 +338,8 @@ function renderFreehandStroke(stroke: Stroke, fillColor: string, opacity: number
     }
 
     const outlinePoints = getStroke(pts, buildStrokeOptions(stroke));
-    const { hasGlow, isMagical, glitterParticles, magicalDust } = getEffectState(effect, stroke);
+    const { hasGlow, glitterParticles } = getEffectState(effect, stroke);
     const pathD = getSvgPathFromStroke(outlinePoints);
-
-    // For magical inner core: render a thinner version of the stroke
-    let corePathD: string | null = null;
-    if (isMagical) {
-        const coreOutline = getStroke(pts, buildStrokeOptions(stroke, Math.max(stroke.size * 0.8, 1)));
-        corePathD = getSvgPathFromStroke(coreOutline);
-    }
-
-    // For magical strokes: compute a fade mask from first→last point
-    // so the stroke is dimmest at the start and brightest at the tip
-    let fadeMaskId: string | null = null;
-    let fadeGradientId: string | null = null;
-    if (isMagical && stroke.points.length >= 2) {
-        const first = stroke.points[0];
-        const last = stroke.points[stroke.points.length - 1];
-        // Compute bounding box for gradientUnits="userSpaceOnUse"
-        const allX = stroke.points.map(p => p.x);
-        const allY = stroke.points.map(p => p.y);
-        const minX = Math.min(...allX);
-        const maxX = Math.max(...allX);
-        const minY = Math.min(...allY);
-        const maxY = Math.max(...allY);
-        const pad = stroke.size * 3; // extra padding for glow/blur spread
-
-        fadeMaskId = `magical-fade-mask-${stroke.id}`;
-        fadeGradientId = `magical-fade-grad-${stroke.id}`;
-
-        return (
-            <g key={`stroke-${stroke.id}`}>
-                <defs>
-                    <linearGradient
-                        id={fadeGradientId}
-                        x1={first.x} y1={first.y}
-                        x2={last.x} y2={last.y}
-                        gradientUnits="userSpaceOnUse"
-                    >
-                        <stop offset="0%" stopColor="white" stopOpacity={0.15} />
-                        <stop offset="100%" stopColor="white" stopOpacity={1} />
-                    </linearGradient>
-                    <mask id={fadeMaskId}>
-                        <rect
-                            x={minX - pad} y={minY - pad}
-                            width={maxX - minX + pad * 2} height={maxY - minY + pad * 2}
-                            fill={`url(#${fadeGradientId})`}
-                        />
-                    </mask>
-                </defs>
-                <g mask={`url(#${fadeMaskId})`}>
-                    {/* Wide outer bloom */}
-                    <path
-                        key={`aura-${stroke.id}`}
-                        d={pathD}
-                        fill={fillColor}
-                        opacity={opacity * 0.25}
-                        filter="url(#palette-glow)"
-                    />
-                    {/* Soft colored core */}
-                    <path
-                        key={`path-${stroke.id}`}
-                        d={pathD}
-                        fill={fillColor}
-                        opacity={opacity * 0.9}
-                        filter="url(#magical-core-blur)"
-                    />
-                    {/* Bright white center line */}
-                    {corePathD && (
-                        <path
-                            key={`core-${stroke.id}`}
-                            d={corePathD}
-                            fill="#FFFFFF"
-                            opacity={opacity * 0.95}
-                        />
-                    )}
-                    {/* Sparkles on top */}
-                    {magicalDust && renderMagicalDust(magicalDust, stroke.id, fillColor)}
-                </g>
-            </g>
-        );
-    }
 
     return (
         <g key={`stroke-${stroke.id}`}>
@@ -567,7 +348,7 @@ function renderFreehandStroke(stroke: Stroke, fillColor: string, opacity: number
                     key={`aura-${stroke.id}`}
                     d={pathD}
                     fill={fillColor}
-                    opacity={opacity * (isMagical ? 0.25 : 0.3)}
+                    opacity={opacity * 0.3}
                     filter="url(#palette-glow)"
                 />
             )}
@@ -575,19 +356,8 @@ function renderFreehandStroke(stroke: Stroke, fillColor: string, opacity: number
                 key={`path-${stroke.id}`}
                 d={pathD}
                 fill={fillColor}
-                opacity={opacity * (isMagical ? 0.9 : 1)}
-                filter={isMagical ? "url(#magical-core-blur)" : undefined}
+                opacity={opacity}
             />
-            {corePathD && (
-                <path
-                    key={`core-${stroke.id}`}
-                    d={corePathD}
-                    fill="#FFFFFF"
-                    opacity={opacity * 0.95}
-                />
-            )}
-            {/* Magical sparkles on top of stroke */}
-            {magicalDust && renderMagicalDust(magicalDust, stroke.id, fillColor)}
             {glitterParticles && renderGlitterSpecs(glitterParticles, stroke.id)}
         </g>
     );
@@ -711,8 +481,8 @@ const Canvas = ({ tool, color }: CanvasProps) => {
     const proEffect = proOverrideActive ? getProEffect() : null;
     const useGradient = proOverrideActive ? proEffect === "gradient" : colorPalette === "gradient";
     const paletteEffect: PaletteEffect = proOverrideActive
-        ? (proEffect === "glitter" ? "glitter" : proEffect === "magical" ? "magical" : "none")
-        : (colorPalette === "glitter" ? "glitter" : colorPalette === "magical" ? "magical" : "none");
+        ? (proEffect === "glitter" ? "glitter" : "none")
+        : (colorPalette === "glitter" ? "glitter" : "none");
 
     const resetToIdle = useCallback(() => {
         machineRef.current = { ...IDLE_MACHINE };
@@ -1352,16 +1122,10 @@ const Canvas = ({ tool, color }: CanvasProps) => {
                         {/* Gradient stroke paints */}
                         {gradientStrokeDefs}
 
-                        {/* Glow filter for Glitter & Magical palettes */}
-                        {(paletteEffect === "glitter" || paletteEffect === "magical") && (
+                        {/* Glow filter for the Glitter palette */}
+                        {paletteEffect === "glitter" && (
                             <filter id="palette-glow" x="-60%" y="-60%" width="220%" height="220%">
-                                <feGaussianBlur in="SourceGraphic" stdDeviation={paletteEffect === "magical" ? "6" : "8"} />
-                            </filter>
-                        )}
-                        {/* Soft blur for magical colored core */}
-                        {paletteEffect === "magical" && (
-                            <filter id="magical-core-blur" x="-30%" y="-30%" width="160%" height="160%">
-                                <feGaussianBlur in="SourceGraphic" stdDeviation="1" />
+                                <feGaussianBlur in="SourceGraphic" stdDeviation="8" />
                             </filter>
                         )}
                     </defs>

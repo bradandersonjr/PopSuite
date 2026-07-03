@@ -25,10 +25,19 @@ import {
   Tray,
   nativeImage,
   ipcMain,
+  shell,
+  clipboard,
 } from "electron";
 import { join } from "path";
-import { existsSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync, unlinkSync } from "fs";
+import { homedir } from "os";
 import { registerSettingsIpc } from "../settings/main";
+import { createSettingsSync } from "./settingsSync";
+import {
+  createLicenseController,
+  registerLicenseIpc,
+  type LicenseController,
+} from "./license";
 import type { SettingsSchema, SettingsValues, SettingValue } from "../settings/schema";
 
 export type ShortcutUpdateResult =
@@ -46,6 +55,20 @@ export interface PopAppContext<S extends SettingsSchema> {
   sendToRenderers(channel: string, value: unknown): void;
   /** Move the overlay window to cover the display the cursor is on. */
   moveOverlayToCursorDisplay(): void;
+  /**
+   * Pin/unpin the overlay's always-on-top state. Pass `false` to let the
+   * overlay sit in normal z-order (e.g. so OBS can capture it as its own
+   * window source rather than it being hard-layered over everything).
+   */
+  setOverlayAlwaysOnTop(onTop: boolean): void;
+  /**
+   * Reflect the app's active/idle state in the tray icon (swaps to the
+   * indicator-dot variant when active). No-ops if no active icon was shipped.
+   */
+  setTrayActive(active: boolean): void;
+  /** Whether a valid Pro license is active. False until `app` is ready, and
+   *  always false for apps that don't set `proProduct`. */
+  isPro(): boolean;
   /** Cursor position in the overlay window's coordinate space (DIPs). */
   getCursorDipPosition(): { x: number; y: number };
   openSettingsWindow(): void;
@@ -75,15 +98,53 @@ export interface PopAppOptions<S extends SettingsSchema> {
     resizable?: boolean;
   };
   shortcuts: ReadonlyArray<PopShortcut<S>>;
+  /**
+   * Product id for the offline license layer, e.g. "popkey" / "popjot". When
+   * set, the license IPC is registered and `ctx.isPro()` reflects the active
+   * key. Omit for apps with no Pro tier.
+   */
+  proProduct?: string;
   tray?: {
     /** Label for the settings item, defaults to "Settings". */
     settingsLabel?: string;
     doubleClickOpensSettings?: boolean;
   };
+  /**
+   * When provided, adds an Enable/Disable item to the tray right-click menu.
+   * `getEnabled` is called fresh each time the menu is built so the label is
+   * always current. `onToggle` is responsible for updating state AND calling
+   * `ctx.setTrayActive` to swap the icon.
+   */
+  trayToggle?: {
+    getEnabled: () => boolean;
+    onToggle: () => void;
+  };
   /** What launching a second instance should do. Defaults to "focus-main". */
   secondInstance?: "focus-main" | "open-settings";
   onReady?: (ctx: PopAppContext<S>) => void;
   onWillQuit?: () => void;
+}
+
+/**
+ * Minimal no-op context returned by the losing instance after it fails the
+ * single-instance lock and calls app.quit(). Every method is inert so the
+ * app's module-level `createPopApp(...)` call still resolves to a valid object
+ * without running any side effects (no windows, no IPC, no file IO).
+ */
+function createInertContext<S extends SettingsSchema>(): PopAppContext<S> {
+  return {
+    settings: {} as SettingsValues<S>,
+    getMainWindow: () => null,
+    getSettingsWindow: () => null,
+    sendToMainWindow: () => {},
+    sendToRenderers: () => {},
+    moveOverlayToCursorDisplay: () => {},
+    setOverlayAlwaysOnTop: () => {},
+    setTrayActive: () => {},
+    isPro: () => false,
+    getCursorDipPosition: () => ({ x: 0, y: 0 }),
+    openSettingsWindow: () => {},
+  };
 }
 
 export function createPopApp<S extends SettingsSchema>(
@@ -92,14 +153,25 @@ export function createPopApp<S extends SettingsSchema>(
   const { appName, settingsSchema } = options;
 
   // ─── Single instance lock ────────────────────────────────────────────
+  // When we lose the lock a sibling instance is already running: quit and
+  // return an inert context immediately. Registering IPC, creating settingsSync
+  // (which does file IO), or scheduling whenReady work in the losing instance
+  // would race the primary and touch the same settings files before quit lands.
   const gotTheLock = app.requestSingleInstanceLock();
   if (!gotTheLock) {
     app.quit();
+    return createInertContext<S>();
   }
 
   let mainWindow: BrowserWindow | null = null;
   let settingsWindow: BrowserWindow | null = null;
   let tray: Tray | null = null;
+  // Idle/active tray images. The active variant (with an indicator dot) is
+  // optional — apps that don't ship one fall back to the idle icon.
+  let trayIdleImage: Electron.NativeImage | null = null;
+  let trayActiveImage: Electron.NativeImage | null = null;
+  let trayActive = false;
+  let licenseController: LicenseController | null = null;
 
   const shortcutState: Record<string, string> = {};
   for (const sc of options.shortcuts) {
@@ -107,6 +179,13 @@ export function createPopApp<S extends SettingsSchema>(
   }
 
   function loadRendererWindow(win: BrowserWindow, query?: Record<string, string>): void {
+    // Never spawn an Electron window for links; hand http(s)/mailto to the OS
+    // browser and deny everything else.
+    win.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^(https?:|mailto:)/i.test(url)) void shell.openExternal(url);
+      return { action: "deny" };
+    });
+
     if (process.env.ELECTRON_RENDERER_URL) {
       const url = new URL(process.env.ELECTRON_RENDERER_URL);
       if (query) {
@@ -124,11 +203,23 @@ export function createPopApp<S extends SettingsSchema>(
     settingsWindow?.webContents.send(channel, value);
   }
 
-  // ─── Settings IPC (schema-driven) ────────────────────────────────────
+  // ─── Settings IPC + cross-app sync ───────────────────────────────────
+
+  // Two-tier persistence: this app's own settings file, plus the shared file
+  // for keys the user opted to sync with the sibling app. `initialValues`
+  // already merges per-app values with any enabled synced overrides.
+  const settingsSync = createSettingsSync({
+    appName,
+    schema: settingsSchema,
+    sendToRenderers,
+    getValues: (): SettingsValues<S> => settingsController.values,
+  });
 
   const settingsController = registerSettingsIpc(settingsSchema, {
     sendToRenderers,
+    initialValues: settingsSync.initialValues,
     onChange: buildOnChange(),
+    onKeyChange: (key, value) => settingsSync.onLocalChange(key, value),
   });
 
   function buildOnChange():
@@ -143,9 +234,55 @@ export function createPopApp<S extends SettingsSchema>(
     return wrapped as { [K in keyof S]?: (value: SettingValue<S[K]>) => void };
   }
 
+  // ─── Open-at-login (platform-aware) ──────────────────────────────────
+
+  // app.setLoginItemSettings / getLoginItemSettings are no-ops on Linux, so
+  // there we manage an XDG autostart .desktop file by hand. Routing every
+  // platform through these two helpers keeps the IPC + tray-sync read paths on
+  // a single code path.
+
+  function linuxAutostartPath(): string {
+    return join(homedir(), ".config", "autostart", `${appName.toLowerCase()}.desktop`);
+  }
+
+  function getOpenAtLoginState(): boolean {
+    if (process.platform === "linux") {
+      return existsSync(linuxAutostartPath());
+    }
+    return app.getLoginItemSettings().openAtLogin;
+  }
+
+  function setOpenAtLoginState(enabled: boolean): void {
+    if (process.platform === "linux") {
+      const file = linuxAutostartPath();
+      try {
+        if (enabled) {
+          // Prefer the AppImage path when running packaged as one; fall back to
+          // the current executable. Quote it so paths with spaces still launch.
+          const exec = process.env.APPIMAGE ?? process.execPath;
+          const contents =
+            "[Desktop Entry]\n" +
+            "Type=Application\n" +
+            `Name=${appName}\n` +
+            `Exec="${exec}"\n` +
+            "X-GNOME-Autostart-enabled=true\n";
+          mkdirSync(join(homedir(), ".config", "autostart"), { recursive: true });
+          writeFileSync(file, contents, "utf-8");
+        } else if (existsSync(file)) {
+          unlinkSync(file);
+        }
+      } catch (err) {
+        // Best-effort, consistent with settings persistence.
+        console.error(`Failed to update Linux autostart entry: ${String(err)}`);
+      }
+      return;
+    }
+    app.setLoginItemSettings({ openAtLogin: enabled });
+  }
+
   function syncTraySettingsToWindow(win: BrowserWindow): void {
     settingsController.syncToWindow(win);
-    win.webContents.send("tray-open-at-login", app.getLoginItemSettings().openAtLogin);
+    win.webContents.send("tray-open-at-login", getOpenAtLoginState());
     for (const name of Object.keys(shortcutState)) {
       win.webContents.send(`tray-set-${name}-shortcut`, shortcutState[name]);
     }
@@ -159,6 +296,19 @@ export function createPopApp<S extends SettingsSchema>(
     const display = screen.getDisplayNearestPoint(cursor);
     const { x, y, width, height } = display.bounds;
     mainWindow.setBounds({ x, y, width, height });
+  }
+
+  // Overlay z-order level used when pinned on top. Kept as a constant so
+  // window creation and later re-pins stay in sync.
+  const OVERLAY_TOP_LEVEL = "screen-saver" as const;
+
+  function setOverlayAlwaysOnTop(onTop: boolean): void {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (onTop) {
+      mainWindow.setAlwaysOnTop(true, OVERLAY_TOP_LEVEL);
+    } else {
+      mainWindow.setAlwaysOnTop(false);
+    }
   }
 
   function getCursorDipPosition(): { x: number; y: number } {
@@ -195,7 +345,14 @@ export function createPopApp<S extends SettingsSchema>(
       },
     });
 
-    win.setAlwaysOnTop(true, "screen-saver");
+    win.setAlwaysOnTop(true, OVERLAY_TOP_LEVEL);
+    // macOS: show the overlay over fullscreen apps and on every Space. Marking it
+    // non-fullscreenable keeps it from ever entering its own fullscreen Space
+    // (which would hide it behind the app the user is drawing over).
+    if (process.platform === "darwin") {
+      win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      win.setFullScreenable(false);
+    }
     // No { forward: true } — we don't need hover detection on the transparent window.
     // Forwarding keeps the window in the input pipeline and can intercept synthetic
     // right/middle-click events from tablet drivers (e.g. Huion stylus buttons).
@@ -216,11 +373,29 @@ export function createPopApp<S extends SettingsSchema>(
     return win;
   }
 
-  function trayIconPath(): string {
+  function trayIconPath(file = "tray-icon.png"): string {
     return app.isPackaged
-      ? join(process.resourcesPath, "tray-icon.png")
-      : join(__dirname, "../../assets/tray-icon.png");
+      ? join(process.resourcesPath, file)
+      : join(__dirname, `../../assets/${file}`);
   }
+
+  /**
+   * Swap the tray icon between its idle and active (indicator-dot) variants.
+   * No-ops gracefully if the app didn't ship an active icon.
+   */
+  function setTrayActive(active: boolean): void {
+    trayActive = active;
+    if (!tray || tray.isDestroyed()) return;
+    const next = active && trayActiveImage ? trayActiveImage : trayIdleImage;
+    if (next) tray.setImage(next);
+    // Linux uses a persisted context menu (see createTray), so the Enable/Disable
+    // label must be rebuilt whenever the active state — and thus the label — changes.
+    refreshLinuxTrayMenu();
+  }
+
+  // Assigned in createTray on Linux; a no-op elsewhere (where the menu is built
+  // fresh per right-click instead of persisted).
+  let refreshLinuxTrayMenu: () => void = () => {};
 
   function createSettingsWindow(): BrowserWindow {
     const iconPath = trayIconPath();
@@ -285,6 +460,9 @@ export function createPopApp<S extends SettingsSchema>(
     },
     sendToRenderers,
     moveOverlayToCursorDisplay,
+    setOverlayAlwaysOnTop,
+    setTrayActive,
+    isPro: () => licenseController?.isPro() ?? false,
     getCursorDipPosition,
     openSettingsWindow,
   };
@@ -295,6 +473,17 @@ export function createPopApp<S extends SettingsSchema>(
     app.quit();
   });
 
+  // Open a link in the user's default browser (not a new Electron window).
+  // Restricted to http/https/mailto so a renderer can't open arbitrary URIs.
+  ipcMain.on("open-external", (_event, url: unknown) => {
+    if (typeof url !== "string") return;
+    if (/^(https?:|mailto:)/i.test(url)) void shell.openExternal(url);
+  });
+
+  // Clipboard read lives in main: the sandboxed preload can't access the
+  // electron `clipboard` module. Used by the license field's Paste button.
+  ipcMain.handle("read-clipboard", () => clipboard.readText());
+
   ipcMain.on("close-window", () => {
     if (settingsWindow && !settingsWindow.isDestroyed()) {
       settingsWindow.hide();
@@ -302,11 +491,11 @@ export function createPopApp<S extends SettingsSchema>(
   });
 
   ipcMain.handle("get-open-at-login", () => {
-    return app.getLoginItemSettings().openAtLogin;
+    return getOpenAtLoginState();
   });
 
   ipcMain.on("set-open-at-login", (_event, enabled: boolean) => {
-    app.setLoginItemSettings({ openAtLogin: Boolean(enabled) });
+    setOpenAtLoginState(Boolean(enabled));
     sendToRenderers("tray-open-at-login", Boolean(enabled));
   });
 
@@ -392,20 +581,42 @@ export function createPopApp<S extends SettingsSchema>(
 
   function createTray(): void {
     const iconPath = trayIconPath();
-    const trayImage = existsSync(iconPath)
+    trayIdleImage = existsSync(iconPath)
       ? nativeImage.createFromPath(iconPath)
       : nativeImage.createEmpty();
 
-    tray = new Tray(trayImage);
+    const activePath = trayIconPath("tray-icon-active.png");
+    trayActiveImage = existsSync(activePath) ? nativeImage.createFromPath(activePath) : null;
+
+    tray = new Tray(trayActive && trayActiveImage ? trayActiveImage : trayIdleImage);
     tray.setToolTip(appName);
 
-    const buildTrayMenu = () =>
-      Menu.buildFromTemplate([
+    const buildTrayMenu = () => {
+      const sep: Electron.MenuItemConstructorOptions = { type: "separator" };
+      const toggleItem: Electron.MenuItemConstructorOptions[] = options.trayToggle
+        ? [
+            {
+              label: options.trayToggle.getEnabled()
+                ? `Disable ${appName}`
+                : `Enable ${appName}`,
+              click: () => {
+                options.trayToggle!.onToggle();
+                // Keep the persisted Linux menu label current even if an app's
+                // onToggle didn't route through setTrayActive.
+                refreshLinuxTrayMenu();
+              },
+            },
+            sep,
+          ]
+        : [];
+
+      return Menu.buildFromTemplate([
         {
           label: appName,
           enabled: false,
         },
         { type: "separator" },
+        ...toggleItem,
         {
           label: options.tray?.settingsLabel ?? "Settings",
           click: () => openSettingsWindow(),
@@ -428,21 +639,49 @@ export function createPopApp<S extends SettingsSchema>(
           click: () => app.quit(),
         },
       ]);
+    };
 
     if (options.tray?.doubleClickOpensSettings) {
       tray.on("double-click", () => openSettingsWindow());
     }
+
+    if (process.platform === "linux") {
+      // Linux (libappindicator) does not emit "right-click" and does not support
+      // popUpContextMenu, so the per-click approach below leaves the menu
+      // unreachable. Use a persisted context menu instead, and rebuild it via
+      // refreshLinuxTrayMenu whenever the Enable/Disable label would change.
+      refreshLinuxTrayMenu = () => {
+        if (tray && !tray.isDestroyed()) tray.setContextMenu(buildTrayMenu());
+      };
+      refreshLinuxTrayMenu();
+      return;
+    }
+
+    // win32 / darwin: build a fresh menu per click and pass it directly to
+    // popUpContextMenu. We intentionally never call setContextMenu — a persisted
+    // menu makes Windows auto-show the *previous* menu on right-click (stale by
+    // one click), so the Enable/Disable label would lag a step behind the real state.
     tray.on("right-click", () => {
-      tray?.setContextMenu(buildTrayMenu());
-      tray?.popUpContextMenu();
+      tray?.popUpContextMenu(buildTrayMenu());
     });
   }
 
   // ─── App lifecycle ───────────────────────────────────────────────────
 
   app.whenReady().then(() => {
+    if (options.proProduct) {
+      licenseController = createLicenseController(options.proProduct, (status) =>
+        sendToRenderers("license-changed", status)
+      );
+      registerLicenseIpc(licenseController, sendToRenderers);
+    }
+
     mainWindow = createWindow();
     createTray();
+
+    // Register sync IPC + start watching the shared file for the sibling app's
+    // changes (applies enabled synced values and live-updates toggle state).
+    settingsSync.start();
 
     const shortcutRegistration = registerShortcutHandlers(shortcutState);
     if (!shortcutRegistration.ok) {
@@ -466,6 +705,7 @@ export function createPopApp<S extends SettingsSchema>(
 
   app.on("will-quit", () => {
     options.onWillQuit?.();
+    settingsSync.dispose();
     globalShortcut.unregisterAll();
     settingsWindow?.destroy();
     settingsWindow = null;

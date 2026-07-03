@@ -55,6 +55,51 @@ export function setOpenAtLogin(enabled: boolean): void {
   bridge()?.setOpenAtLogin?.(enabled);
 }
 
+/** Open a URL in the OS browser (desktop). On web, falls back to window.open. */
+export function openExternal(url: string): void {
+  const api = bridge() as { openExternal?: (url: string) => void } | undefined;
+  if (api?.openExternal) {
+    api.openExternal(url);
+  } else if (typeof window !== "undefined") {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
+/** Read the clipboard text (desktop only; "" elsewhere). */
+export async function readClipboard(): Promise<string> {
+  const api = bridge() as { readClipboard?: () => Promise<string> } | undefined;
+  return (await api?.readClipboard?.()) ?? "";
+}
+
+// ─── Cross-app settings sync ───────────────────────────────────────────
+
+type SyncBridge = {
+  getSyncPrefs?: () => Promise<Record<string, boolean>>;
+  setSyncPref?: (key: string, enabled: boolean) => void;
+  setSyncAll?: (enabled: boolean) => void;
+  onSyncPrefsChanged?: (cb: (prefs: Record<string, boolean>) => void) => () => void;
+};
+
+/** Current per-key sync on/off map (empty on web). */
+export async function getSyncPrefs(): Promise<Record<string, boolean>> {
+  return (await (bridge() as SyncBridge | undefined)?.getSyncPrefs?.()) ?? {};
+}
+
+/** Enable/disable syncing a single setting key with the sibling app. */
+export function setSyncPref(key: string, enabled: boolean): void {
+  (bridge() as SyncBridge | undefined)?.setSyncPref?.(key, enabled);
+}
+
+/** Enable/disable syncing for every syncable key at once. */
+export function setSyncAll(enabled: boolean): void {
+  (bridge() as SyncBridge | undefined)?.setSyncAll?.(enabled);
+}
+
+/** Subscribe to sync-toggle changes (from this or the sibling app). */
+export function onSyncPrefsChanged(cb: (prefs: Record<string, boolean>) => void): () => void {
+  return (bridge() as SyncBridge | undefined)?.onSyncPrefsChanged?.(cb) ?? (() => {});
+}
+
 export interface SettingsPlatform<S extends SettingsSchema> {
   /** Send a setting change to the main process (no-op on web). */
   sendSetting<K extends keyof S & string>(key: K, value: SettingValue<S[K]>): void;

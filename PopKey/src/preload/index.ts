@@ -4,6 +4,7 @@ import {
   createShortcutBridge,
   subscribe,
 } from "@shared/settings/preload";
+import { createLicenseBridge } from "@shared/license/preload";
 import { settingsSchema } from "@/config/settingsSchema";
 
 contextBridge.exposeInMainWorld("electronAPI", {
@@ -11,6 +12,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // quitApp, closeWindow, open-at-login.
   ...createSettingsBridge(settingsSchema),
   ...createShortcutBridge(["main"]),
+  ...createLicenseBridge(),
 
   // Main → Renderer: global shortcut toggle
   onShortcutToggle: subscribe("shortcut-toggle"),

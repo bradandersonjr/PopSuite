@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { createPortal } from "react-dom";
-import { IS_PRO } from "@/pro";
-import ProSettingsModal from "./ProSettingsModal";
+import { useCallback, useEffect, useMemo } from "react";
+import { activateLicense, deactivateLicense } from "@shared/license/renderer";
+import CustomPaletteSettings from "@/components/pro/CustomPaletteSettings";
+import CenterCircleSettings from "@/components/pro/CenterCircleSettings";
+
+/** Ko-fi product page where buyers get a PopJot Pro key. */
+const POPJOT_PRO_URL = "https://ko-fi.com/s/264fd0031f";
 import {
   getShortcuts,
   isDesktop,
@@ -12,7 +15,11 @@ import {
   sendGridSize,
   sendMenuStyle,
   sendOverlayMode,
-  sendPopMonoColor,
+  sendGlowIntensity,
+  sendTextColor,
+  sendButtonRoundness,
+  sendMenuTranslucency,
+  sendSolidColor,
   sendScaleFactor,
   sendThemeMode,
   setMainShortcut,
@@ -35,14 +42,18 @@ import {
   SettingsUIProvider,
   SettingsWindowFrame,
   EmbeddedSettingsPanel,
+  SettingsImportExport,
+  SyncSettings,
+  ProSection,
   ShortcutButton,
   ShortcutErrorBanner,
+  SliderRow,
   ToggleRow,
   useOpenAtLogin,
   useShortcutRecorder,
 } from "@shared/components/settings";
 import { SubMenuSection } from "@shared/components/settings/dropdown";
-import { LogOut, Settings, Sparkles } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import {
   AnimationIntensity,
   ColorPalette,
@@ -50,270 +61,118 @@ import {
   GridSize,
   MenuStyle,
   OverlayMode,
+  TextColor,
   ThemeMode,
   useStore,
 } from "@/store/useStore";
+import { settingsSchema } from "@/config/settingsSchema";
 import { getEffectiveColors, getProPalette } from "@/pro";
 import { getMenuColors, getSurfacePalette, PRO_ACCENT, type SurfacePalette } from "@shared/config/desktopTheme";
-import { getColors, PALETTE_NAMES } from "@/config/themes";
+import { getColors, getHighlighterGradientStops, PALETTE_NAMES } from "@/config/themes";
 import { isMac } from "@shared/lib/hotkeys";
 
 
-// ─── Custom Color Mixer Helpers ──────────────────────────────────────
-
-function hexToHsl(hex: string): { h: number; s: number; l: number } {
-  let r = 0, g = 0, b = 0;
-  if (/^#?([0-9a-fA-F]{3})$/.test(hex)) {
-    r = parseInt(hex[1] + hex[1], 16);
-    g = parseInt(hex[2] + hex[2], 16);
-    b = parseInt(hex[3] + hex[3], 16);
-  } else if (/^#?([0-9a-fA-F]{6})$/.test(hex)) {
-    r = parseInt(hex.slice(1, 3), 16);
-    g = parseInt(hex.slice(3, 5), 16);
-    b = parseInt(hex.slice(5, 7), 16);
-  }
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0;
-  const l = (max + min) / 2;
-
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
-    }
-    h /= 6;
-  }
-  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
-}
-
-function hslToHex(h: number, s: number, l: number): string {
-  s /= 100;
-  l /= 100;
-  const k = (n: number) => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n: number) =>
-    l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
-  const toHex = (x: number) => {
-    const hex = Math.round(x * 255).toString(16);
-    return hex.length === 1 ? "0" + hex : hex;
-  };
-  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
-}
-
-interface CustomColorPickerProps {
-  currentColor: string;
-  onColorChange: (hex: string) => void;
+interface MenuStylePickerProps {
+  menuStyle: MenuStyle;
+  onSelect: (style: MenuStyle) => void;
   surfacePalette: SurfacePalette;
-  paletteColors: string[];
+  themeMode: ThemeMode;
+  colorPalette: ColorPalette;
+  solidColor: string;
+  textColor: TextColor;
+  glowIntensity: number;
+  buttonRoundness: number;
 }
 
-const CustomColorPicker = ({ currentColor, onColorChange, surfacePalette, paletteColors }: CustomColorPickerProps) => {
-  const [showPicker, setShowPicker] = useState(false);
-  const [tempHex, setTempHex] = useState(currentColor);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const [coords, setCoords] = useState({ top: 0, left: 0, showBelow: false });
+const MenuStylePicker = ({
+  menuStyle,
+  onSelect,
+  surfacePalette,
+  themeMode,
+  colorPalette,
+  solidColor,
+  textColor,
+  glowIntensity,
+  buttonRoundness,
+}: MenuStylePickerProps) => {
+  const isDark = themeMode === "dark";
+  // Reflect the live palette/solid color so the preview matches the real menu.
+  const color = colorPalette === "solid" ? solidColor : getEffectiveColors(colorPalette).draw[0];
+  const stops = getHighlighterGradientStops(color);
+  const textOverride = textColor === "white" ? "#ffffff" : textColor === "black" ? "#111111" : null;
+  const popBorder = isDark ? "#111111" : "#f5f5f5";
+  const flatBg = isDark ? "#2c313c" : "#eef1f5";
+  const PREVIEW = 16;
+  const radius = `${(buttonRoundness / 100) * PREVIEW}px`;
+  const gi = glowIntensity / 100;
 
-  useEffect(() => {
-    setTempHex(currentColor);
-  }, [currentColor]);
-
-  const { h, s, l } = useMemo(() => {
-    try {
-      return hexToHsl(currentColor);
-    } catch {
-      return { h: 0, s: 100, l: 50 };
-    }
-  }, [currentColor]);
-
-  const updateCoords = () => {
-    if (triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      const popoverWidth = 250;
-      const showBelow = rect.top - 290 < 10;
-      
-      setCoords({
-        top: showBelow ? rect.bottom + 8 : rect.top - 8,
-        left: Math.max(10, Math.min(window.innerWidth - popoverWidth - 10, rect.right - popoverWidth)),
-        showBelow
-      });
-    }
+  const base: React.CSSProperties = {
+    fontSize: `${PREVIEW}px`,
+    fontWeight: 700,
+    fontFamily: "'Space Mono', monospace",
+    borderRadius: radius,
+    lineHeight: 1.2,
   };
 
-  const togglePicker = () => {
-    if (!showPicker) {
-      updateCoords();
-      setShowPicker(true);
-    } else {
-      setShowPicker(false);
-    }
+  const styles: Record<MenuStyle, React.CSSProperties> = {
+    flat: {
+      ...base,
+      backgroundColor: color,
+      color: textOverride ?? (isDark ? "#ffffff" : "#0b0b0b"),
+      padding: "7px 14px",
+    },
+    "flat-outline": {
+      ...base,
+      backgroundColor: flatBg,
+      color: textOverride ?? color,
+      border: `2px solid ${color}`,
+      padding: "5px 12px",
+    },
+    pop: {
+      ...base,
+      backgroundImage: `linear-gradient(135deg, ${stops[0]}, ${stops[1]})`,
+      color: textOverride ?? (isDark ? "#ffffff" : "#0b0b0b"),
+      border: `2px solid ${popBorder}`,
+      boxShadow: `3px 3px 0 ${popBorder}`,
+      padding: "5px 12px",
+    },
+    glow: {
+      ...base,
+      backgroundColor: color,
+      color: textOverride ?? (isDark ? "#ffffff" : "#0b0b0b"),
+      boxShadow: `0 0 ${Math.round(PREVIEW * (0.35 + gi * 0.9))}px ${color}, 0 0 ${Math.round(PREVIEW * (0.8 + gi * 1.8))}px ${color}88`,
+      padding: "5px 12px",
+    },
   };
 
-  useEffect(() => {
-    if (showPicker) {
-      updateCoords();
-      window.addEventListener("scroll", updateCoords, true);
-      window.addEventListener("resize", updateCoords);
-      return () => {
-        window.removeEventListener("scroll", updateCoords, true);
-        window.removeEventListener("resize", updateCoords);
-      };
-    }
-  }, [showPicker]);
-
-  const handleHslChange = (newH: number, newS: number, newL: number) => {
-    const hex = hslToHex(newH, newS, newL);
-    setTempHex(hex);
-    onColorChange(hex);
-  };
-
-  const handleHexInput = (val: string) => {
-    setTempHex(val);
-    if (/^#[0-9a-fA-F]{6}$/.test(val)) {
-      onColorChange(val);
-    }
+  const styleNames: Record<MenuStyle, string> = {
+    flat: "Flat",
+    "flat-outline": "Flat Outline",
+    pop: "Pop",
+    glow: "Glow",
   };
 
   return (
-    <div className="relative">
-      <div
-        className="flex items-center gap-2 rounded-[12px] px-2.5 py-1.5 animate-in fade-in duration-200"
-        style={{ backgroundColor: surfacePalette.card, border: `1.5px solid ${surfacePalette.divider}` }}
-      >
+    <div className="grid grid-cols-4 gap-2.5">
+      {(Object.keys(styles) as MenuStyle[]).map((style) => (
         <button
-          ref={triggerRef}
-          onClick={togglePicker}
-          title="Open color mixer"
-          className="w-5 h-5 rounded-full flex-shrink-0 cursor-pointer transition-transform hover:scale-110 active:scale-95 ring-1 ring-black/10"
+          key={style}
+          onClick={() => onSelect(style)}
+          className="flex flex-col items-center justify-between gap-2.5 rounded-[14px] px-3 py-4 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
           style={{
-            backgroundColor: currentColor,
-            boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+            minHeight: 92,
+            backgroundColor: menuStyle === style ? surfacePalette.selected : surfacePalette.card,
+            border: `1.5px solid ${menuStyle === style ? surfacePalette.text : "transparent"}`,
           }}
-        />
-        <input
-          type="text"
-          value={tempHex}
-          onChange={(e) => handleHexInput(e.target.value)}
-          maxLength={7}
-          spellCheck={false}
-          style={{
-            width: 68,
-            fontFamily: "'Space Mono', monospace",
-            fontSize: 13,
-            fontWeight: 600,
-            color: surfacePalette.text,
-            background: "transparent",
-            border: "none",
-            outline: "none",
-          }}
-        />
-      </div>
-
-      {showPicker && createPortal(
-        <>
-          <div className="fixed inset-0 z-[9998]" onClick={() => setShowPicker(false)} />
-          <div
-            className="fixed z-[9999] w-[250px]"
-            style={{
-              top: coords.top,
-              left: coords.left,
-              transform: coords.showBelow ? "none" : "translateY(-100%)",
-            }}
-          >
-            <div
-              className={`w-full rounded-2xl p-4 flex flex-col gap-3 shadow-2xl border animate-in fade-in zoom-in-95 duration-150 ${
-                coords.showBelow ? "origin-top" : "origin-bottom"
-              }`}
-              style={{
-                backgroundColor: surfacePalette.panel,
-                borderColor: surfacePalette.divider,
-                color: surfacePalette.text,
-              }}
-            >
-              <div className="text-xs font-bold uppercase tracking-wider opacity-60">Color Mixer</div>
-              
-              {/* Hue Slider (Red to Red) */}
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-between text-[11px] font-semibold opacity-70">
-                  <span>Hue</span>
-                  <span>{h}°</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={360}
-                  value={h}
-                  onChange={(e) => handleHslChange(Number(e.target.value), s, l)}
-                  className="w-full mixer-slider cursor-pointer"
-                  style={{
-                    background: "linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
-                  }}
-                />
-              </div>
-
-              {/* Saturation Slider */}
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-between text-[11px] font-semibold opacity-70">
-                  <span>Saturation</span>
-                  <span>{s}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={s}
-                  onChange={(e) => handleHslChange(h, Number(e.target.value), l)}
-                  className="w-full mixer-slider cursor-pointer"
-                  style={{
-                    background: `linear-gradient(to right, #808080, hsl(${h}, 100%, 50%))`,
-                  }}
-                />
-              </div>
-
-              {/* Lightness Slider */}
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-between text-[11px] font-semibold opacity-70">
-                  <span>Lightness</span>
-                  <span>{l}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={10}
-                  max={90}
-                  value={l}
-                  onChange={(e) => handleHslChange(h, s, Number(e.target.value))}
-                  className="w-full mixer-slider cursor-pointer"
-                  style={{
-                    background: `linear-gradient(to right, #000000, hsl(${h}, ${s}%, 50%), #ffffff)`,
-                  }}
-                />
-              </div>
-
-              {/* Quick Palette Colors */}
-              <div className="flex flex-col gap-2 pt-2.5 border-t" style={{ borderColor: surfacePalette.divider }}>
-                <div className="text-[10px] font-bold uppercase tracking-wider opacity-60">Palette Swatches</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {paletteColors.map((hex) => (
-                    <button
-                      key={hex}
-                      onClick={() => {
-                        setTempHex(hex);
-                        onColorChange(hex);
-                      }}
-                      className="w-[22px] h-[22px] rounded-full border border-black/10 transition-transform hover:scale-110 active:scale-95"
-                      style={{ backgroundColor: hex }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </>,
-        document.body
-      )}
+        >
+          <span className="flex flex-1 items-center">
+            <span style={styles[style]}>PopJot</span>
+          </span>
+          <span className="text-xs font-medium" style={{ color: surfacePalette.muted }}>
+            {styleNames[style]}
+          </span>
+        </button>
+      ))}
     </div>
   );
 };
@@ -324,7 +183,6 @@ type SystemTrayProps = {
 };
 
 const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTrayProps) => {
-  const [showProModal, setShowProModal] = useState(false);
 
   const {
     hotkey,
@@ -333,8 +191,14 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     setPersistentHotkey,
     menuStyle,
     setMenuStyle: setMenuStyleLocal,
+    glowIntensity,
+    setGlowIntensity: setGlowIntensityLocal,
+    textColor,
+    setTextColor: setTextColorLocal,
     colorPalette,
     setColorPalette: setColorPaletteLocal,
+    solidColor,
+    setSolidColor: setSolidColorLocal,
     themeMode,
     setThemeMode: setThemeModeLocal,
     animationIntensity,
@@ -349,15 +213,16 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     setOverlayMode: setOverlayModeLocal,
     paletteVersion,
     buttonRoundness,
-    setButtonRoundness,
-    popMonoColor,
-    setPopMonoColor: setPopMonoColorLocal,
+    setButtonRoundness: setButtonRoundnessLocal,
+    menuTranslucency,
+    setMenuTranslucency: setMenuTranslucencyLocal,
+    isPro,
   } = useStore();
 
   const { draw: drawColors } = getEffectiveColors(colorPalette);
   // paletteVersion is read above to trigger re-render when Pro palette changes
   void paletteVersion;
-  const hasProPalette = IS_PRO && getProPalette(colorPalette) !== null;
+  const hasProPalette = getProPalette(colorPalette) !== null;
   const desktop = isDesktop();
   const isDark = themeMode === "dark";
 
@@ -435,6 +300,32 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     sendMenuStyle(style);
   };
 
+  const applyGlowIntensity = (val: number) => {
+    setGlowIntensityLocal(val);
+    sendGlowIntensity(val);
+  };
+
+  const applyTextColor = (val: TextColor) => {
+    setTextColorLocal(val);
+    sendTextColor(val);
+  };
+
+  const applyButtonRoundness = (val: number) => {
+    setButtonRoundnessLocal(val);
+    sendButtonRoundness(val);
+  };
+
+  const applyMenuTranslucency = (val: number) => {
+    setMenuTranslucencyLocal(val);
+    sendMenuTranslucency(val);
+  };
+
+
+  const applySolidColor = (color: string) => {
+    setSolidColorLocal(color);
+    sendSolidColor(color);
+  };
+
   const applyScaleFactor = (scale: number) => {
     setScaleFactorLocal(scale);
     sendScaleFactor(scale);
@@ -454,11 +345,11 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     setOverlayModeLocal(mode);
     sendOverlayMode(mode);
   };
- 
-  const applyPopMonoColor = (color: string) => {
-    setPopMonoColorLocal(color);
-    sendPopMonoColor(color);
-  };
+
+  const themeModeOptions: Option<ThemeMode>[] = [
+    { label: "Dark", checked: themeMode === "dark", value: "dark", onSelect: applyThemeMode },
+    { label: "Light", checked: themeMode === "light", value: "light", onSelect: applyThemeMode },
+  ];
 
   const menuStyleOptions: Option<MenuStyle>[] = [
     { label: "Flat", checked: menuStyle === "flat", value: "flat", onSelect: applyMenuStyle },
@@ -469,17 +360,13 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
       onSelect: applyMenuStyle,
     },
     { label: "Pop", checked: menuStyle === "pop", value: "pop", onSelect: applyMenuStyle },
-    {
-      label: "Pop Mono",
-      checked: menuStyle === "pop-mono",
-      value: "pop-mono",
-      onSelect: applyMenuStyle,
-    },
+    { label: "Glow", checked: menuStyle === "glow", value: "glow", onSelect: applyMenuStyle },
   ];
 
-  const themeModeOptions: Option<ThemeMode>[] = [
-    { label: "Dark", checked: themeMode === "dark", value: "dark", onSelect: applyThemeMode },
-    { label: "Light", checked: themeMode === "light", value: "light", onSelect: applyThemeMode },
+  const textColorOptions: Option<TextColor>[] = [
+    { label: "Auto", checked: textColor === "auto", value: "auto", onSelect: applyTextColor },
+    { label: "White", checked: textColor === "white", value: "white", onSelect: applyTextColor },
+    { label: "Black", checked: textColor === "black", value: "black", onSelect: applyTextColor },
   ];
 
   const colorPaletteOptions: Option<ColorPalette>[] = PALETTE_NAMES.map((name) => ({
@@ -501,7 +388,8 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
   const renderPalettePicker = () => (
     <div className="grid grid-cols-2 gap-3">
       {PALETTE_NAMES.map((name) => {
-        const colors = getColors(name).draw;
+        const isSolid = name === "solid";
+        const colors = isSolid ? [solidColor] : getColors(name).draw;
         const isSelected = colorPalette === name;
         return (
           <button
@@ -515,78 +403,57 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
             }}
           >
             <span className="capitalize">{name}</span>
-            <div className="flex gap-1">
-              {colors.map((hex: string) => (
+            {isSolid && isSelected ? (
+              <div
+                className="flex items-center gap-2"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <span
-                  key={hex}
+                  style={{ width: 20, height: 20, borderRadius: "50%", backgroundColor: solidColor, flexShrink: 0 }}
+                />
+                <input
+                  type="text"
+                  value={solidColor}
+                  onChange={(e) => {
+                    const val = e.currentTarget.value;
+                    if (/^#[0-9a-fA-F]{6}$/.test(val)) applySolidColor(val);
+                  }}
+                  maxLength={7}
+                  spellCheck={false}
                   style={{
-                    display: "inline-block",
-                    width: 20,
-                    height: 20,
-                    borderRadius: "50%",
-                    backgroundColor: hex,
-                    flexShrink: 0,
+                    width: 72,
+                    fontFamily: "'Space Mono', monospace",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: surfacePalette.text,
+                    background: "transparent",
+                    border: "none",
+                    outline: "none",
                   }}
                 />
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div className="flex gap-1">
+                {colors.map((hex: string) => (
+                  <span
+                    key={hex}
+                    style={{
+                      display: "inline-block",
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      backgroundColor: hex,
+                      flexShrink: 0,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </button>
         );
       })}
     </div>
   );
-
-  const renderColorPicker = (
-    currentColor: string,
-    onColorChange: (hex: string) => void,
-    onPaletteSelect?: () => void
-  ) => {
-    const paletteColors = getEffectiveColors(colorPalette).draw;
-    const isPalette = currentColor === "palette";
-    return (
-      <div className="flex flex-wrap items-center gap-1.5">
-        {paletteColors.map((hex) => {
-          const isActive = !isPalette && currentColor === hex;
-          return (
-            <button
-              key={hex}
-              onClick={() => onColorChange(hex)}
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: "50%",
-                backgroundColor: hex,
-                border: isActive ? `2.5px solid ${surfacePalette.text}` : `2px solid transparent`,
-                flexShrink: 0,
-                outline: "none",
-              }}
-            />
-          );
-        })}
-        {onPaletteSelect && (
-          <button
-            onClick={onPaletteSelect}
-            title="Follow palette"
-            style={{
-              width: 22,
-              height: 22,
-              borderRadius: "50%",
-              background: `conic-gradient(${paletteColors.join(", ")})`,
-              border: isPalette ? `2.5px solid ${surfacePalette.text}` : `2px solid ${surfacePalette.divider}`,
-              flexShrink: 0,
-              outline: "none",
-            }}
-          />
-        )}
-        <CustomColorPicker
-          currentColor={isPalette ? paletteColors[0] : currentColor}
-          onColorChange={onColorChange}
-          surfacePalette={surfacePalette}
-          paletteColors={paletteColors}
-        />
-      </div>
-    );
-  };
 
   const animationOptions: Option<AnimationIntensity>[] = [
     {
@@ -672,55 +539,30 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     },
   ];
 
-  const buttonShapePicker = (
-    <div className="grid grid-cols-3 gap-2">
-      {([
-        { label: "Square", value: 0, radius: "4px" },
-        { label: "Rounded", value: 40, radius: "20%" },
-        { label: "Circle", value: 100, radius: "50%" },
-      ] as const).map((opt) => {
-        const active = buttonRoundness === opt.value;
-        return (
-          <button
-            key={opt.label}
-            onClick={() => setButtonRoundness(opt.value)}
-            className="flex flex-col items-center gap-1.5 py-2.5 text-xs font-medium transition-colors rounded-[16px]"
-            style={{
-              backgroundColor: active ? surfacePalette.selected : surfacePalette.card,
-              color: active ? surfacePalette.text : surfacePalette.muted,
-            }}
-          >
-            <div style={{
-              width: 22, height: 22,
-              borderRadius: opt.radius,
-              backgroundColor: active ? PRO_ACCENT : surfacePalette.muted,
-              opacity: active ? 1 : 0.4,
-              transition: "border-radius 150ms ease",
-            }} />
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-
   const settingsColumns = [
     {
       title: "Appearance",
       items: [
         <SettingGroup key="menu-style" title="Menu Style" description="Choose how your radial menu looks">
-          <div className="space-y-2">
-            <OptionGrid options={menuStyleOptions} columns="grid-cols-2" compact />
-            {menuStyle === "pop-mono" && (
-              <div
-                className="flex items-center gap-2 rounded-[12px] px-3 py-1.5"
-                style={{ backgroundColor: surfacePalette.card }}
-              >
-                <span className="text-xs font-medium" style={{ color: surfacePalette.text }}>Mono Color</span>
-                <div className="ml-auto">{renderColorPicker(popMonoColor, applyPopMonoColor)}</div>
-              </div>
-            )}
-          </div>
+          <MenuStylePicker
+            menuStyle={menuStyle}
+            onSelect={applyMenuStyle}
+            surfacePalette={surfacePalette}
+            themeMode={themeMode}
+            colorPalette={colorPalette}
+            solidColor={solidColor}
+            textColor={textColor}
+            glowIntensity={glowIntensity}
+            buttonRoundness={buttonRoundness}
+          />
+        </SettingGroup>,
+        menuStyle === "glow" && (
+          <SettingGroup key="glow-intensity" title="Glow Intensity" description="How strong the glow halo is">
+            <SliderRow value={glowIntensity} min={0} max={100} step={5} onChange={applyGlowIntensity} valueSuffix="%" defaultValue={50} />
+          </SettingGroup>
+        ),
+        <SettingGroup key="text-color" title="Icon Color" description="Force menu icons white or black, or follow the style">
+          <OptionGrid options={textColorOptions} columns="grid-cols-3" compact />
         </SettingGroup>,
         <SettingGroup key="theme" title="Theme Mode" description="Switch between dark and light themes">
           <OptionGrid options={themeModeOptions} columns="grid-cols-2" />
@@ -736,19 +578,39 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
             </div>
             {hasProPalette && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <button
-                  onClick={() => setShowProModal(true)}
-                  className="rounded-full px-3 py-1 text-xs font-semibold transition-opacity hover:opacity-80"
+                <span
+                  className="rounded-full px-3 py-1 text-xs font-semibold"
                   style={{ backgroundColor: PRO_ACCENT, color: "#fff" }}
                 >
                   Custom Palette Active
-                </button>
+                </span>
               </div>
             )}
           </div>
         </SettingGroup>,
-        <SettingGroup key="shape" title="Button Shape" description="Set the corner style for menu buttons">
-          {buttonShapePicker}
+        <SettingGroup key="roundness" title="Roundness" description="0% = square corners, 100% = circle">
+          <SliderRow value={buttonRoundness} min={0} max={100} step={5} onChange={applyButtonRoundness} valueSuffix="%" defaultValue={100} />
+        </SettingGroup>,
+        <SettingGroup key="translucency" title="Translucency" description="Menu button background opacity">
+          <SliderRow value={menuTranslucency} min={0} max={95} step={5} onChange={applyMenuTranslucency} valueSuffix="%" defaultValue={0} />
+        </SettingGroup>,
+      ],
+    },
+    {
+      title: "Branding",
+      items: [
+        <SettingGroup key="branding" title="Branding" description="Replace the menu's center shape with your logo, plus a custom palette" pro locked={!isPro} buyUrl={POPJOT_PRO_URL}>
+          <div className="space-y-5">
+            <div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Logo</div>
+              <CenterCircleSettings />
+            </div>
+            <div className="h-px" style={{ backgroundColor: surfacePalette.divider }} />
+            <div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Custom Palette</div>
+              <CustomPaletteSettings />
+            </div>
+          </div>
         </SettingGroup>,
       ],
     },
@@ -767,14 +629,35 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
         <SettingGroup key="grid-size" title="Grid Size" description="Adjust grid density if visible">
           <OptionGrid options={gridSizeOptions} columns="grid-cols-2" />
         </SettingGroup>,
+        <SettingGroup key="scale" title="UI Scale" description="Adjust interface size for your screen resolution">
+          <OptionGrid options={scaleOptions} columns="grid-cols-2" />
+        </SettingGroup>,
+      ],
+    },
+    {
+      title: "Sync",
+      items: [
+        <SettingGroup
+          key="sync"
+          title="Sync with PopKey"
+          description="Keep these settings identical across PopJot and PopKey. Toggles are shared, so changes here appear in PopKey instantly."
+        >
+          <SyncSettings schema={settingsSchema} />
+        </SettingGroup>,
       ],
     },
     {
       title: "System",
       items: [
-        <SettingGroup key="scale" title="UI Scale" description="Adjust interface size for your screen resolution">
-          <OptionGrid options={scaleOptions} columns="grid-cols-2" />
-        </SettingGroup>,
+        <ProSection
+          key="pro"
+          palette={surfacePalette}
+          isPro={isPro}
+          buyUrl={POPJOT_PRO_URL}
+          tagline="Custom palette, center icon, circle size & stroke effects — in the Appearance tab."
+          onActivate={(key) => activateLicense(key)}
+          onDeactivate={() => void deactivateLicense()}
+        />,
         <SettingGroup
           key="main-shortcut"
           title="Main Shortcut"
@@ -804,20 +687,9 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
             <ToggleRow label="Open at login" checked={openAtLogin} onChange={toggleOpenAtLogin} />
           </SettingGroup>
         ) : null,
-        IS_PRO ? (
-          <SettingGroup key="pro" title="Pro Features" description="Custom palette · Center icon · Circle size">
-            <button
-              onClick={() => setShowProModal(true)}
-              className="flex w-full items-center justify-between rounded-[16px] px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-80"
-              style={{ backgroundColor: PRO_ACCENT, color: "#fff" }}
-            >
-              <span className="flex items-center gap-2">
-                <Sparkles size={14} />
-                Customize
-              </span>
-            </button>
-          </SettingGroup>
-        ) : null,
+        <SettingGroup key="config" title="Config" description="Back up your settings or restore them from a file">
+          <SettingsImportExport schema={settingsSchema} store={useStore} appName="PopJot" />
+        </SettingGroup>,
         desktop ? (
           <SettingGroup key="quit" title="Quit" description="Close PopJot completely">
             <button
@@ -936,7 +808,6 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     return (
       <SettingsUIProvider density="compact" palette={surfacePalette}>
         <EmbeddedSettingsPanel>{sectionsContent}</EmbeddedSettingsPanel>
-        {showProModal && <ProSettingsModal onClose={() => setShowProModal(false)} />}
       </SettingsUIProvider>
     );
   }
@@ -945,7 +816,6 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     return (
       <SettingsUIProvider density="compact" palette={surfacePalette}>
         <SettingsWindowFrame appName="PopJot">{sectionsContent}</SettingsWindowFrame>
-        {showProModal && <ProSettingsModal onClose={() => setShowProModal(false)} />}
       </SettingsUIProvider>
     );
   }

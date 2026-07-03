@@ -19,6 +19,7 @@ import type {
   GridMode,
   GridSize,
   OverlayMode,
+  TextColor,
 } from "@/store/useStore";
 
 export {
@@ -38,6 +39,8 @@ const settings = createSettingsPlatform(settingsSchema);
 export const sendThemeMode = (mode: ThemeMode): void => settings.sendSetting("themeMode", mode);
 export const sendColorPalette = (palette: ColorPalette): void =>
   settings.sendSetting("colorPalette", palette);
+export const sendLastColorPalette = (palette: ColorPalette): void =>
+  settings.sendSetting("lastColorPalette", palette);
 export const sendAnimationIntensity = (intensity: AnimationIntensity): void =>
   settings.sendSetting("animationIntensity", intensity);
 export const sendMenuStyle = (style: MenuStyle): void => settings.sendSetting("menuStyle", style);
@@ -46,8 +49,22 @@ export const sendGridMode = (mode: GridMode): void => settings.sendSetting("grid
 export const sendGridSize = (size: GridSize): void => settings.sendSetting("gridSize", size);
 export const sendOverlayMode = (mode: OverlayMode): void =>
   settings.sendSetting("overlayMode", mode);
-export const sendPopMonoColor = (color: string): void =>
-  settings.sendSetting("popMonoColor", color);
+export const sendButtonRoundness = (val: number): void =>
+  settings.sendSetting("buttonRoundness", val);
+export const sendMenuTranslucency = (val: number): void =>
+  settings.sendSetting("menuTranslucency", val);
+export const sendBrandingEnabled = (val: boolean): void =>
+  settings.sendSetting("brandingEnabled", val);
+export const sendBrandingImage = (dataUrl: string): void =>
+  settings.sendSetting("brandingImage", dataUrl);
+export const sendBrandingScale = (val: number): void =>
+  settings.sendSetting("brandingScale", val);
+export const sendGlowIntensity = (val: number): void =>
+  settings.sendSetting("glowIntensity", val);
+export const sendTextColor = (val: TextColor): void =>
+  settings.sendSetting("textColor", val);
+export const sendSolidColor = (color: string): void =>
+  settings.sendSetting("solidColor", color);
 
 export function overlayActivated(): void {
   window.electronAPI?.overlayActivated();

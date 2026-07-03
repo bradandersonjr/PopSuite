@@ -22,9 +22,6 @@ export const BADGE_COLORS_GRADIENT: [string, string, string, string, string, str
 export const BADGE_COLORS_GLITTER: [string, string, string, string, string, string] = [
     "#FF69B4", "#C0C0FF", "#FFD700", "#7FFFD4", "#E6CAFF", "#F4A0C0",
 ];
-export const BADGE_COLORS_MAGICAL: [string, string, string, string, string, string] = [
-    "#FF2D2D", "#FF6B00", "#FFD600", "#00E065", "#0075FF", "#A033FF",
-];
 
 /** All badge palettes in index order — matches ColorPalette union order */
 export const ALL_BADGE_PALETTES = [
@@ -35,11 +32,12 @@ export const ALL_BADGE_PALETTES = [
     BADGE_COLORS_PASTEL,
     BADGE_COLORS_GRADIENT,
     BADGE_COLORS_GLITTER,
-    BADGE_COLORS_MAGICAL,
 ] as const;
 
+// "solid" has no fixed swatch set — it maps to a dummy index and the live color
+// is injected at the component layer (see resolvePaletteColors).
 const PALETTE_INDEX: Record<ColorPalette, number> = {
-    muted: 0, vibrant: 1, retro: 2, neon: 3, pastel: 4, gradient: 5, glitter: 6, magical: 7,
+    muted: 0, vibrant: 1, retro: 2, neon: 3, pastel: 4, gradient: 5, glitter: 6, solid: 0,
 };
 
 /** Get the 6-color badge palette for a given ColorPalette name */
@@ -49,8 +47,22 @@ export const getBadgeColors = (palette: ColorPalette) => {
 
 /** Palette names in display order */
 export const PALETTE_NAMES: ColorPalette[] = [
-    "muted", "vibrant", "retro", "neon", "pastel", "gradient", "glitter", "magical",
+    "muted", "vibrant", "retro", "neon", "pastel", "gradient", "glitter", "solid",
 ];
+
+/** Premium palettes — selectable only with a PopKey Pro license. (None today.) */
+export const PRO_PALETTES: ReadonlySet<ColorPalette> = new Set<ColorPalette>();
+
+/** Resolve the effective badge colors, injecting the live solid color. */
+export function resolvePaletteColors(palette: ColorPalette, solidColor: string): readonly string[] {
+    if (palette === "solid") return [solidColor];
+    return getBadgeColors(palette);
+}
+
+/** Palette free users fall back to if a Pro palette is somehow active unlicensed. */
+export const DEFAULT_FREE_PALETTE: ColorPalette = "retro";
+
+export const isProPalette = (palette: ColorPalette): boolean => PRO_PALETTES.has(palette);
 
 /** Helper to generate a 30° hue-shifted gradient pair for a base color */
 export function getBadgeGradientStops(color: string): readonly string[] {

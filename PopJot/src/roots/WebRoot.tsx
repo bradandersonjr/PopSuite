@@ -52,7 +52,6 @@ const getLandingCardStyle = (
   drawColors: readonly string[],
   isGradient: boolean,
   popColor?: string,
-  monoColor?: string,
 ): { className: string; style: React.CSSProperties } => {
   const gradientStyle = isGradient
     ? { backgroundImage: gradientCss(getGradientVariantStops(colorIndex)) }
@@ -66,10 +65,15 @@ const getLandingCardStyle = (
         : { backgroundColor: popColor ?? drawColors[colorIndex % drawColors.length] },
     };
   }
-  if (menuStyle === "pop-mono") {
+  if (menuStyle === "glow") {
+    const bg = popColor ?? drawColors[colorIndex % drawColors.length];
+    const glow = isGradient ? getGradientVariantStops(colorIndex)[0] : bg;
     return {
-      className: "landing-card-pop-mono",
-      style: { backgroundColor: monoColor ?? "#fcbf47" },
+      className: "landing-card-glow",
+      style: {
+        ...(isGradient ? gradientStyle : { backgroundColor: bg }),
+        boxShadow: `0 0 18px ${glow}, 0 0 36px ${glow}88`,
+      },
     };
   }
   if (menuStyle === "flat-outline") {
@@ -156,16 +160,13 @@ const getSectionShapes = (drawColors: readonly string[], highlighterColors: read
   ],
 ];
 
-const renderShapes = (shapes: readonly Shape[], menuStyle: MenuStyle, themeMode: "dark" | "light", monoColor?: string) => {
-  const defaultMonoColor = themeMode === "dark" ? "#242424" : "#F8F8F6";
-  const isMonoStyle = menuStyle === "pop-mono";
-  const finalMonoColor = isMonoStyle && monoColor ? monoColor : defaultMonoColor;
+const renderShapes = (shapes: readonly Shape[]) => {
   return shapes.map((shape) =>
     shape.type === "box" ? (
       <div
         key={shape.className}
         className={`absolute z-0 neo-box hidden md:block opacity-30 ${shape.className}`}
-        style={isMonoStyle ? { backgroundColor: finalMonoColor } : shape.gradientStops ? { backgroundImage: gradientCss(shape.gradientStops) } : { backgroundColor: shape.color }}
+        style={shape.gradientStops ? { backgroundImage: gradientCss(shape.gradientStops) } : { backgroundColor: shape.color }}
       />
     ) : (
       <shape.icon
@@ -173,7 +174,7 @@ const renderShapes = (shapes: readonly Shape[], menuStyle: MenuStyle, themeMode:
         className={`absolute z-0 hidden md:block opacity-30 ${shape.className}`}
         size={shape.size}
         strokeWidth={2.5}
-        color={isMonoStyle ? finalMonoColor : shape.gradientId ? `url(#${shape.gradientId})` : shape.color}
+        color={shape.gradientId ? `url(#${shape.gradientId})` : shape.color}
       />
     )
   );
@@ -182,7 +183,7 @@ const renderShapes = (shapes: readonly Shape[], menuStyle: MenuStyle, themeMode:
 /* ─── Component ─── */
 
 const WebRoot = () => {
-  const { themeMode, colorPalette, menuStyle, hotkey, persistentHotkey, setScaleFactor, popMonoColor } = useStore();
+  const { themeMode, colorPalette, menuStyle, hotkey, persistentHotkey, setScaleFactor } = useStore();
   useScaleSync(setScaleFactor);
 
   const isGradient = colorPalette === "gradient";
@@ -192,7 +193,7 @@ const WebRoot = () => {
   // No two adjacent slots share a color; groups of ≤6 each get exactly one of each color.
   const card = (colorIndex: number, popSlot: number) => {
     const popColor = drawColors[popSlot % drawColors.length];
-    return getLandingCardStyle(colorIndex, menuStyle, drawColors, isGradient, popColor, popMonoColor);
+    return getLandingCardStyle(colorIndex, menuStyle, drawColors, isGradient, popColor);
   };
 
   const floatingShapes = getFloatingShapes(drawColors, highlighterColors, isGradient);
@@ -351,8 +352,8 @@ const WebRoot = () => {
     themeMode,
     colors: drawColors,
     card,
-    renderFloatingShapes: () => renderShapes(floatingShapes, menuStyle, themeMode, popMonoColor),
-    renderSectionShapes: (index) => renderShapes(sectionShapes[index], menuStyle, themeMode, popMonoColor),
+    renderFloatingShapes: () => renderShapes(floatingShapes),
+    renderSectionShapes: (index) => renderShapes(sectionShapes[index]),
     // Gradient SVG defs (hidden, referenced by floating icons)
     defs: isGradient ? (
       <svg className="absolute inset-0 h-0 w-0 pointer-events-none" aria-hidden="true">

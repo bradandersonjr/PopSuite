@@ -17,6 +17,11 @@ import type {
   AnimationIntensity,
   DisplayPosition,
   BadgeStyle,
+  BadgeTextColor,
+  ClickEffect,
+  BrandingCorner,
+  BadgeFont,
+  BadgeAnimation,
 } from "@/store/useStore";
 
 export {
@@ -64,25 +69,49 @@ export const sendPositionOffsetY = (val: number): void =>
 export const sendBadgeDuration = (ms: number): void => settings.sendSetting("badgeDuration", ms);
 export const sendMaxBadges = (n: number): void => settings.sendSetting("maxBadges", n);
 export const sendBadgeStyle = (style: BadgeStyle): void => settings.sendSetting("badgeStyle", style);
+export const sendBadgeTextColor = (val: BadgeTextColor): void =>
+  settings.sendSetting("badgeTextColor", val);
+export const sendBadgeFont = (val: BadgeFont): void => settings.sendSetting("badgeFont", val);
+export const sendBadgeAnimation = (val: BadgeAnimation): void =>
+  settings.sendSetting("badgeAnimation", val);
 export const sendBadgeTranslucency = (val: number): void =>
   settings.sendSetting("badgeTranslucency", val);
-export const sendBadgeBlur = (val: number): void => settings.sendSetting("badgeBlur", val);
 export const sendBadgeRoundness = (val: number): void =>
   settings.sendSetting("badgeRoundness", val);
+export const sendGlowIntensity = (val: number): void =>
+  settings.sendSetting("glowIntensity", val);
 export const sendFontSize = (size: number): void => settings.sendSetting("fontSize", size);
 export const sendKeyboardEnabled = (val: boolean): void =>
   settings.sendSetting("keyboardEnabled", val);
+export const sendShowKeyRepeat = (val: boolean): void =>
+  settings.sendSetting("showKeyRepeat", val);
 export const sendWordMode = (val: boolean): void => settings.sendSetting("wordMode", val);
 export const sendMouseEnabled = (val: boolean): void => settings.sendSetting("mouseEnabled", val);
 export const sendShowMouseClicks = (val: boolean): void =>
   settings.sendSetting("showMouseClicks", val);
 export const sendShowScrollWheel = (val: boolean): void =>
   settings.sendSetting("showScrollWheel", val);
-export const sendPopMonoColor = (color: string): void =>
-  settings.sendSetting("popMonoColor", color);
 export const sendScrollColor = (color: string): void => settings.sendSetting("scrollColor", color);
 export const sendClickColor = (color: string): void => settings.sendSetting("clickColor", color);
+export const sendClickEffect = (effect: ClickEffect): void =>
+  settings.sendSetting("clickEffect", effect);
+export const sendClickSize = (px: number): void => settings.sendSetting("clickSize", px);
+export const sendSolidColor = (color: string): void => settings.sendSetting("solidColor", color);
+export const sendBrandingEnabled = (val: boolean): void =>
+  settings.sendSetting("brandingEnabled", val);
+export const sendBrandingImage = (dataUrl: string): void =>
+  settings.sendSetting("brandingImage", dataUrl);
+export const sendBrandingCorner = (corner: BrandingCorner): void =>
+  settings.sendSetting("brandingCorner", corner);
+export const sendBrandingSize = (px: number): void => settings.sendSetting("brandingSize", px);
+export const sendBrandingOpacity = (val: number): void =>
+  settings.sendSetting("brandingOpacity", val);
+export const sendBrandingRadius = (val: number): void =>
+  settings.sendSetting("brandingRadius", val);
+export const sendBrandingGrayscale = (val: boolean): void =>
+  settings.sendSetting("brandingGrayscale", val);
 export const sendScaleFactor = (scale: number): void => settings.sendSetting("scaleFactor", scale);
+export const sendObsMode = (val: boolean): void => settings.sendSetting("obsMode", val);
 
 export async function setMainShortcut(shortcut: string): Promise<ShortcutUpdateResult> {
   return setNamedShortcut("main", shortcut);

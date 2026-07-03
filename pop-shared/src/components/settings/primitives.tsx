@@ -8,10 +8,10 @@
  */
 
 import React, { createContext, useContext, useState } from "react";
-import { AlertCircle, Check, Keyboard, RotateCcw, Paintbrush, SlidersHorizontal, MousePointer, Settings as SettingsIcon } from "lucide-react";
-import { ERROR_COLORS, type SurfacePalette } from "../../config/desktopTheme";
+import { AlertCircle, Check, Keyboard, RotateCcw, Paintbrush, SlidersHorizontal, MousePointer, Sparkles, RefreshCw, Image as ImageIcon, Settings as SettingsIcon } from "lucide-react";
+import { ERROR_COLORS, PRO_ACCENT, type SurfacePalette } from "../../config/desktopTheme";
 import { formatHotkey } from "../../lib/hotkeys";
-import { closeWindow, isDesktop, isSettingsWindow } from "../../settings/renderer";
+import { closeWindow, isDesktop, isSettingsWindow, openExternal } from "../../settings/renderer";
 
 export type Option<T> = {
   label: string;
@@ -102,23 +102,58 @@ export const SettingGroup = ({
   title,
   description,
   children,
+  pro = false,
+  locked = false,
+  buyUrl,
 }: {
   title: string;
   description: string;
   children: React.ReactNode;
+  /** Pro feature: adds a "PRO" badge + accent card so it stands out. */
+  pro?: boolean;
+  /** Pro feature the user hasn't unlocked: controls show muted + disabled with a Get Pro CTA. */
+  locked?: boolean;
+  /** Where the Get Pro button links (shown when locked). */
+  buyUrl?: string;
 }) => {
   const { palette, styles } = useSettingsUI();
   return (
-    <div className={styles.groupWrap}>
+    <div
+      className={pro ? "space-y-3 rounded-[16px] p-4" : styles.groupWrap}
+      style={pro ? { border: `1.5px solid ${PRO_ACCENT}59`, backgroundColor: `${PRO_ACCENT}12` } : undefined}
+    >
       <div>
-        <h4 className={styles.groupTitle} style={{ color: palette.text }}>
-          {title}
-        </h4>
+        <div className="flex items-center gap-2">
+          <h4 className={styles.groupTitle} style={{ color: palette.text }}>
+            {title}
+          </h4>
+          {pro && (
+            <span
+              className="rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+              style={{ backgroundColor: PRO_ACCENT, color: "#fff" }}
+            >
+              Pro
+            </span>
+          )}
+          {pro && locked && buyUrl && (
+            <button
+              onClick={() => openExternal(buyUrl)}
+              className="ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition-opacity hover:opacity-90"
+              style={{ backgroundColor: PRO_ACCENT, color: "#fff" }}
+            >
+              <Sparkles className="h-3 w-3" />
+              Get Pro
+            </button>
+          )}
+        </div>
         <p className={styles.groupDesc} style={{ color: palette.muted }}>
           {description}
         </p>
       </div>
-      <div>{children}</div>
+      {/* Locked: preview the real controls, muted + non-interactive. */}
+      <div style={locked ? { opacity: 0.5, pointerEvents: "none", userSelect: "none" } : undefined}>
+        {children}
+      </div>
     </div>
   );
 };
@@ -330,6 +365,12 @@ const getCategoryIcon = (title: string, className?: string) => {
   }
   if (t.includes("input")) {
     return <MousePointer className={className} />;
+  }
+  if (t.includes("sync")) {
+    return <RefreshCw className={className} />;
+  }
+  if (t.includes("brand")) {
+    return <ImageIcon className={className} />;
   }
   return <SettingsIcon className={className} />;
 };

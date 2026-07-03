@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import type { MenuStyle } from "@/store/useStore";
 import { useStore } from "@/store/useStore";
 import { getAnimationConfig } from "@shared/config/animations";
-import PaletteEffectOverlay from "./PaletteEffectOverlay";
+import PaletteEffectOverlay from "@shared/components/PaletteEffectOverlay";
+import { withAlpha } from "@/lib/color";
 
 // ─── Animation Constants ────────────────────────────────────────────
 
@@ -53,6 +54,13 @@ const RadialButton = ({
   const scaleFactor = useStore(state => state.scaleFactor);
   const buttonRoundness = useStore(state => state.buttonRoundness);
   const colorPalette = useStore(state => state.colorPalette);
+  const glowIntensity = useStore(state => state.glowIntensity);
+  const textColor = useStore(state => state.textColor);
+  const menuTranslucency = useStore(state => state.menuTranslucency);
+  const themeMode = useStore(state => state.themeMode);
+  const bgAlpha = 1 - menuTranslucency / 100;
+  // Flat / flat-outline / pop-light backgrounds (otherwise from CSS) so translucency applies uniformly.
+  const flatBase = themeMode === "dark" ? "#242424" : "#F8F8F6";
   const animConfig = getAnimationConfig(animationIntensity);
   const [isPressing, setIsPressing] = useState(false);
 
@@ -83,9 +91,20 @@ const RadialButton = ({
     appearance: "none",
     WebkitAppearance: "none",
     ...(popGradientStops && popGradientStops.length > 1
-      ? { background: `linear-gradient(135deg, ${popGradientStops.join(", ")})` }
-      : popColor ? { backgroundColor: popColor } : {}),
+      ? { background: `linear-gradient(135deg, ${popGradientStops.map((s) => withAlpha(s, bgAlpha)).join(", ")})` }
+      : { backgroundColor: withAlpha(popColor ?? flatBase, bgAlpha) }),
     ...(ringColor ? { borderColor: ringColor } : {}),
+    // Glow: soft colored halo in the button's own color, scaled by intensity.
+    ...(variant === "glow"
+      ? (() => {
+          const glow = popGradientStops?.[0] ?? popColor;
+          if (!glow) return {};
+          const gi = glowIntensity / 100;
+          return { boxShadow: `0 0 ${Math.round(8 + gi * 16)}px ${glow}, 0 0 ${Math.round(16 + gi * 30)}px ${glow}88` };
+        })()
+      : {}),
+    // Force icon/text color when not "auto".
+    ...(textColor === "white" ? { color: "#ffffff" } : textColor === "black" ? { color: "#111111" } : {}),
   };
 
   const animate = isSelected

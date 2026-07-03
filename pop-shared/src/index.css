@@ -172,20 +172,10 @@
   box-shadow: 2px 2px 0px #000;
 }
 
-.theme-dark .radial-btn-pop-mono {
-  background: #242424;
-  color: #E8EAED;
-  border: 3px solid #3D3D3D;
-  box-shadow: 4px 4px 0px #2D2D2D;
-}
-
-.theme-dark .radial-btn-pop-mono:hover {
-  box-shadow: 6px 6px 0px #2D2D2D;
-}
-
-.theme-dark .radial-btn-pop-mono:active,
-.theme-dark .radial-btn-pop-mono[data-selected="true"] {
-  box-shadow: 2px 2px 0px #2D2D2D;
+/* glow: colored bg (inline) + soft colored halo (inline box-shadow), no border */
+.theme-dark .radial-btn-glow {
+  color: #000;
+  border: none;
 }
 
 .theme-dark .radial-btn-pop-light {
@@ -261,20 +251,9 @@
   box-shadow: 2px 2px 0px #000;
 }
 
-.theme-light .radial-btn-pop-mono {
-  background: #F8F8F6;
+.theme-light .radial-btn-glow {
   color: #000;
-  border: 3px solid #000;
-  box-shadow: 4px 4px 0px #000;
-}
-
-.theme-light .radial-btn-pop-mono:hover {
-  box-shadow: 6px 6px 0px #000;
-}
-
-.theme-light .radial-btn-pop-mono:active,
-.theme-light .radial-btn-pop-mono[data-selected="true"] {
-  box-shadow: 2px 2px 0px #000;
+  border: none;
 }
 
 /* Landing page card skins — outside @layer to avoid purge (dynamic class names)
@@ -326,45 +305,17 @@
   transform: translate(1px, 1px);
 }
 
-/* ── pop-mono: neutral bg, border, hard shadow ── */
-/* Scoped --foreground override so text-foreground/70/80 all resolve correctly */
-.theme-dark .landing-card-pop-mono {
-  --foreground: 220 10% 91%;
-  /* #E8EAED in HSL */
-  background: #242424;
-  color: #E8EAED;
-  border: 3px solid #3D3D3D;
-  box-shadow: 4px 4px 0px #2D2D2D;
+/* ── glow: colored bg + soft colored halo (box-shadow set inline), no border ── */
+.landing-card-glow {
+  border: none;
   border-radius: var(--radius);
 }
 
-.theme-dark .landing-card-pop-mono.neo-box-hover:hover {
-  box-shadow: 6px 6px 0px #2D2D2D;
+.landing-card-glow.neo-box-hover:hover {
   transform: translate(-2px, -2px);
 }
 
-.theme-dark .landing-card-pop-mono.neo-box-hover:active {
-  box-shadow: 2px 2px 0px #2D2D2D;
-  transform: translate(1px, 1px);
-}
-
-.theme-light .landing-card-pop-mono {
-  --foreground: 0 0% 0%;
-  /* #000 in HSL */
-  background: #F8F8F6;
-  color: #000;
-  border: 3px solid #000;
-  box-shadow: 4px 4px 0px #000;
-  border-radius: var(--radius);
-}
-
-.theme-light .landing-card-pop-mono.neo-box-hover:hover {
-  box-shadow: 6px 6px 0px #000;
-  transform: translate(-2px, -2px);
-}
-
-.theme-light .landing-card-pop-mono.neo-box-hover:active {
-  box-shadow: 2px 2px 0px #000;
+.landing-card-glow.neo-box-hover:active {
   transform: translate(1px, 1px);
 }
 

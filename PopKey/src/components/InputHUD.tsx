@@ -1,6 +1,6 @@
 import { AnimatePresence } from "framer-motion";
 import { useStore } from "@/store/useStore";
-import { getBadgeColors } from "@/config/themes";
+import { resolvePaletteColors } from "@/config/themes";
 import KeyBadge from "./KeyBadge";
 import type { Badge } from "@/hooks/useInputCapture";
 
@@ -9,8 +9,9 @@ interface InputHUDProps {
 }
 
 const InputHUD = ({ badges }: InputHUDProps) => {
-  const { displayPosition, colorPalette, badgeStyle, fontSize, scaleFactor, scaleMultiplier, positionOffsetX, positionOffsetY } = useStore();
-  const colors = getBadgeColors(colorPalette);
+  const { displayPosition, colorPalette, badgeStyle, fontSize, scaleFactor, scaleMultiplier, positionOffsetX, positionOffsetY, solidColor } = useStore();
+  // "solid" injects the live color; others use the built-in palette.
+  const colors = resolvePaletteColors(colorPalette, solidColor);
   const effectiveScale = scaleFactor * scaleMultiplier;
 
   const isTop = displayPosition.startsWith("top");

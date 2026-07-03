@@ -6,9 +6,10 @@ import { normalizeKey, isHotkeyPressed, isMac } from "@shared/lib/hotkeys";
 import { isDesktop, onShortcutActivate, onShortcutPersistent, overlayActivated, overlayDeactivated } from "@/lib/platform";
 import { getGradientVariantStops, getHighlighterGradientStops } from "@/config/themes";
 import { getAnimationConfig } from "@shared/config/animations";
-import { getProCenterIcon, getProCenterScale, getEffectiveColors, getProPalette } from "@/pro";
+import { getEffectiveColors, getProPalette } from "@/pro";
 import RadialButton from "./RadialButton";
-import PaletteEffectOverlay from "./PaletteEffectOverlay";
+import PaletteEffectOverlay from "@shared/components/PaletteEffectOverlay";
+import { withAlpha } from "@/lib/color";
 
 const BASE_SCREEN_ITEMS = [
   { icon: X, bg: "transparent" as const, color: undefined },
@@ -45,8 +46,11 @@ const getPosition = (index: number, total: number, radius: number, offset: numbe
 
 const SPRING_CONFIG = { type: "spring", stiffness: 1500, damping: 40 } as const;
 
-const pickPopColors = (palette: ColorPalette): { colors: string[]; centerColor: string; centerGradient?: [string, string]; gradientStops?: readonly string[][] } => {
-  const { draw, tertiary } = getEffectiveColors(palette);
+const pickPopColors = (palette: ColorPalette, solidColor: string): { colors: string[]; centerColor: string; centerGradient?: [string, string]; gradientStops?: readonly string[][] } => {
+  // "solid" has no fixed palette — every slot is the single chosen color.
+  const { draw, tertiary } = palette === "solid"
+    ? { draw: [solidColor, solidColor, solidColor, solidColor, solidColor, solidColor], tertiary: [solidColor, solidColor, solidColor] }
+    : getEffectiveColors(palette);
 
   // Fisher-Yates shuffle for random button coloring each time
   const colors = Array.from(draw);
@@ -134,7 +138,18 @@ const RadialMenu = () => {
   const persistentHotkey = useStore(state => state.persistentHotkey);
   const menuStyle = useStore(state => state.menuStyle);
   const colorPalette = useStore(state => state.colorPalette);
-  const popMonoColor = useStore(state => state.popMonoColor);
+  const lastColorPalette = useStore(state => state.lastColorPalette);
+  const solidColor = useStore(state => state.solidColor);
+  const glowIntensity = useStore(state => state.glowIntensity);
+  const textColor = useStore(state => state.textColor);
+  const themeMode = useStore(state => state.themeMode);
+  const menuTranslucency = useStore(state => state.menuTranslucency);
+  const brandingEnabled = useStore(state => state.brandingEnabled);
+  const brandingImage = useStore(state => state.brandingImage);
+  const brandingScale = useStore(state => state.brandingScale);
+  const isPro = useStore(state => state.isPro);
+  const menuBgAlpha = 1 - menuTranslucency / 100;
+  const menuFlatBase = themeMode === "dark" ? "#242424" : "#F8F8F6";
   const scaleFactor = useStore(state => state.scaleFactor);
   const pageZoomFactor = useStore(state => state.pageZoomFactor);
 
@@ -143,14 +158,18 @@ const RadialMenu = () => {
   const SUB_RADIUS = BASE_SUB_RADIUS * scaleFactor;
 
   /** Random pop colors — reshuffled each time the menu opens */
-  const popColorsRef = useRef(pickPopColors(colorPalette));
+  const popColorsRef = useRef(pickPopColors(colorPalette, solidColor));
 
   const paletteVersion = useStore(state => state.paletteVersion);
 
   const SUB_MENUS = useMemo(() => {
-    const { draw: drawColors, highlighter: highlighterColors } = getEffectiveColors(colorPalette);
+    // Solid only restyles the menu chrome — strokes keep real, multi-color
+    // swatches from the last non-Solid palette so you can still draw in any color.
+    const strokePalette: ColorPalette =
+      colorPalette === "solid" ? (lastColorPalette === "solid" ? "retro" : lastColorPalette) : colorPalette;
+    const { draw: drawColors, highlighter: highlighterColors } = getEffectiveColors(strokePalette);
     // Only use gradient rendering when the built-in gradient palette is active with no custom Pro override
-    const useGradient = colorPalette === "gradient" && getProPalette(colorPalette) === null;
+    const useGradient = strokePalette === "gradient" && getProPalette(strokePalette) === null;
 
     const drawItems = toColorItems(drawColors, useGradient ? "gradient" : "muted", "draw");
     const highlighterItems = toColorItems(highlighterColors, useGradient ? "gradient" : "muted", "highlighter");
@@ -167,7 +186,7 @@ const RadialMenu = () => {
       { offset: 180, items: screenItems },
     ];
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colorPalette, paletteVersion]); // paletteVersion invalidates when Pro palette changes
+  }, [colorPalette, lastColorPalette, paletteVersion]); // paletteVersion invalidates when Pro palette changes
 
   const checkHotkey = useCallback(
     () => isHotkeyPressed(hotkey, keysDown.current),
@@ -186,7 +205,7 @@ const RadialMenu = () => {
 
   const openMenuAtCursor = useCallback(() => {
     const state = useStore.getState();
-    popColorsRef.current = pickPopColors(state.colorPalette);
+    popColorsRef.current = pickPopColors(state.colorPalette, state.solidColor);
     const origin = { x: mousePos.current.x, y: mousePos.current.y };
     menuOriginRef.current = origin;
     setMenuPos(origin);
@@ -229,7 +248,7 @@ const RadialMenu = () => {
       const leftHeld = (e.buttons & 1) !== 0;
       if (state.appEnabled && !state.isDrawing && !leftHeld) {
         e.preventDefault();
-        popColorsRef.current = pickPopColors(state.colorPalette);
+        popColorsRef.current = pickPopColors(state.colorPalette, state.solidColor);
         setMenuOpen(true);
         const origin = toOverlayPoint(e.clientX, e.clientY);
         menuOriginRef.current = origin;
@@ -376,7 +395,7 @@ const RadialMenu = () => {
         state.setSnapshotDataUrl(snapshotDataUrl);
         overlayActivated();
       }
-      popColorsRef.current = pickPopColors(state.colorPalette);
+      popColorsRef.current = pickPopColors(state.colorPalette, state.solidColor);
       menuOriginRef.current = { x, y };
       setMenuPos({ x, y });
       setMenuOpen(true);
@@ -396,7 +415,7 @@ const RadialMenu = () => {
           state.setSnapshotDataUrl(snapshotDataUrl);
           overlayActivated();
         }
-        popColorsRef.current = pickPopColors(state.colorPalette);
+        popColorsRef.current = pickPopColors(state.colorPalette, state.solidColor);
         menuOriginRef.current = { x, y };
         setMenuPos({ x, y });
         setMenuOpen(true);
@@ -414,7 +433,7 @@ const RadialMenu = () => {
       }
       // Only update position if menu wasn't already open
       if (!menuOpenRef.current) {
-        popColorsRef.current = pickPopColors(state.colorPalette);
+        popColorsRef.current = pickPopColors(state.colorPalette, state.solidColor);
         menuOriginRef.current = { x, y };
         setMenuPos({ x, y });
         setMenuOpen(true);
@@ -428,39 +447,8 @@ const RadialMenu = () => {
     };
   }, []);
 
-  // ─── Tray menu IPC handlers (for Electron desktop settings) ───────
-
-  useEffect(() => {
-    if (!isDesktop()) return;
-
-    const unlisteners = [
-      window.electronAPI?.onTrayMenuChange("tray-set-theme-mode", (mode: string) => {
-        useStore.getState().setThemeMode(mode as "dark" | "light");
-      }),
-      window.electronAPI?.onTrayMenuChange("tray-set-color-palette", (palette: string) => {
-        useStore.getState().setColorPalette(palette as "muted" | "vibrant" | "retro" | "neon" | "pastel" | "gradient");
-      }),
-      window.electronAPI?.onTrayMenuChange("tray-set-animation-intensity", (intensity: string) => {
-        useStore.getState().setAnimationIntensity(intensity as "low" | "medium" | "high");
-      }),
-      window.electronAPI?.onTrayMenuChange("tray-set-menu-style", (style: string) => {
-        useStore.getState().setMenuStyle(style as "flat" | "flat-outline" | "pop" | "pop-mono");
-      }),
-      window.electronAPI?.onTrayMenuChange("tray-set-grid-mode", (mode: string) => {
-        useStore.getState().setGridMode(mode as "none" | "grid" | "dots");
-      }),
-      window.electronAPI?.onTrayMenuChange("tray-set-grid-size", (size: string) => {
-        useStore.getState().setGridSize(size as "small" | "large");
-      }),
-      window.electronAPI?.onTrayMenuChange("tray-set-overlay-mode", (mode: string) => {
-        useStore.getState().setOverlayMode(mode as "live" | "snapshot");
-      }),
-    ];
-
-    return () => {
-      unlisteners.forEach(fn => fn?.());
-    };
-  }, []);
+  // Tray-settings broadcasts are applied generically by useTraySettingsSync
+  // (mounted in DesktopRoot), so no per-setting handlers are needed here.
 
   // ─── Selection pop animation ─────────────────────────────────────
 
@@ -505,7 +493,8 @@ const RadialMenu = () => {
 
   // ─── Render ──────────────────────────────────────────────────────
 
-  const isPop = menuStyle === "pop" || menuStyle === "pop-mono";
+  // Glow shares Pop's palette-color logic (colored fill); only the chrome differs.
+  const isPop = menuStyle === "pop" || menuStyle === "glow";
 
   return (
     <AnimatePresence>
@@ -528,14 +517,17 @@ const RadialMenu = () => {
                     hasActiveSelection={hasActiveSelection}
                     menuOpen={menuOpen}
                     title={MAIN_LABELS[i]}
-                    popColor={
-                      menuStyle === "pop-mono"
-                        ? popMonoColor
-                        : isPop && !popColorsRef.current.gradientStops
+                    ringColor={
+                      menuStyle === "flat-outline"
                         ? popColorsRef.current.colors[i % popColorsRef.current.colors.length]
                         : undefined
                     }
-                    popGradientStops={menuStyle === "pop" && popColorsRef.current.gradientStops ? popColorsRef.current.gradientStops[i % popColorsRef.current.gradientStops.length] : undefined}
+                    popColor={
+                      isPop && !popColorsRef.current.gradientStops
+                        ? popColorsRef.current.colors[i % popColorsRef.current.colors.length]
+                        : undefined
+                    }
+                    popGradientStops={isPop && popColorsRef.current.gradientStops ? popColorsRef.current.gradientStops[i % popColorsRef.current.gradientStops.length] : undefined}
                     onHoverStart={() => {
                       // Angular gatekeeper: validate chip is in the correct slice
                       if (!isChipInActiveSlice(i, MAIN_ICONS.length, mousePos.current, menuOriginRef.current)) return;
@@ -578,21 +570,21 @@ const RadialMenu = () => {
                       return (
                         <RadialButton
                           key={`sub-${activeIndex}-${si}`}
-                          variant={isPop && item.color ? ("pop-light" as MenuStyle) : menuStyle}
+                          variant={menuStyle === "glow" ? "glow" : isPop && item.color ? ("pop-light" as MenuStyle) : menuStyle}
                           position={pos}
                           isSelected={isSelected}
                           interactable={subInteractable}
                           hasActiveSelection={hasActiveSelection}
                           menuOpen={menuOpen}
-                          ringColor={(isPop || menuStyle === "flat-outline") && item.color ? item.color : undefined}
+                          ringColor={menuStyle !== "glow" && (isPop || menuStyle === "flat-outline") && item.color ? item.color : undefined}
                           popColor={
-                            menuStyle === "pop-mono" && !item.color
-                              ? popMonoColor
+                            menuStyle === "glow" && item.color
+                              ? item.color
                               : isPop && !item.color && !item.gradientStops
                               ? popColorsRef.current.colors[si % popColorsRef.current.colors.length]
                               : undefined
                           }
-                          popGradientStops={menuStyle === "pop" && !item.color && item.gradientStops ? item.gradientStops : undefined}
+                          popGradientStops={isPop && !item.color && item.gradientStops ? item.gradientStops : undefined}
                           onHoverStart={() => {
                             // Validate chip is in active angular slice (with offset for submenu layout)
                             const isValid = isChipInActiveSlice(
@@ -635,8 +627,11 @@ const RadialMenu = () => {
 
             {/* Center circle */}
             {(() => {
-              const proScale = activeIndex === null ? getProCenterScale() : 1;
-              const proIcon = getProCenterIcon();
+              // Branding logo replaces the center shape (Pro). Stored in
+              // settings so it renders in every build, gated on Pro + enabled.
+              const brandingActive = isPro && brandingEnabled && brandingImage !== "";
+              const proScale = activeIndex === null && brandingActive ? brandingScale : 1;
+              const proIcon = brandingActive ? brandingImage : null;
               const circleSize = 48 * scaleFactor * proScale;
               const iconSize = 22 * scaleFactor * proScale;
               const centerBorderRadius = `${buttonRoundness / 2}%`;
@@ -653,11 +648,18 @@ const RadialMenu = () => {
                     boxSizing: "border-box",
                     lineHeight: 0,
                     overflow: "hidden",
-                    ...(menuStyle === "pop-mono"
-                      ? { backgroundColor: popMonoColor }
-                      : isPop && popColorsRef.current.centerGradient
-                      ? { background: `linear-gradient(135deg, ${popColorsRef.current.centerGradient[0]}, ${popColorsRef.current.centerGradient[1]})` }
-                      : isPop ? { backgroundColor: popColorsRef.current.centerColor } : {}),
+                    ...(isPop && popColorsRef.current.centerGradient
+                      ? { background: `linear-gradient(135deg, ${withAlpha(popColorsRef.current.centerGradient[0], menuBgAlpha)}, ${withAlpha(popColorsRef.current.centerGradient[1], menuBgAlpha)})` }
+                      : { backgroundColor: withAlpha(isPop ? popColorsRef.current.centerColor : menuFlatBase, menuBgAlpha) }),
+                    ...(menuStyle === "glow"
+                      ? (() => {
+                          const glow = popColorsRef.current.centerGradient?.[0] ?? popColorsRef.current.centerColor;
+                          if (!glow) return {};
+                          const gi = glowIntensity / 100;
+                          return { boxShadow: `0 0 ${Math.round(8 + gi * 16)}px ${glow}, 0 0 ${Math.round(16 + gi * 30)}px ${glow}88` };
+                        })()
+                      : {}),
+                    ...(textColor === "white" ? { color: "#ffffff" } : textColor === "black" ? { color: "#111111" } : {}),
                   }}
                   initial={{ scale: 0, rotate: -90 }}
                   animate={hasActiveSelection ? { scale: 0, rotate: 0 } : { scale: 1, rotate: 0 }}
@@ -666,7 +668,7 @@ const RadialMenu = () => {
                 >
                   {activeIndex === null ? (
                     proIcon ? (
-                      <img src={proIcon} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "50%" }} />
+                      <img src={proIcon} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: centerBorderRadius }} />
                     ) : (
                       <Bolt size={iconSize} strokeWidth={2} />
                     )
@@ -676,7 +678,7 @@ const RadialMenu = () => {
                       return <ActiveIcon size={iconSize} strokeWidth={2} />;
                     })()
                   )}
-                  <PaletteEffectOverlay palette={colorPalette} size={circleSize} seed="center" tintColor={menuStyle === "pop-mono" ? popMonoColor : isPop ? popColorsRef.current.centerColor : undefined} />
+                  <PaletteEffectOverlay palette={colorPalette} size={circleSize} seed="center" tintColor={isPop ? popColorsRef.current.centerColor : undefined} />
                 </motion.div>
               );
             })()}
