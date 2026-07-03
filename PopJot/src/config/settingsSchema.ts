@@ -39,6 +39,7 @@ export const settingsSchema = {
   gridMode: setting.enum(["none", "grid", "dots"], "none"),
   gridSize: setting.enum(["small", "large"], "small"),
   overlayMode: setting.enum(["live", "snapshot"], "live"),
+  scaleMultiplier: setting.number(1, { positive: true }),
   // Per-monitor UI scale — derived by each window, broadcast but never stored.
   scaleFactor: setting.number(1, { positive: true, volatile: true }),
 } as const;

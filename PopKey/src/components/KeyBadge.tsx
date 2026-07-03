@@ -7,6 +7,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useStore } from "@/store/useStore";
+import { isDesktop } from "@/lib/platform";
 import { getAnimationConfig } from "@shared/config/animations";
 import PaletteEffectOverlay from "@shared/components/PaletteEffectOverlay";
 import type { BadgeType } from "@/hooks/useInputCapture";
@@ -53,10 +54,11 @@ interface KeyBadgeProps {
 }
 
 const KeyBadge = ({ label, type, color, style, fontSize, exitDirection }: KeyBadgeProps) => {
-  const { colorPalette, animationIntensity, themeMode, badgeTranslucency, badgeRoundness, badgeTextColor, glowIntensity, badgeFont, badgeAnimation, isPro } = useStore();
-  const fontFamily = fontStackFor(badgeFont, isPro);
+  const { colorPalette, animationIntensity, themeMode, badgeTranslucency, badgeRoundness, badgeTextColor, glowIntensity, badgeFont, customFont, badgeAnimation, isPro } = useStore();
+  const effectiveIsPro = !isDesktop() || isPro;
+  const fontFamily = fontStackFor(badgeFont, effectiveIsPro, customFont);
   const config = getAnimationConfig(animationIntensity);
-  const motion0 = getBadgeMotion(badgeAnimation, isPro, config, exitDirection);
+  const motion0 = getBadgeMotion(badgeAnimation, effectiveIsPro, config, exitDirection);
   const isDark = themeMode === "dark";
   const backgroundAlpha = 1 - badgeTranslucency / 100;
   const flatBg = isDark ? "#2c313c" : "#eef1f5";

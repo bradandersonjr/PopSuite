@@ -52,6 +52,8 @@ const RadialButton = ({
 }: RadialButtonProps) => {
   const animationIntensity = useStore(state => state.animationIntensity);
   const scaleFactor = useStore(state => state.scaleFactor);
+  const scaleMultiplier = useStore(state => state.scaleMultiplier);
+  const effectiveScale = scaleFactor * scaleMultiplier;
   const buttonRoundness = useStore(state => state.buttonRoundness);
   const colorPalette = useStore(state => state.colorPalette);
   const glowIntensity = useStore(state => state.glowIntensity);
@@ -76,7 +78,7 @@ const RadialButton = ({
 
   // Base sizes (in px)
   const baseSize = size === "sm" ? 12 : 14;
-  const scaledSize = baseSize * scaleFactor;
+  const scaledSize = baseSize * effectiveScale;
   const scaledHalf = scaledSize / 2;
 
   const skinClass = `radial-btn-${variant}`;

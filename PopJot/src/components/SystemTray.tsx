@@ -20,7 +20,7 @@ import {
   sendButtonRoundness,
   sendMenuTranslucency,
   sendSolidColor,
-  sendScaleFactor,
+  sendScaleMultiplier,
   sendThemeMode,
   setMainShortcut,
   setPersistentShortcut,
@@ -207,8 +207,8 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     setGridMode: setGridModeLocal,
     gridSize,
     setGridSize: setGridSizeLocal,
-    scaleFactor,
-    setScaleFactor: setScaleFactorLocal,
+    scaleMultiplier,
+    setScaleMultiplier: setScaleMultiplierLocal,
     overlayMode,
     setOverlayMode: setOverlayModeLocal,
     paletteVersion,
@@ -224,6 +224,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
   void paletteVersion;
   const hasProPalette = getProPalette(colorPalette) !== null;
   const desktop = isDesktop();
+  const effectiveIsPro = isPro || embedded;
   const isDark = themeMode === "dark";
 
   // Use custom palette for menu colors if active, otherwise use theme-based colors
@@ -326,9 +327,9 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     sendSolidColor(color);
   };
 
-  const applyScaleFactor = (scale: number) => {
-    setScaleFactorLocal(scale);
-    sendScaleFactor(scale);
+  const applyScaleMultiplier = (multiplier: number) => {
+    setScaleMultiplierLocal(multiplier);
+    sendScaleMultiplier(multiplier);
   };
 
   const applyGridMode = (mode: GridMode) => {
@@ -512,32 +513,6 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     },
   ];
 
-  const scaleOptions: Option<number>[] = [
-    {
-      label: "75%",
-      checked: Math.abs(scaleFactor - 0.75) < 0.01,
-      value: 0.75,
-      onSelect: applyScaleFactor,
-    },
-    {
-      label: "100%",
-      checked: Math.abs(scaleFactor - 1.0) < 0.01,
-      value: 1.0,
-      onSelect: applyScaleFactor,
-    },
-    {
-      label: "150%",
-      checked: Math.abs(scaleFactor - 1.5) < 0.01,
-      value: 1.5,
-      onSelect: applyScaleFactor,
-    },
-    {
-      label: "200%",
-      checked: Math.abs(scaleFactor - 2.0) < 0.01,
-      value: 2.0,
-      onSelect: applyScaleFactor,
-    },
-  ];
 
   const settingsColumns = [
     {
@@ -599,7 +574,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     {
       title: "Branding",
       items: [
-        <SettingGroup key="branding" title="Branding" description="Replace the menu's center shape with your logo, plus a custom palette" pro locked={!isPro} buyUrl={POPJOT_PRO_URL}>
+        <SettingGroup key="branding" title="Branding" description="Replace the menu's center shape with your logo, plus a custom palette" pro locked={!effectiveIsPro} buyUrl={POPJOT_PRO_URL}>
           <div className="space-y-5">
             <div>
               <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Logo</div>
@@ -629,8 +604,8 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
         <SettingGroup key="grid-size" title="Grid Size" description="Adjust grid density if visible">
           <OptionGrid options={gridSizeOptions} columns="grid-cols-2" />
         </SettingGroup>,
-        <SettingGroup key="scale" title="UI Scale" description="Adjust interface size for your screen resolution">
-          <OptionGrid options={scaleOptions} columns="grid-cols-2" />
+        <SettingGroup key="scale" title="Size" description="Scale interface size">
+          <SliderRow value={Math.round(scaleMultiplier * 100)} min={50} max={200} step={5} onChange={(v) => applyScaleMultiplier(v / 100)} valueSuffix="%" defaultValue={100} />
         </SettingGroup>,
       ],
     },
@@ -648,11 +623,11 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     },
     {
       title: "System",
-      items: [
+      items: desktop ? [
         <ProSection
           key="pro"
           palette={surfacePalette}
-          isPro={isPro}
+          isPro={effectiveIsPro}
           buyUrl={POPJOT_PRO_URL}
           tagline="Custom palette, center icon, circle size & stroke effects — in the Appearance tab."
           onActivate={(key) => activateLicense(key)}
@@ -661,7 +636,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
         <SettingGroup
           key="main-shortcut"
           title="Main Shortcut"
-          description={desktop ? "Hold to activate menu temporarily" : "Try shortcut changes directly in the browser"}
+          description="Hold to activate menu temporarily"
         >
           <ShortcutButton
             currentShortcut={hotkey}
@@ -673,7 +648,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
         <SettingGroup
           key="persistent-shortcut"
           title="Persistent Shortcut"
-          description={desktop ? "Press once to stay in draw mode" : "Test a stay-in-draw shortcut for Mac or PC"}
+          description="Press once to stay in draw mode"
         >
           <ShortcutButton
             currentShortcut={persistentHotkey}
@@ -682,27 +657,27 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
             onStartRecording={() => startRecording("persistent")}
           />
         </SettingGroup>,
-        desktop ? (
-          <SettingGroup key="startup" title="Startup" description="Configure application startup behavior">
-            <ToggleRow label="Open at login" checked={openAtLogin} onChange={toggleOpenAtLogin} />
-          </SettingGroup>
-        ) : null,
+        <SettingGroup key="startup" title="Startup" description="Configure application startup behavior">
+          <ToggleRow label="Open at login" checked={openAtLogin} onChange={toggleOpenAtLogin} />
+        </SettingGroup>,
         <SettingGroup key="config" title="Config" description="Back up your settings or restore them from a file">
           <SettingsImportExport schema={settingsSchema} store={useStore} appName="PopJot" />
         </SettingGroup>,
-        desktop ? (
-          <SettingGroup key="quit" title="Quit" description="Close PopJot completely">
-            <button
-              onClick={() => quitApp()}
-              className="flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2 text-xs font-medium transition-opacity hover:opacity-80"
-              style={{ backgroundColor: surfacePalette.card, color: "#ef4444" }}
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              Quit PopJot
-              <span className="ml-auto text-xs opacity-60">{isMac() ? "Cmd+Q" : "Ctrl+Q"}</span>
-            </button>
-          </SettingGroup>
-        ) : null,
+        <SettingGroup key="quit" title="Quit" description="Close PopJot completely">
+          <button
+            onClick={() => quitApp()}
+            className="flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2 text-xs font-medium transition-opacity hover:opacity-80"
+            style={{ backgroundColor: surfacePalette.card, color: "#ef4444" }}
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Quit PopJot
+            <span className="ml-auto text-xs opacity-60">{isMac() ? "Cmd+Q" : "Ctrl+Q"}</span>
+          </button>
+        </SettingGroup>,
+      ] : [
+        <p key="desktop-only" className="text-xs" style={{ color: surfacePalette.muted }}>
+          System settings are available in the desktop app.
+        </p>,
       ],
     },
   ];
@@ -807,7 +782,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
   if (embedded) {
     return (
       <SettingsUIProvider density="compact" palette={surfacePalette}>
-        <EmbeddedSettingsPanel>{sectionsContent}</EmbeddedSettingsPanel>
+        <EmbeddedSettingsPanel appName="PopJot">{sectionsContent}</EmbeddedSettingsPanel>
       </SettingsUIProvider>
     );
   }

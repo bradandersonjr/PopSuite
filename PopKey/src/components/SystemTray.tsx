@@ -9,6 +9,7 @@ import {
   sendBadgeStyle,
   sendBadgeTextColor,
   sendBadgeFont,
+  sendCustomFont,
   sendBadgeAnimation,
   sendBadgeTranslucency,
   sendGlowIntensity,
@@ -55,7 +56,8 @@ import { settingsSchema } from "@/config/settingsSchema";
 import { BADGE_FONTS, fontStackFor } from "@/config/fonts";
 import { BADGE_ANIMATIONS } from "@/config/badgeAnimations";
 import { activateLicense, deactivateLicense } from "@shared/license/renderer";
-import { LogOut, Lock, Settings } from "lucide-react";
+import { openExternal } from "@shared/settings/renderer";
+import { LogOut, Lock, Settings, Sparkles } from "lucide-react";
 import {
   AnimationIntensity,
   BadgeStyle,
@@ -68,9 +70,10 @@ import {
   ThemeMode,
   useStore,
 } from "@/store/useStore";
-import { getMenuColors, getSurfacePalette, type SurfacePalette } from "@shared/config/desktopTheme";
+import { getMenuColors, getSurfacePalette, PRO_ACCENT, type SurfacePalette } from "@shared/config/desktopTheme";
 import { getBadgeColors, getBadgeGradientStops, PALETTE_NAMES, isProPalette, resolvePaletteColors } from "@/config/themes";
 import BrandingSettings from "@/components/BrandingSettings";
+import { FontPicker } from "@/components/FontPicker";
 
 /** Ko-fi product page where buyers get a PopKey Pro key. */
 const POPKEY_PRO_URL = "https://ko-fi.com/s/264fd0031f";
@@ -352,6 +355,7 @@ interface BadgeStylePickerProps {
   glowIntensity: number;
   badgeRoundness: number;
   badgeFont: BadgeFont;
+  customFont: string;
   isPro: boolean;
 }
 
@@ -366,6 +370,7 @@ const BadgeStylePicker = ({
   glowIntensity,
   badgeRoundness,
   badgeFont,
+  customFont,
   isPro,
 }: BadgeStylePickerProps) => {
   const isDark = themeMode === "dark";
@@ -378,7 +383,7 @@ const BadgeStylePicker = ({
   const PREVIEW = 16;
   const radius = `${(badgeRoundness / 100) * PREVIEW}px`;
   const gi = glowIntensity / 100;
-  const fontFamily = fontStackFor(badgeFont, isPro);
+  const fontFamily = fontStackFor(badgeFont, isPro, customFont);
 
   const base: React.CSSProperties = {
     fontSize: `${PREVIEW}px`,
@@ -486,6 +491,8 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     setBadgeTextColor: setBadgeTextColorLocal,
     badgeFont,
     setBadgeFont: setBadgeFontLocal,
+    customFont,
+    setCustomFont: setCustomFontLocal,
     badgeAnimation,
     setBadgeAnimation: setBadgeAnimationLocal,
     badgeTranslucency,
@@ -520,6 +527,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
   } = useStore();
 
   const desktop = isDesktop();
+  const effectiveIsPro = isPro || embedded;
   const isDark = themeMode === "dark";
   const surfacePalette = useMemo(() => getSurfacePalette(isDark), [isDark]);
 
@@ -619,6 +627,17 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     setBadgeFontLocal(val);
     sendBadgeFont(val);
   };
+  const applyCustomFont = (val: string) => {
+    setCustomFontLocal(val);
+    sendCustomFont(val);
+    if (val.trim()) {
+      setBadgeFontLocal("custom");
+      sendBadgeFont("custom");
+    } else if (badgeFont === "custom") {
+      setBadgeFontLocal("mono");
+      sendBadgeFont("mono");
+    }
+  };
   const applyBadgeAnimation = (val: BadgeAnimation) => {
     setBadgeAnimationLocal(val);
     sendBadgeAnimation(val);
@@ -690,7 +709,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     <div className="grid grid-cols-2 gap-3">
       {PALETTE_NAMES.map((name) => {
         const isSelected = colorPalette === name;
-        const locked = isProPalette(name) && !isPro;
+        const locked = isProPalette(name) && !effectiveIsPro;
         const isSolid = name === "solid";
         const colors = isSolid ? [solidColor] : getBadgeColors(name);
 
@@ -816,7 +835,10 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
   ];
 
   const badgeFontOptions: Option<BadgeFont>[] = BADGE_FONTS.map((f) => ({
-    label: f.label, checked: badgeFont === f.key, value: f.key, onSelect: applyBadgeFont,
+    label: f.label,
+    checked: badgeFont === f.key,
+    value: f.key,
+    onSelect: applyBadgeFont,
   }));
 
   const badgeAnimationOptions: Option<BadgeAnimation>[] = BADGE_ANIMATIONS.map((a) => ({
@@ -877,7 +899,8 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
             glowIntensity={glowIntensity}
             badgeRoundness={badgeRoundness}
             badgeFont={badgeFont}
-            isPro={isPro}
+            customFont={customFont}
+            isPro={effectiveIsPro}
           />
         </SettingGroup>,
         badgeStyle === "glow" && (
@@ -888,8 +911,46 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
         <SettingGroup key="text-color" title="Text Color" description="Force badge text white or black, or follow the theme">
           <OptionGrid options={badgeTextColorOptions} columns="grid-cols-3" compact />
         </SettingGroup>,
-        <SettingGroup key="font" title="Font" description="Typeface for badges" pro locked={!isPro} buyUrl={POPKEY_PRO_URL}>
-          <OptionGrid options={badgeFontOptions} columns="grid-cols-3" compact />
+        <SettingGroup key="font" title="Font" description="Typeface for badges">
+          <div className="space-y-3">
+            <OptionGrid options={badgeFontOptions} columns="grid-cols-3" compact />
+            <div
+              className="space-y-2 rounded-[14px] p-3"
+              style={{
+                border: `1.5px solid ${PRO_ACCENT}59`,
+                backgroundColor: `${PRO_ACCENT}12`,
+                opacity: effectiveIsPro ? 1 : 0.5,
+                pointerEvents: effectiveIsPro ? "auto" : "none",
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>
+                  Any system font
+                </span>
+                <span
+                  className="rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                  style={{ backgroundColor: PRO_ACCENT, color: "#fff" }}
+                >
+                  Pro
+                </span>
+                {!effectiveIsPro && (
+                  <button
+                    onClick={() => openExternal(POPKEY_PRO_URL)}
+                    className="ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: PRO_ACCENT, color: "#fff" }}
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    Get Pro
+                  </button>
+                )}
+              </div>
+              <FontPicker
+                value={badgeFont === "custom" ? customFont : ""}
+                onChange={applyCustomFont}
+                palette={surfacePalette}
+              />
+            </div>
+          </div>
         </SettingGroup>,
         <SettingGroup key="theme" title="Theme Mode" description="Switch between dark and light themes">
           <OptionGrid options={themeModeOptions} columns="grid-cols-2" />
@@ -908,7 +969,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     {
       title: "Branding",
       items: [
-        <SettingGroup key="branding" title="Branding" description="Pin a logo or watermark to a screen corner" pro locked={!isPro} buyUrl={POPKEY_PRO_URL}>
+        <SettingGroup key="branding" title="Branding" description="Pin a logo or watermark to a screen corner" pro locked={!effectiveIsPro} buyUrl={POPKEY_PRO_URL}>
           <BrandingSettings />
         </SettingGroup>,
       ],
@@ -916,7 +977,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     {
       title: "Behavior",
       items: [
-        <SettingGroup key="animation-style" title="Animation" description="How badges enter and exit" pro locked={!isPro} buyUrl={POPKEY_PRO_URL}>
+        <SettingGroup key="animation-style" title="Animation" description="How badges enter and exit" pro locked={!effectiveIsPro} buyUrl={POPKEY_PRO_URL}>
           <OptionGrid options={badgeAnimationOptions} columns="grid-cols-3" compact />
         </SettingGroup>,
         <SettingGroup key="animation" title="Animation Intensity" description="Control how animated your interactions feel">
@@ -999,57 +1060,53 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     },
     {
       title: "System",
-      items: [
+      items: desktop ? [
         <ProSection
           key="pro"
           palette={surfacePalette}
-          isPro={isPro}
+          isPro={effectiveIsPro}
           buyUrl={POPKEY_PRO_URL}
           tagline="Branding, custom fonts & badge animations."
           onActivate={(key) => activateLicense(key)}
           onDeactivate={() => void deactivateLicense()}
         />,
-        desktop ? (
-          <SettingGroup key="shortcut" title="Toggle Shortcut" description="Global shortcut to show/hide PopKey">
-            <ShortcutButton
-              currentShortcut={hotkey}
-              isRecording={recordingKind === "main"}
-              activeKeys={activeKeys}
-              onStartRecording={() => startRecording("main")}
-            />
-          </SettingGroup>
-        ) : null,
-        desktop ? (
-          <SettingGroup key="obs" title="OBS Mode" description="Unpin from always-on-top so OBS can capture PopKey as its own window source">
-            <ToggleRow
-              label="OBS mode"
-              description="Overlay drops to normal z-order — capture it separately and composite in OBS"
-              checked={obsMode}
-              onChange={toggleObsMode}
-            />
-          </SettingGroup>
-        ) : null,
-        desktop ? (
-          <SettingGroup key="startup" title="Startup" description="Configure application startup behavior">
-            <ToggleRow label="Open at login" checked={openAtLogin} onChange={toggleOpenAtLogin} />
-          </SettingGroup>
-        ) : null,
+        <SettingGroup key="shortcut" title="Toggle Shortcut" description="Global shortcut to show/hide PopKey">
+          <ShortcutButton
+            currentShortcut={hotkey}
+            isRecording={recordingKind === "main"}
+            activeKeys={activeKeys}
+            onStartRecording={() => startRecording("main")}
+          />
+        </SettingGroup>,
+        <SettingGroup key="obs" title="OBS Mode" description="Unpin from always-on-top so OBS can capture PopKey as its own window source">
+          <ToggleRow
+            label="OBS mode"
+            description="Overlay drops to normal z-order — capture it separately and composite in OBS"
+            checked={obsMode}
+            onChange={toggleObsMode}
+          />
+        </SettingGroup>,
+        <SettingGroup key="startup" title="Startup" description="Configure application startup behavior">
+          <ToggleRow label="Open at login" checked={openAtLogin} onChange={toggleOpenAtLogin} />
+        </SettingGroup>,
         <SettingGroup key="config" title="Config" description="Back up your settings or restore them from a file">
           <SettingsImportExport schema={settingsSchema} store={useStore} appName="PopKey" />
         </SettingGroup>,
-        desktop ? (
-          <SettingGroup key="quit" title="Quit" description="Close PopKey completely">
-            <button
-              onClick={() => quitApp()}
-              className="flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2 text-xs font-medium transition-opacity hover:opacity-80"
-              style={{ backgroundColor: surfacePalette.card, color: "#ef4444" }}
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              Quit PopKey
-              <span className="ml-auto text-xs opacity-60">{isMac() ? "Cmd+Q" : "Ctrl+Q"}</span>
-            </button>
-          </SettingGroup>
-        ) : null,
+        <SettingGroup key="quit" title="Quit" description="Close PopKey completely">
+          <button
+            onClick={() => quitApp()}
+            className="flex w-full items-center gap-2.5 rounded-[12px] px-3 py-2 text-xs font-medium transition-opacity hover:opacity-80"
+            style={{ backgroundColor: surfacePalette.card, color: "#ef4444" }}
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Quit PopKey
+            <span className="ml-auto text-xs opacity-60">{isMac() ? "Cmd+Q" : "Ctrl+Q"}</span>
+          </button>
+        </SettingGroup>,
+      ] : [
+        <p key="desktop-only" className="text-xs" style={{ color: surfacePalette.muted }}>
+          System settings are available in the desktop app.
+        </p>,
       ],
     },
   ];
@@ -1064,7 +1121,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
   if (embedded) {
     return (
       <SettingsUIProvider density="compact" palette={surfacePalette}>
-        <EmbeddedSettingsPanel>{sectionsContent}</EmbeddedSettingsPanel>
+        <EmbeddedSettingsPanel appName="PopKey">{sectionsContent}</EmbeddedSettingsPanel>
       </SettingsUIProvider>
     );
   }

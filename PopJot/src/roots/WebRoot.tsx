@@ -183,17 +183,28 @@ const renderShapes = (shapes: readonly Shape[]) => {
 /* ─── Component ─── */
 
 const WebRoot = () => {
-  const { themeMode, colorPalette, menuStyle, hotkey, persistentHotkey, setScaleFactor } = useStore();
+  const { themeMode, colorPalette, menuStyle, buttonRoundness, hotkey, persistentHotkey, setScaleFactor } = useStore();
   useScaleSync(setScaleFactor);
+
+  // Roundness slider (0–100) drives the landing cards' corner radius.
+  const cssVars = { "--radius": `${(buttonRoundness / 100) * 1.5}rem` } as React.CSSProperties;
 
   const isGradient = colorPalette === "gradient";
   const { draw: drawColors, highlighter: highlighterColors } = getColors(colorPalette);
 
   // Deterministic color sequence: each slot cycles through all 6 colors in order.
   // No two adjacent slots share a color; groups of ≤6 each get exactly one of each color.
+  const isGlitter = colorPalette === "glitter";
   const card = (colorIndex: number, popSlot: number) => {
     const popColor = drawColors[popSlot % drawColors.length];
-    return getLandingCardStyle(colorIndex, menuStyle, drawColors, isGradient, popColor);
+    const base = getLandingCardStyle(colorIndex, menuStyle, drawColors, isGradient, popColor);
+    // Glitter palette: layer shimmering sparkles on top of the active style.
+    if (!isGlitter) return base;
+    const tint = (base.style.backgroundColor as string) ?? drawColors[colorIndex % drawColors.length];
+    return {
+      className: `${base.className} landing-glitter`,
+      style: { ...base.style, "--glitter-tint": tint } as React.CSSProperties,
+    };
   };
 
   const floatingShapes = getFloatingShapes(drawColors, highlighterColors, isGradient);
@@ -228,7 +239,7 @@ const WebRoot = () => {
         { icon: Bolt, label: "Radial menu", description: "Right-click to open a circular tool picker. Choose your tool and color in one fluid gesture — no toolbar hunting.", colorIndex: 4 },
         { icon: PenLine, label: "Marker, pen & highlighter", description: "Three drawing tools — thick markers for emphasis, precise pens for detail, and translucent highlighters for callouts.", colorIndex: 0 },
         { icon: MousePointer2, label: "Straight line snapping", description: "Hold right-click while drawing to snap to perfectly straight lines. Point at exactly what you mean.", colorIndex: 3 },
-        { icon: Palette, label: "Themes & palettes", description: "4 menu styles, 6 color palettes, dark or light theme, and 3 animation intensities. Make it yours.", colorIndex: 1 },
+        { icon: Palette, label: "Themes & palettes", description: "4 menu styles, 8 color palettes, dark or light theme, and 3 animation intensities. Make it yours.", colorIndex: 1 },
         { icon: Monitor, label: "Temporary by nature", description: "Annotations live on screen while you need them, then vanish. Release the hotkey or press Escape — clean slate.", colorIndex: 5 },
       ],
     },
@@ -330,8 +341,8 @@ const WebRoot = () => {
       planMinHeight: 512,
       plans: [
         { name: "PopJot Extension", price: "Free", period: "forever", colorIndex: 2, ctaColorIndex: 3, popular: false, features: ["Annotate over any webpage", "Marker, pen & highlighter", "Radial menu tool picker", "Chrome & Chromium browsers", "No install required"], cta: "Add to Chrome", url: CHROME_STORE_URL },
-        { name: "PopJot Desktop", price: "Free", period: "open source", colorIndex: 4, ctaColorIndex: 1, popular: true, features: ["Transparent overlay over any app", "Marker, pen & highlighter", "Radial menu tool picker", "4 menu styles & 6 color palettes", "Dark/light themes & animations", "Custom keyboard shortcuts", "Windows, macOS & Linux"], cta: "Download", url: GITHUB_RELEASE_URL },
-        { name: "PopSuite Pro", price: "$9", period: "one-time", colorIndex: 0, ctaColorIndex: 5, popular: false, features: ["Everything in Desktop", "Includes PopJot + PopKey", "Custom color palettes", "Custom radial menu center icon", "Scalable center shape", "Support open source development"], cta: "Get Pro", url: LEMON_SQUEEZY_URL, crossLink: { label: "Also includes PopKey", href: POPKEY_URL } },
+        { name: "PopJot Desktop", price: "Free", period: "open source", colorIndex: 4, ctaColorIndex: 1, popular: true, features: ["Transparent overlay over any app", "Marker, pen & highlighter", "Radial menu tool picker", "4 menu styles & 8 color palettes", "Dark/light themes & animations", "Custom keyboard shortcuts", "Windows, macOS & Linux"], cta: "Download", url: GITHUB_RELEASE_URL },
+        { name: "PopSuite Pro", price: "$7", period: "one-time", colorIndex: 0, ctaColorIndex: 5, popular: false, features: ["Everything in Desktop", "Includes PopJot + PopKey", "Custom color palettes", "Custom radial menu center icon", "Scalable center shape", "Support open source development"], cta: "Get Pro", url: LEMON_SQUEEZY_URL, crossLink: { label: "Also includes PopKey", href: POPKEY_URL } },
       ],
     },
     faq: {
@@ -340,7 +351,7 @@ const WebRoot = () => {
       items: [
         { question: "What exactly is PopJot?", answer: "PopJot is a screen annotation tool. Press a hotkey and a transparent canvas appears on top of your screen. Draw, circle, highlight — your audience sees it live. Release the hotkey and everything vanishes." },
         { question: "Is this a screenshot tool?", answer: "No. PopJot is for live, temporary annotation — think circling a button while recording a tutorial, or highlighting code during a screen share. It doesn't capture or save images." },
-        { question: "How does PopSuite Pro work?", answer: "Pay $9 once via Lemon Squeezy and get a download link for the Pro build. No subscriptions, no recurring charges. Pro perks include custom color palettes, a custom radial menu center icon, and a scalable center circle." },
+        { question: "How does PopSuite Pro work?", answer: "Pay $7 once via Lemon Squeezy and get a download link for the Pro build. No subscriptions, no recurring charges. Pro perks include custom color palettes, a custom radial menu center icon, and a scalable center circle." },
         { question: "What platforms are supported?", answer: "Windows, macOS, and Linux. PopJot is built with Electron so it runs natively on all three." },
         { question: "Can I use this during Zoom / Teams / Discord calls?", answer: "Yes. PopJot draws on top of your entire screen, so your annotations show up in any screen share or recording. Your audience sees exactly what you draw." },
         { question: "How do I pick tools and colors?", answer: "Right-click to open a radial menu. Hover over a tool (marker, pen, highlighter, eraser), then glide into a submenu to pick your color. It's designed for speed — one fluid gesture." },
@@ -352,6 +363,7 @@ const WebRoot = () => {
     themeMode,
     colors: drawColors,
     card,
+    cssVars,
     renderFloatingShapes: () => renderShapes(floatingShapes),
     renderSectionShapes: (index) => renderShapes(sectionShapes[index]),
     // Gradient SVG defs (hidden, referenced by floating icons)

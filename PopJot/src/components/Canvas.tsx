@@ -441,14 +441,16 @@ const Canvas = ({ tool, color }: CanvasProps) => {
     const gridMode = useStore((state) => state.gridMode);
     const gridSize = useStore((state) => state.gridSize);
     const scaleFactor = useStore((state) => state.scaleFactor);
+    const scaleMultiplier = useStore((state) => state.scaleMultiplier);
+    const effectiveScale = scaleFactor * scaleMultiplier;
     const pageZoomFactor = useStore((state) => state.pageZoomFactor);
     const toolSizeMultiplier = useStore((state) => state.toolSizeMultiplier);
     const adjustToolSize = useStore((state) => state.adjustToolSize);
     const paletteVersion = useStore((state) => state.paletteVersion);
 
-    const scaleRef = useRef(scaleFactor);
+    const scaleRef = useRef(effectiveScale);
     const sizeMultRef = useRef(toolSizeMultiplier);
-    scaleRef.current = scaleFactor;
+    scaleRef.current = effectiveScale;
     sizeMultRef.current = toolSizeMultiplier;
 
     /** Map colors from all palettes → current palette */
@@ -1088,8 +1090,8 @@ const Canvas = ({ tool, color }: CanvasProps) => {
                 {gridMode !== "none" && background !== "transparent" && (
                     <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
                         <defs>
-                            {gridMode === "grid" && renderGridPattern(background === "dark", gridSize, scaleFactor)}
-                            {gridMode === "dots" && renderDotsPattern(background === "dark", gridSize, scaleFactor)}
+                            {gridMode === "grid" && renderGridPattern(background === "dark", gridSize, effectiveScale)}
+                            {gridMode === "dots" && renderDotsPattern(background === "dark", gridSize, effectiveScale)}
                             <radialGradient id="vignette-fade" cx="50%" cy="50%" r="60%">
                                 <stop offset="0%" stopColor="rgba(0, 0, 0, 0)" />
                                 <stop offset="100%" stopColor={background === "dark" ? CANVAS_BG.darkRgba : background === "light" ? CANVAS_BG.lightRgba : "rgba(0, 0, 0, 0.05)"} />
@@ -1145,13 +1147,13 @@ const Canvas = ({ tool, color }: CanvasProps) => {
                     <g className="transition-opacity duration-75">
                         {tool === "pen" && (
                             <circle
-                                cx={cursorPos.x} cy={cursorPos.y} r={8 * scaleFactor}
-                                fill="none" stroke="rgba(150, 150, 150, 0.6)" strokeWidth={Math.max(1, scaleFactor)}
+                                cx={cursorPos.x} cy={cursorPos.y} r={8 * effectiveScale}
+                                fill="none" stroke="rgba(150, 150, 150, 0.6)" strokeWidth={Math.max(1, effectiveScale)}
                             />
                         )}
                         {(() => {
-                            const ts = getToolSize(tool, scaleFactor, toolSizeMultiplier[tool]);
-                            const sw = Math.max(1, scaleFactor);
+                            const ts = getToolSize(tool, effectiveScale, toolSizeMultiplier[tool]);
+                            const sw = Math.max(1, effectiveScale);
                             if (tool === "highlighter") return (
                                 <rect
                                     x={cursorPos.x - ts / 4} y={cursorPos.y - ts / 2}

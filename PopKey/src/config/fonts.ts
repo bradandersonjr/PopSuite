@@ -1,25 +1,28 @@
 import type { BadgeFont } from "@/store/useStore";
 
-/** Pro badge fonts — system font stacks (nothing bundled). */
+/** Preset badge fonts available to all users — no Pro required. */
 export const BADGE_FONTS: { key: BadgeFont; label: string }[] = [
   { key: "mono", label: "Mono" },
   { key: "sans", label: "Sans" },
   { key: "serif", label: "Serif" },
-  { key: "rounded", label: "Rounded" },
-  { key: "condensed", label: "Condensed" },
-  { key: "display", label: "Display" },
 ];
 
-export const FONT_STACK: Record<BadgeFont, string> = {
+export const FONT_STACK: Record<Exclude<BadgeFont, "custom">, string> = {
   mono: "'Space Mono', ui-monospace, monospace",
   sans: "system-ui, 'Segoe UI', Roboto, sans-serif",
   serif: "Georgia, 'Times New Roman', serif",
-  rounded: "'Segoe UI Rounded', 'Comic Sans MS', system-ui, sans-serif",
-  condensed: "'Arial Narrow', 'Roboto Condensed', 'Segoe UI', sans-serif",
-  display: "Impact, 'Arial Black', sans-serif",
 };
 
-/** Effective font stack — non-Pro users always get mono. */
-export function fontStackFor(font: BadgeFont, isPro: boolean): string {
-  return FONT_STACK[isPro ? font : "mono"];
+/**
+ * Effective font stack for badge rendering.
+ * - Free users get mono/sans/serif.
+ * - "custom" uses the named system font (Pro only); falls back to sans.
+ */
+export function fontStackFor(font: BadgeFont, isPro: boolean, customFont = ""): string {
+  if (font === "custom") {
+    return isPro && customFont.trim()
+      ? `"${customFont.trim()}", system-ui, sans-serif`
+      : FONT_STACK.sans;
+  }
+  return FONT_STACK[font] ?? FONT_STACK.mono;
 }

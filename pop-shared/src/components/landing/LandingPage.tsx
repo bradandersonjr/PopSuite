@@ -110,6 +110,11 @@ export interface LandingTheme {
   defs?: React.ReactNode;
   /** Override FAB placement (defaults to bottom-left). */
   fabStyle?: React.CSSProperties;
+  /**
+   * CSS custom properties applied on the page root so live settings can
+   * theme the page chrome (e.g. `--radius` driven by the roundness slider).
+   */
+  cssVars?: React.CSSProperties;
 }
 
 const SECTION_IDS = ["hero", "demo", "features", "how-it-works", "settings", "use-cases", "pricing", "faq"] as const;
@@ -280,6 +285,7 @@ export const LandingPage = ({
       <div
         ref={scrollContainerRef}
         className={`w-full h-screen bg-background theme-${themeMode} overflow-x-hidden overflow-y-hidden`}
+        style={theme.cssVars}
       >
         {isMobile && <MobileGate />}
 
@@ -289,46 +295,46 @@ export const LandingPage = ({
         <section id="hero" className="relative h-screen overflow-hidden">
           {theme.renderFloatingShapes()}
           <FitContent>
-          <div className="flex flex-col items-center gap-12 max-w-3xl mx-auto text-center z-10 w-full">
-            {content.hero.brand}
+            <div className="flex flex-col items-center gap-12 max-w-3xl mx-auto text-center z-10 w-full">
+              {content.hero.brand}
 
-            <p className="font-body text-xl md:text-2xl font-medium text-foreground max-w-xl leading-snug">
-              {content.hero.tagline}
-            </p>
+              <p className="font-body text-xl md:text-2xl font-medium text-foreground max-w-xl leading-snug">
+                {content.hero.tagline}
+              </p>
 
-            <div className="flex flex-wrap justify-center gap-4">
-              {content.hero.pills.map((f, i) => (
-                <div
-                  key={f.label}
-                  className={`${card(f.colorIndex, 1 + i).className} neo-box-hover px-5 py-3 flex items-center gap-2 relative overflow-hidden`}
-                  style={card(f.colorIndex, 1 + i).style}
-                >
-                  <div className="relative z-10 flex items-center gap-2">
-                    <f.icon className="w-5 h-5 text-foreground" strokeWidth={2.5} />
-                    <span className="font-display text-sm font-bold text-foreground uppercase tracking-wide">
-                      {f.label}
-                    </span>
+              <div className="flex flex-wrap justify-center gap-4">
+                {content.hero.pills.map((f, i) => (
+                  <div
+                    key={f.label}
+                    className={`${card(f.colorIndex, 1 + i).className} neo-box-hover px-5 py-3 flex items-center gap-2 relative overflow-hidden`}
+                    style={card(f.colorIndex, 1 + i).style}
+                  >
+                    <div className="relative z-10 flex items-center gap-2">
+                      <f.icon className="w-5 h-5 text-foreground" strokeWidth={2.5} />
+                      <span className="font-display text-sm font-bold text-foreground uppercase tracking-wide">
+                        {f.label}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+
+              <button
+                onClick={() => scrollToSection(3)}
+                className={`${card(3, 4).className} neo-box-hover px-10 py-4 mt-2 inline-block rotate-1 cursor-pointer`}
+                style={card(3, 4).style}
+              >
+                <span className="font-display text-lg md:text-xl font-bold text-foreground uppercase tracking-wider">
+                  {isMobile ? "How it works →" : "Try now! →"}
+                </span>
+              </button>
+
+              {!isMobile && content.hero.hint && (
+                <p className="font-body text-base md:text-lg text-muted-foreground">{content.hero.hint}</p>
+              )}
+
+              <p className="font-body text-sm text-muted-foreground">{content.hero.footnote}</p>
             </div>
-
-            <button
-              onClick={() => scrollToSection(3)}
-              className={`${card(3, 4).className} neo-box-hover px-10 py-4 mt-2 inline-block rotate-1 cursor-pointer`}
-              style={card(3, 4).style}
-            >
-              <span className="font-display text-lg md:text-xl font-bold text-foreground uppercase tracking-wider">
-                {isMobile ? "How it works →" : "Try now! →"}
-              </span>
-            </button>
-
-            {!isMobile && content.hero.hint && (
-              <p className="font-body text-base md:text-lg text-muted-foreground">{content.hero.hint}</p>
-            )}
-
-            <p className="font-body text-sm text-muted-foreground">{content.hero.footnote}</p>
-          </div>
           </FitContent>
           <button
             onClick={() => scrollToSection(1)}
@@ -343,23 +349,23 @@ export const LandingPage = ({
         <section id="demo" className="relative h-screen overflow-hidden bg-primary/5">
           {theme.renderSectionShapes(1)}
           <FitContent>
-          <div className="max-w-5xl mx-auto w-full">
-            <div className="text-center mb-10">
-              <SectionBadge label="Demo" card={card(5, 5)} rotate="-rotate-1" onClick={() => scrollToSection(1)} />
-              <SectionIntro heading={content.demo.heading} description={content.demo.description} />
+            <div className="max-w-5xl mx-auto w-full">
+              <div className="text-center mb-10">
+                <SectionBadge label="Demo" card={card(5, 5)} rotate="-rotate-1" onClick={() => scrollToSection(1)} />
+                <SectionIntro heading={content.demo.heading} description={content.demo.description} />
+              </div>
+              <div className={`${card(2, 2).className} w-full aspect-video overflow-hidden`} style={card(2, 2).style}>
+                <iframe
+                  width="100%"
+                  height="100%"
+                  src="https://www.youtube.com/embed/"
+                  title={`${appName} Demo`}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="w-full h-full border-0"
+                />
+              </div>
             </div>
-            <div className={`${card(2, 2).className} w-full aspect-video overflow-hidden`} style={card(2, 2).style}>
-              <iframe
-                width="100%"
-                height="100%"
-                src="https://www.youtube.com/embed/"
-                title={`${appName} Demo`}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="w-full h-full border-0"
-              />
-            </div>
-          </div>
           </FitContent>
         </section>
 
@@ -367,26 +373,26 @@ export const LandingPage = ({
         <section id="features" className="relative h-screen overflow-hidden">
           {theme.renderSectionShapes(0)}
           <FitContent>
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16">
-              <SectionBadge label="Features" card={card(0, 0)} rotate="rotate-1" onClick={() => scrollToSection(2)} />
-              <SectionIntro heading={content.features.heading} description={content.features.description} />
-            </div>
+            <div className="max-w-5xl mx-auto">
+              <div className="text-center mb-16">
+                <SectionBadge label="Features" card={card(0, 0)} rotate="rotate-1" onClick={() => scrollToSection(2)} />
+                <SectionIntro heading={content.features.heading} description={content.features.description} />
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {content.features.items.map((f, i) => (
-                <div
-                  key={f.label}
-                  className={`${card(f.colorIndex, 6 + i).className} neo-box-hover p-6 flex flex-col gap-3 relative overflow-hidden`}
-                  style={card(f.colorIndex, 6 + i).style}
-                >
-                  <f.icon className="relative z-10 w-8 h-8 text-foreground" strokeWidth={2.5} />
-                  <h3 className="relative z-10 font-display text-lg font-bold text-foreground">{f.label}</h3>
-                  <p className="relative z-10 font-body text-sm text-foreground/80 leading-relaxed">{f.description}</p>
-                </div>
-              ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {content.features.items.map((f, i) => (
+                  <div
+                    key={f.label}
+                    className={`${card(f.colorIndex, 6 + i).className} neo-box-hover p-6 flex flex-col gap-3 relative overflow-hidden`}
+                    style={card(f.colorIndex, 6 + i).style}
+                  >
+                    <f.icon className="relative z-10 w-8 h-8 text-foreground" strokeWidth={2.5} />
+                    <h3 className="relative z-10 font-display text-lg font-bold text-foreground">{f.label}</h3>
+                    <p className="relative z-10 font-body text-sm text-foreground/80 leading-relaxed">{f.description}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
           </FitContent>
         </section>
 
@@ -394,33 +400,33 @@ export const LandingPage = ({
         <section id="how-it-works" className="relative h-screen overflow-hidden bg-primary/5">
           {theme.renderSectionShapes(1)}
           <FitContent>
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16">
-              <SectionBadge label="How it works" card={card(3, 3)} rotate="-rotate-1" onClick={() => scrollToSection(3)} />
-              <SectionIntro heading={content.howItWorks.heading} description={content.howItWorks.description} />
-            </div>
+            <div className="max-w-5xl mx-auto">
+              <div className="text-center mb-16">
+                <SectionBadge label="How it works" card={card(3, 3)} rotate="-rotate-1" onClick={() => scrollToSection(3)} />
+                <SectionIntro heading={content.howItWorks.heading} description={content.howItWorks.description} />
+              </div>
 
-            <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 ${content.howItWorks.extra ? "mb-16" : ""}`}>
-              {content.howItWorks.steps.map((step, i) => (
-                <div
-                  key={step.title}
-                  className={`${card(step.colorIndex, 13 + i).className} neo-box-hover p-6 flex flex-col gap-4 relative overflow-hidden`}
-                  style={card(step.colorIndex, 13 + i).style}
-                >
-                  <div className="relative z-10 flex flex-col items-center gap-3 text-center">
-                    <div className="flex items-center gap-3">
-                      <span className="font-display text-3xl font-bold text-foreground">{step.number}.</span>
-                      <step.icon className="w-7 h-7 text-foreground" strokeWidth={2.5} />
+              <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 ${content.howItWorks.extra ? "mb-16" : ""}`}>
+                {content.howItWorks.steps.map((step, i) => (
+                  <div
+                    key={step.title}
+                    className={`${card(step.colorIndex, 13 + i).className} neo-box-hover p-6 flex flex-col gap-4 relative overflow-hidden`}
+                    style={card(step.colorIndex, 13 + i).style}
+                  >
+                    <div className="relative z-10 flex flex-col items-center gap-3 text-center">
+                      <div className="flex items-center gap-3">
+                        <span className="font-display text-3xl font-bold text-foreground">{step.number}.</span>
+                        <step.icon className="w-7 h-7 text-foreground" strokeWidth={2.5} />
+                      </div>
+                      <h3 className="font-display text-xl font-bold text-foreground">{step.title}</h3>
                     </div>
-                    <h3 className="font-display text-xl font-bold text-foreground">{step.title}</h3>
+                    <p className="relative z-10 font-body text-sm text-foreground/80 leading-relaxed text-center">{step.description}</p>
                   </div>
-                  <p className="relative z-10 font-body text-sm text-foreground/80 leading-relaxed text-center">{step.description}</p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            {content.howItWorks.extra}
-          </div>
+              {content.howItWorks.extra}
+            </div>
           </FitContent>
         </section>
 
@@ -428,27 +434,27 @@ export const LandingPage = ({
         <section id="settings" className="relative h-screen overflow-hidden">
           {theme.renderSectionShapes(2)}
           <FitContent>
-          <div className="relative z-10 max-w-5xl mx-auto">
-            <div className="text-center mb-4">
-              <SectionBadge label="Settings" card={card(4, 4)} rotate="rotate-1" onClick={() => scrollToSection(4)} />
-              <SectionIntro heading={content.settings.heading} description={content.settings.description} />
-              <p className="font-body text-sm text-muted-foreground mt-8 italic">
-                This is the actual settings panel that the app uses
-              </p>
+            <div className="relative z-10 max-w-5xl mx-auto">
+              <div className="text-center mb-4">
+                <SectionBadge label="Settings" card={card(4, 4)} rotate="rotate-1" onClick={() => scrollToSection(4)} />
+                <SectionIntro heading={content.settings.heading} description={content.settings.description} />
+                <p className="font-body text-sm text-muted-foreground mt-8 italic">
+                  This is the actual settings panel that the app uses
+                </p>
+              </div>
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(true)}
+                  className={`${card(4, 4).className} neo-box-hover px-8 py-4 cursor-pointer`}
+                  style={card(4, 4).style}
+                >
+                  <span className="font-display text-base font-bold text-foreground uppercase tracking-wider">
+                    Open Settings
+                  </span>
+                </button>
+              </div>
             </div>
-            <div className="flex justify-center">
-              <button
-                type="button"
-                onClick={() => setSettingsOpen(true)}
-                className={`${card(4, 4).className} neo-box-hover px-8 py-4 cursor-pointer`}
-                style={card(4, 4).style}
-              >
-                <span className="font-display text-base font-bold text-foreground uppercase tracking-wider">
-                  Open Settings
-                </span>
-              </button>
-            </div>
-          </div>
           </FitContent>
         </section>
 
@@ -456,28 +462,28 @@ export const LandingPage = ({
         <section id="use-cases" className="relative h-screen overflow-hidden">
           {theme.renderSectionShapes(3)}
           <FitContent>
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16">
-              <SectionBadge label="Use Cases" card={card(1, 1)} rotate="rotate-1" onClick={() => scrollToSection(5)} />
-              <SectionIntro heading={content.useCases.heading} description={content.useCases.description} />
-            </div>
+            <div className="max-w-5xl mx-auto">
+              <div className="text-center mb-16">
+                <SectionBadge label="Use Cases" card={card(1, 1)} rotate="rotate-1" onClick={() => scrollToSection(5)} />
+                <SectionIntro heading={content.useCases.heading} description={content.useCases.description} />
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {content.useCases.items.map((u, i) => (
-                <div
-                  key={u.title}
-                  className={`${card(u.colorIndex, 22 + i).className} neo-box-hover p-6 flex flex-col gap-4 relative overflow-hidden`}
-                  style={card(u.colorIndex, 22 + i).style}
-                >
-                  <div className="relative z-10 flex items-center gap-3">
-                    <u.icon className="w-7 h-7 text-foreground" strokeWidth={2.5} />
-                    <h3 className="font-display text-lg font-bold text-foreground">{u.title}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {content.useCases.items.map((u, i) => (
+                  <div
+                    key={u.title}
+                    className={`${card(u.colorIndex, 22 + i).className} neo-box-hover p-6 flex flex-col gap-4 relative overflow-hidden`}
+                    style={card(u.colorIndex, 22 + i).style}
+                  >
+                    <div className="relative z-10 flex items-center gap-3">
+                      <u.icon className="w-7 h-7 text-foreground" strokeWidth={2.5} />
+                      <h3 className="font-display text-lg font-bold text-foreground">{u.title}</h3>
+                    </div>
+                    <p className="relative z-10 font-body text-sm text-foreground/80 leading-relaxed">{u.description}</p>
                   </div>
-                  <p className="relative z-10 font-body text-sm text-foreground/80 leading-relaxed">{u.description}</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
           </FitContent>
         </section>
 
@@ -485,69 +491,69 @@ export const LandingPage = ({
         <section id="pricing" className="relative h-screen overflow-hidden bg-primary/5">
           {theme.renderSectionShapes(4)}
           <FitContent>
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16">
-              <SectionBadge label="Pricing" card={card(5, 5)} rotate="-rotate-1" onClick={() => scrollToSection(6)} />
-              <SectionIntro heading={content.pricing.heading} description={content.pricing.description} />
-            </div>
+            <div className="max-w-5xl mx-auto">
+              <div className="text-center mb-16">
+                <SectionBadge label="Pricing" card={card(5, 5)} rotate="-rotate-1" onClick={() => scrollToSection(6)} />
+                <SectionIntro heading={content.pricing.heading} description={content.pricing.description} />
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 max-w-5xl mx-auto items-end">
-              {content.pricing.plans.map((plan) => (
-                <div key={plan.name} style={plan.popular ? { paddingBottom: "24px" } : {}}>
-                  <div
-                    className={`${card(plan.colorIndex, plan.colorIndex).className} neo-box-hover p-8 flex flex-col gap-5 relative overflow-hidden`}
-                    style={{ ...card(plan.colorIndex, plan.colorIndex).style, minHeight: `${content.pricing.planMinHeight}px` }}
-                  >
-                    {plan.popular && (
-                      <div className="relative z-10 font-display text-xs font-bold uppercase tracking-widest px-3 py-2 self-start mb-2" style={{ backgroundColor: "#000", color: "#fff", border: "3px solid #000", borderRadius: "var(--radius)", boxShadow: "2px 2px 0px #000" }}>
-                        Most Popular
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 max-w-5xl mx-auto items-end">
+                {content.pricing.plans.map((plan) => (
+                  <div key={plan.name} style={plan.popular ? { paddingBottom: "24px" } : {}}>
+                    <div
+                      className={`${card(plan.colorIndex, plan.colorIndex).className} neo-box-hover p-8 flex flex-col gap-5 relative overflow-hidden`}
+                      style={{ ...card(plan.colorIndex, plan.colorIndex).style, minHeight: `${content.pricing.planMinHeight}px` }}
+                    >
+                      {plan.popular && (
+                        <div className="relative z-10 font-display text-xs font-bold uppercase tracking-widest px-3 py-2 self-start mb-2" style={{ backgroundColor: "#000", color: "#fff", border: "3px solid #000", borderRadius: "var(--radius)", boxShadow: "2px 2px 0px #000" }}>
+                          Most Popular
+                        </div>
+                      )}
+
+                      <h3 className="relative z-10 font-display text-2xl font-bold text-foreground">{plan.name}</h3>
+                      <div className="relative z-10 flex items-baseline gap-1">
+                        <span className="font-display text-4xl font-bold text-foreground">{plan.price}</span>
+                        <span className="font-body text-sm text-foreground/70">{plan.period}</span>
                       </div>
-                    )}
-
-                    <h3 className="relative z-10 font-display text-2xl font-bold text-foreground">{plan.name}</h3>
-                    <div className="relative z-10 flex items-baseline gap-1">
-                      <span className="font-display text-4xl font-bold text-foreground">{plan.price}</span>
-                      <span className="font-body text-sm text-foreground/70">{plan.period}</span>
+                      <ul className="relative z-10 flex flex-col gap-2">
+                        {plan.features.map((feat) => (
+                          <li key={feat} className="flex items-center gap-2 font-body text-sm text-foreground">
+                            <Check className="w-4 h-4 text-foreground" strokeWidth={3} />
+                            {feat}
+                          </li>
+                        ))}
+                      </ul>
+                      {plan.crossLink && (
+                        <div className="relative z-10 text-center">
+                          {plan.crossLink.href ? (
+                            <a href={plan.crossLink.href} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-semibold text-foreground/70 hover:text-foreground underline underline-offset-2 transition-colors">
+                              {plan.crossLink.label} →
+                            </a>
+                          ) : (
+                            <span className="font-body text-xs text-foreground/50">{plan.crossLink.label} →</span>
+                          )}
+                        </div>
+                      )}
+                      {plan.url ? (
+                        <a
+                          href={plan.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`relative z-10 ${card(plan.ctaColorIndex, plan.ctaColorIndex).className} neo-box-hover px-6 py-3 text-center mt-auto block`}
+                          style={{ backgroundColor: "#fff", color: "#000", border: "3px solid #000", boxShadow: "4px 4px 0px #000" }}
+                        >
+                          <span className="font-display text-sm font-bold uppercase tracking-wide">{plan.cta}</span>
+                        </a>
+                      ) : (
+                        <div className={`relative z-10 ${card(plan.ctaColorIndex, plan.ctaColorIndex).className} neo-box-hover px-6 py-3 text-center mt-auto opacity-50 cursor-not-allowed`} style={{ backgroundColor: "#fff", color: "#000", border: "3px solid #000", boxShadow: "4px 4px 0px #000" }}>
+                          <span className="font-display text-sm font-bold uppercase tracking-wide">Coming Soon</span>
+                        </div>
+                      )}
                     </div>
-                    <ul className="relative z-10 flex flex-col gap-2">
-                      {plan.features.map((feat) => (
-                        <li key={feat} className="flex items-center gap-2 font-body text-sm text-foreground">
-                          <Check className="w-4 h-4 text-foreground" strokeWidth={3} />
-                          {feat}
-                        </li>
-                      ))}
-                    </ul>
-                    {plan.crossLink && (
-                      <div className="relative z-10 text-center">
-                        {plan.crossLink.href ? (
-                          <a href={plan.crossLink.href} target="_blank" rel="noopener noreferrer" className="font-body text-xs font-semibold text-foreground/70 hover:text-foreground underline underline-offset-2 transition-colors">
-                            {plan.crossLink.label} →
-                          </a>
-                        ) : (
-                          <span className="font-body text-xs text-foreground/50">{plan.crossLink.label} →</span>
-                        )}
-                      </div>
-                    )}
-                    {plan.url ? (
-                      <a
-                        href={plan.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`relative z-10 ${card(plan.ctaColorIndex, plan.ctaColorIndex).className} neo-box-hover px-6 py-3 text-center mt-auto block`}
-                        style={{ backgroundColor: "#fff", color: "#000", border: "3px solid #000", boxShadow: "4px 4px 0px #000" }}
-                      >
-                        <span className="font-display text-sm font-bold uppercase tracking-wide">{plan.cta}</span>
-                      </a>
-                    ) : (
-                      <div className={`relative z-10 ${card(plan.ctaColorIndex, plan.ctaColorIndex).className} neo-box-hover px-6 py-3 text-center mt-auto opacity-50 cursor-not-allowed`} style={{ backgroundColor: "#fff", color: "#000", border: "3px solid #000", boxShadow: "4px 4px 0px #000" }}>
-                        <span className="font-display text-sm font-bold uppercase tracking-wide">Coming Soon</span>
-                      </div>
-                    )}
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
           </FitContent>
         </section>
 
@@ -555,68 +561,68 @@ export const LandingPage = ({
         <section id="faq" className="relative flex h-screen flex-col overflow-hidden">
           {theme.renderSectionShapes(5)}
           <div className="relative flex-1">
-          <FitContent>
-          <div className="mx-auto w-full max-w-3xl">
-            <div className="text-center mb-16">
-              <SectionBadge label="FAQ" card={card(2, 2)} rotate="-rotate-1" onClick={() => scrollToSection(7)} />
-              <SectionIntro heading={content.faq.heading} description={content.faq.description} />
-            </div>
+            <FitContent>
+              <div className="mx-auto w-full max-w-3xl">
+                <div className="text-center mb-16">
+                  <SectionBadge label="FAQ" card={card(2, 2)} rotate="-rotate-1" onClick={() => scrollToSection(7)} />
+                  <SectionIntro heading={content.faq.heading} description={content.faq.description} />
+                </div>
 
-            <div className="flex flex-col gap-4 w-full">
-              {content.faq.items.map((faq, i) => (
-                <motion.div
-                  key={i}
-                  className="landing-card-faq neo-box-hover overflow-hidden w-full"
-                  layout="position"
-                  transition={{ type: "spring", stiffness: 400, damping: 35 }}
-                >
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between p-5 text-left cursor-pointer"
-                    onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                    aria-expanded={openFaq === i}
-                    aria-controls={`faq-answer-${i}`}
-                  >
-                    <h3 className="font-display text-base font-bold text-foreground flex-1">{faq.question}</h3>
+                <div className="flex flex-col gap-4 w-full">
+                  {content.faq.items.map((faq, i) => (
                     <motion.div
-                      animate={{ rotate: openFaq === i ? 180 : 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="ml-4 flex-shrink-0"
+                      key={i}
+                      className="landing-card-faq neo-box-hover overflow-hidden w-full"
+                      layout="position"
+                      transition={{ type: "spring", stiffness: 400, damping: 35 }}
                     >
-                      {openFaq === i ? (
-                        <Minus className="w-5 h-5 text-foreground" strokeWidth={2.5} />
-                      ) : (
-                        <Plus className="w-5 h-5 text-foreground" strokeWidth={2.5} />
-                      )}
-                    </motion.div>
-                  </button>
-                  <AnimatePresence initial={false}>
-                    {openFaq === i && (
-                      <motion.div
-                        id={`faq-answer-${i}`}
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ type: "spring", stiffness: 400, damping: 35 }}
-                        className="overflow-hidden"
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between p-5 text-left cursor-pointer"
+                        onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                        aria-expanded={openFaq === i}
+                        aria-controls={`faq-answer-${i}`}
                       >
-                        <div className="px-5 pb-5">
-                          <p className="font-body text-sm text-foreground/80 leading-relaxed">{faq.answer}</p>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-          </FitContent>
+                        <h3 className="font-display text-base font-bold text-foreground flex-1">{faq.question}</h3>
+                        <motion.div
+                          animate={{ rotate: openFaq === i ? 180 : 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="ml-4 flex-shrink-0"
+                        >
+                          {openFaq === i ? (
+                            <Minus className="w-5 h-5 text-foreground" strokeWidth={2.5} />
+                          ) : (
+                            <Plus className="w-5 h-5 text-foreground" strokeWidth={2.5} />
+                          )}
+                        </motion.div>
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {openFaq === i && (
+                          <motion.div
+                            id={`faq-answer-${i}`}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 35 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="px-5 pb-5">
+                              <p className="font-body text-sm text-foreground/80 leading-relaxed">{faq.answer}</p>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </FitContent>
           </div>
           <footer className="relative z-10 py-8 border-t border-foreground/10">
             <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
               <p className="font-body text-sm text-muted-foreground">
                 &copy; {new Date().getFullYear()} {appName} &mdash; made by{" "}
-                <a href="https://bradandersonjr.com" target="_blank" rel="noopener noreferrer" className="font-comfortaa hover:text-foreground transition-colors">
+                <a href="https://www.bradandersonjr.com" target="_blank" rel="noopener noreferrer" className="font-comfortaa hover:text-foreground transition-colors">
                   @bradandersonjr
                 </a>
               </p>
@@ -665,12 +671,16 @@ export const LandingPage = ({
         )}
 
         {/* ─── SETTINGS FAB + MODAL ─── */}
+        {/* Reuses the app's card() so the button matches the live style,
+            palette, roundness, and theme just like the page cards. */}
         <button
           type="button"
           onClick={() => setSettingsOpen(true)}
           aria-label="Open settings"
-          className="fixed z-40 flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-foreground text-foreground shadow-[4px_4px_0px_hsl(var(--foreground))] transition-all hover:-translate-y-0.5 hover:shadow-[5px_6px_0px_hsl(var(--foreground))] active:translate-y-0 active:shadow-[2px_2px_0px_hsl(var(--foreground))]"
-          style={{ backgroundColor: colors[0], bottom: "1.5rem", left: "1.5rem", ...theme.fabStyle }}
+          className={`fixed z-40 flex h-14 w-14 items-center justify-center text-foreground neo-box-hover ${card(0, 0).className}`}
+          // position:fixed inline so the .landing-glitter rule (position:relative)
+          // can't override the Tailwind `fixed` class and drop the FAB into flow.
+          style={{ ...card(0, 0).style, position: "fixed", bottom: "1.5rem", left: "1.5rem", ...theme.fabStyle }}
         >
           <Settings className="h-6 w-6" strokeWidth={2.5} />
         </button>

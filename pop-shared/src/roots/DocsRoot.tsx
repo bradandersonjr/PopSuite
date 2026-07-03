@@ -397,15 +397,15 @@ const DocsRoot = () => {
                     <td className="py-2">Neo-brutalist style with random colors from your selected palette.</td>
                   </tr>
                   <tr>
-                    <td className="py-2 pr-4 font-medium">PoP Mono</td>
-                    <td className="py-2">Neo-brutalist with monochrome colors. Adapts to theme.</td>
+                    <td className="py-2 pr-4 font-medium">Glow</td>
+                    <td className="py-2">Filled buttons with a soft colored halo. Adapts to theme.</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
             <SubHeading>Color palettes</SubHeading>
-            <P>Six palettes that affect drawing colors and PoP menu button colors:</P>
+            <P>Eight palettes that affect drawing colors and PoP menu button colors:</P>
             <div className="overflow-x-auto mb-6">
               <table className="w-full text-sm text-foreground/80 border-collapse">
                 <thead>
@@ -435,9 +435,17 @@ const DocsRoot = () => {
                     <td className="py-2 pr-4 font-medium">Pastel</td>
                     <td className="py-2">Soft, chalky tints</td>
                   </tr>
-                  <tr>
+                  <tr className="border-b border-foreground/10">
                     <td className="py-2 pr-4 font-medium">Gradient</td>
                     <td className="py-2">Rainbow ink gradient progression</td>
+                  </tr>
+                  <tr className="border-b border-foreground/10">
+                    <td className="py-2 pr-4 font-medium">Glitter</td>
+                    <td className="py-2">Shimmering particle effect over each color</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-4 font-medium">Solid</td>
+                    <td className="py-2">A single custom color for every stroke</td>
                   </tr>
                 </tbody>
               </table>

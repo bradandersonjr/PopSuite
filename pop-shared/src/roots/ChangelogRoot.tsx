@@ -64,8 +64,8 @@ const ChangelogRoot = () => {
           <Entry tag="new">Transparent fullscreen drawing overlay for desktop (Windows, macOS, Linux)</Entry>
           <Entry tag="new">Chrome extension with Shadow DOM overlay on any webpage</Entry>
           <Entry tag="new">Radial menu with 6 tools: Pen, Marker, Highlighter, Eraser, Shapes, Clear</Entry>
-          <Entry tag="new">4 menu styles: Flat, Flat Outline, PoP, PoP Mono</Entry>
-          <Entry tag="new">6 color palettes: Muted, Vibrant, Retro, Neon, Pastel, Gradient</Entry>
+          <Entry tag="new">4 menu styles: Flat, Flat Outline, Pop, Glow</Entry>
+          <Entry tag="new">8 color palettes: Muted, Vibrant, Retro, Neon, Pastel, Gradient, Glitter, Solid</Entry>
           <Entry tag="new">Dark and light theme support</Entry>
           <Entry tag="new">3 animation intensity levels: Low, Medium, High</Entry>
           <Entry tag="new">Dynamic resolution scaling (optimized for 1080p through 4K)</Entry>

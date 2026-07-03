@@ -123,6 +123,15 @@
 
 }
 
+/* Font picker list — slim styled scrollbar */
+.fp-list::-webkit-scrollbar { width: 6px; }
+.fp-list::-webkit-scrollbar-track { background: transparent; }
+.fp-list::-webkit-scrollbar-thumb {
+  border-radius: 99px;
+  background: rgba(128, 128, 128, 0.3);
+}
+.fp-list::-webkit-scrollbar-thumb:hover { background: rgba(128, 128, 128, 0.55); }
+
 /* Radial button skins — outside @layer to avoid purge (dynamic class names) */
 /* No CSS transitions here — Framer Motion owns all animation */
 
@@ -317,6 +326,47 @@
 
 .landing-card-glow.neo-box-hover:active {
   transform: translate(1px, 1px);
+}
+
+/* ── glitter: shimmering white/silver/tint sparkles layered over any style ──
+ * Added alongside a landing-card-* class when the Glitter palette is active.
+ * Two desynced pseudo-element layers fake the PaletteEffectOverlay twinkle.
+ * `--glitter-tint` (set inline per card) colors a few sparkles like the live effect. */
+@keyframes landing-glitter-a {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.85; }
+}
+@keyframes landing-glitter-b {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 0.2; }
+}
+.landing-glitter { position: relative; }
+.landing-glitter::before,
+.landing-glitter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-repeat: no-repeat;
+}
+.landing-glitter::before {
+  background-image:
+    radial-gradient(circle at 12% 22%, #ffffff 0, transparent 2.2px),
+    radial-gradient(circle at 68% 12%, var(--glitter-tint, #ffffff) 0, transparent 1.8px),
+    radial-gradient(circle at 82% 58%, #e8e8f0 0, transparent 2px),
+    radial-gradient(circle at 33% 72%, #ffffff 0, transparent 1.6px),
+    radial-gradient(circle at 52% 38%, var(--glitter-tint, #ffffff) 0, transparent 2px);
+  animation: landing-glitter-a 1.6s ease-in-out infinite;
+}
+.landing-glitter::after {
+  background-image:
+    radial-gradient(circle at 24% 48%, #ffffff 0, transparent 1.6px),
+    radial-gradient(circle at 88% 30%, #d0d0e8 0, transparent 2px),
+    radial-gradient(circle at 45% 88%, #ffffff 0, transparent 1.8px),
+    radial-gradient(circle at 72% 80%, var(--glitter-tint, #ffffff) 0, transparent 1.6px),
+    radial-gradient(circle at 16% 64%, #ffffff 0, transparent 2px);
+  animation: landing-glitter-b 2.1s ease-in-out infinite;
 }
 
 /* ── FAQ cards: always light regardless of theme ── */

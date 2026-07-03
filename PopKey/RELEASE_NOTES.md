@@ -12,7 +12,7 @@ screen-share, on top of whatever app you're using.
 - ⌨️ **Global keyboard capture** — every key and shortcut shown as a badge, system-wide (powered by uiohook)
 - 🖱️ **Mouse click & scroll visualization** — click ripples and a scroll-direction indicator
 - 🅰️ **Persistent modifier bar** — see Ctrl / Alt / Shift / ⌘ held state at a glance
-- 🎨 **4 badge styles & 5 color palettes**
+- 🎨 **4 badge styles & 8 color palettes** — plus font and roundness controls
 - 🌗 **Dark / light themes**
 - ⌨️ **Custom toggle shortcut**
 - 🪟 **Transparent overlay over any app**
@@ -89,8 +89,8 @@ xattr -dr com.apple.quarantine /Applications/PopKey.app
 ## Free & open source
 
 PopKey is free forever. If it earns a spot in your recording setup, **PopSuite Pro**
-($9 one-time) unlocks extra perks — custom color palettes and custom badge styles —
-and includes its sister app **PopJot**. It's open core: you *can* build the desktop app
+($7 one-time) unlocks extra perks — custom color palettes, any system font, badge
+enter/exit animations, and a branding watermark — and includes its sister app **PopJot**. It's open core: you *can* build the desktop app
 yourself, and buying Pro is mostly a way to support development. 💛
 
 Found a bug or have an idea? [Open an issue](https://github.com/bradandersonjr/PopSuite/issues).

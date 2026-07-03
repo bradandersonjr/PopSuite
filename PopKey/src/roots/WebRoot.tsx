@@ -105,14 +105,32 @@ const renderShapes = (shapes: Shape[], themeMode: string) =>
 /* ─── Component ─── */
 
 const WebRoot = () => {
-  const { themeMode, colorPalette, setScaleFactor, displayPosition } = useStore();
+  const { themeMode, colorPalette, setScaleFactor, displayPosition, badgeRoundness, badgeStyle } = useStore();
   useScaleSync(setScaleFactor);
 
+  // Roundness slider (0–100) drives the landing cards' corner radius.
+  const cssVars = { "--radius": `${(badgeRoundness / 100) * 1.5}rem` } as React.CSSProperties;
+
   const colors = getBadgeColors(colorPalette);
-  const card = (colorIndex: number) => ({
-    className: "neo-box",
-    style: { backgroundColor: colors[colorIndex % colors.length] } as React.CSSProperties,
-  });
+  const isGlitter = colorPalette === "glitter";
+
+  // Badge style drives the landing cards' visual treatment (matches the live badges).
+  // The Glitter palette layers shimmering sparkles on top of whatever style is active.
+  const card = (colorIndex: number) => {
+    const color = colors[colorIndex % colors.length];
+    const glitter = isGlitter ? " landing-glitter" : "";
+    const tint = isGlitter ? ({ "--glitter-tint": color } as React.CSSProperties) : {};
+    if (badgeStyle === "glow") {
+      return {
+        className: `landing-card-glow${glitter}`,
+        style: { backgroundColor: color, boxShadow: `0 0 18px ${color}, 0 0 36px ${color}88`, ...tint } as React.CSSProperties,
+      };
+    }
+    return {
+      className: `landing-card-${badgeStyle}${glitter}`,
+      style: { backgroundColor: color, ...tint } as React.CSSProperties,
+    };
+  };
 
   // FAB stays on the bottom, opposite side from the HUD overlay
   const fabOnLeft = !displayPosition.includes("left");
@@ -146,7 +164,7 @@ const WebRoot = () => {
         { icon: Keyboard, label: "Keyboard visualization", description: "Every keypress appears as a styled badge on screen. Modifiers, combos, and key sequences — all shown live.", colorIndex: 0 },
         { icon: Mouse, label: "Mouse click overlay", description: "Left, right, middle, double click, and drag — each gets its own badge. A ripple effect marks where you clicked.", colorIndex: 2 },
         { icon: MousePointer2, label: "Scroll indicator", description: "Scroll wheel activity shows directional arrows at the cursor position so your audience never loses track.", colorIndex: 4 },
-        { icon: Sparkles, label: "5 color palettes", description: "Muted, vibrant, retro, neon, and pastel. Pick the palette that matches your recording style.", colorIndex: 1 },
+        { icon: Sparkles, label: "8 color palettes", description: "Muted, vibrant, retro, neon, pastel, gradient, glitter, and solid. Pick the palette that matches your recording style.", colorIndex: 1 },
         { icon: Settings, label: "Fully customizable", description: "Badge duration, max badges, position, font size, translucency, blur, roundness — tweak everything.", colorIndex: 3 },
         { icon: Monitor, label: "Transparent overlay", description: "Runs as a transparent layer on top of your screen. Your audience sees keystrokes over any app.", colorIndex: 5 },
       ],
@@ -179,9 +197,9 @@ const WebRoot = () => {
       description: "PopKey is free and open source. Use it however you want.",
       planMinHeight: 460,
       plans: [
-        { name: "PopKey Extension", price: "Free", period: "forever", colorIndex: 2, ctaColorIndex: 3, popular: false, features: ["Keyboard input display", "Mouse click badges", "5 color palettes", "Chrome & Chromium browsers", "No install required"], cta: "Add to Chrome", url: CHROME_STORE_URL },
-        { name: "PopKey Desktop", price: "Free", period: "open source", colorIndex: 4, ctaColorIndex: 1, popular: true, features: ["Transparent overlay over any app", "Global keyboard capture", "Mouse click & scroll visualization", "4 badge styles & 5 palettes", "Dark/light themes", "Custom keyboard shortcut", "Windows, macOS & Linux"], cta: "Download", url: GITHUB_RELEASE_URL },
-        { name: "PopSuite Pro", price: "$9", period: "one-time", colorIndex: 0, ctaColorIndex: 5, popular: false, features: ["Everything in Desktop", "Includes PopKey + PopJot", "Custom color palettes", "Custom badge styles", "Support open source development"], cta: "Get Pro", url: null, crossLink: { label: "Also includes PopJot", href: POPJOT_URL } },
+        { name: "PopKey Extension", price: "Free", period: "forever", colorIndex: 2, ctaColorIndex: 3, popular: false, features: ["Keyboard input display", "Mouse click badges", "8 color palettes", "Chrome & Chromium browsers", "No install required"], cta: "Add to Chrome", url: CHROME_STORE_URL },
+        { name: "PopKey Desktop", price: "Free", period: "open source", colorIndex: 4, ctaColorIndex: 1, popular: true, features: ["Transparent overlay over any app", "Global keyboard capture", "Mouse click & scroll visualization", "4 badge styles & 8 palettes", "3 fonts + dark/light themes", "Custom keyboard shortcut", "Windows, macOS & Linux"], cta: "Download", url: GITHUB_RELEASE_URL },
+        { name: "PopSuite Pro", price: "$7", period: "one-time", colorIndex: 0, ctaColorIndex: 5, popular: false, features: ["Everything in Desktop", "Includes PopKey + PopJot", "Custom color palettes", "Any system font", "Badge enter/exit animations", "Branding watermark", "Support open source development"], cta: "Get Pro", url: null, crossLink: { label: "Also includes PopJot", href: POPJOT_URL } },
       ],
     },
     faq: {
@@ -192,7 +210,7 @@ const WebRoot = () => {
         { question: "Does it capture or log my input?", answer: "No. PopKey only displays inputs in real-time on your screen. Nothing is stored, logged, or transmitted. It's purely visual." },
         { question: "What platforms are supported?", answer: "Windows, macOS, and Linux. PopKey is built with Electron so it runs natively on all three." },
         { question: "Can I use this during screen recordings?", answer: "Yes — that's exactly what it's for. PopKey draws on a transparent overlay so your inputs show up in any screen recorder, OBS capture, or screen share." },
-        { question: "Can I customize the appearance?", answer: "Absolutely. Badge style (flat, outlined, pop, mono), color palette, position, font size, translucency, blur, roundness, duration, and max badges on screen — everything is adjustable." },
+        { question: "Can I customize the appearance?", answer: "Absolutely. Badge style (flat, outlined, pop, glow), 8 color palettes, font, text color, position, size, translucency, roundness, duration, and max badges on screen — everything is adjustable. Pro adds any system font, badge animations, custom palettes, and a branding watermark." },
         { question: "How is this different from other keystroke visualizers?", answer: "PopKey is designed to be snappy, beautiful, and stay out of your way. It supports keyboard, mouse clicks, scroll wheel, drag detection, and modifier combos — all with smooth animations and multiple visual styles." },
       ],
     },
@@ -205,6 +223,7 @@ const WebRoot = () => {
     renderFloatingShapes: () => renderShapes(getFloatingShapes(colors), themeMode),
     renderSectionShapes: (index) => renderShapes(getSectionShapes(colors)[index], themeMode),
     fabStyle,
+    cssVars,
   };
 
   return (

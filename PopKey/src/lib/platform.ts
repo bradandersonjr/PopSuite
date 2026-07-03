@@ -72,6 +72,7 @@ export const sendBadgeStyle = (style: BadgeStyle): void => settings.sendSetting(
 export const sendBadgeTextColor = (val: BadgeTextColor): void =>
   settings.sendSetting("badgeTextColor", val);
 export const sendBadgeFont = (val: BadgeFont): void => settings.sendSetting("badgeFont", val);
+export const sendCustomFont = (val: string): void => settings.sendSetting("customFont", val);
 export const sendBadgeAnimation = (val: BadgeAnimation): void =>
   settings.sendSetting("badgeAnimation", val);
 export const sendBadgeTranslucency = (val: number): void =>

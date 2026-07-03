@@ -44,7 +44,7 @@ export const sendLastColorPalette = (palette: ColorPalette): void =>
 export const sendAnimationIntensity = (intensity: AnimationIntensity): void =>
   settings.sendSetting("animationIntensity", intensity);
 export const sendMenuStyle = (style: MenuStyle): void => settings.sendSetting("menuStyle", style);
-export const sendScaleFactor = (scale: number): void => settings.sendSetting("scaleFactor", scale);
+export const sendScaleMultiplier = (multiplier: number): void => settings.sendSetting("scaleMultiplier", multiplier);
 export const sendGridMode = (mode: GridMode): void => settings.sendSetting("gridMode", mode);
 export const sendGridSize = (size: GridSize): void => settings.sendSetting("gridSize", size);
 export const sendOverlayMode = (mode: OverlayMode): void =>

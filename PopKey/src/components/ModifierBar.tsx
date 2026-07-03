@@ -1,4 +1,5 @@
 import { useStore } from "@/store/useStore";
+import { isDesktop } from "@/lib/platform";
 import { getBadgeGradientStops, resolvePaletteColors } from "@/config/themes";
 import { fontStackFor } from "@/config/fonts";
 
@@ -32,9 +33,10 @@ interface ModifierBarProps {
 const MODIFIERS = ["Ctrl", "Shift", "Alt", "Win"];
 
 const ModifierBar = ({ heldModifiers }: ModifierBarProps) => {
-  const { colorPalette, fontSize, displayPosition, badgeStyle, themeMode, badgeTranslucency, badgeRoundness, glowIntensity, badgeFont, isPro, solidColor } = useStore();
+  const { colorPalette, fontSize, displayPosition, badgeStyle, themeMode, badgeTranslucency, badgeRoundness, glowIntensity, badgeFont, customFont, isPro, solidColor } = useStore();
+  const effectiveIsPro = !isDesktop() || isPro;
   const gi = glowIntensity / 100;
-  const fontFamily = fontStackFor(badgeFont, isPro);
+  const fontFamily = fontStackFor(badgeFont, effectiveIsPro, customFont);
   const colors = resolvePaletteColors(colorPalette, solidColor);
   const isDark = themeMode === "dark";
   const backgroundAlpha = 1 - badgeTranslucency / 100;

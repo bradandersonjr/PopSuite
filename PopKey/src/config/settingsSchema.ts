@@ -23,11 +23,13 @@ export const settingsSchema = {
   scaleFactor: setting.number(1, { positive: true, volatile: true }),
   badgeDuration: setting.number(2000, { positive: true }),
   maxBadges: setting.number(5, { positive: true }),
-  badgeStyle: setting.enum(["flat", "flat-outline", "pop", "glow"], "flat"),
+  badgeStyle: setting.enum(["flat", "flat-outline", "pop", "glow"], "pop"),
   // Badge text color: "auto" follows the theme, else force white/black.
   badgeTextColor: setting.enum(["auto", "white", "black"], "auto"),
-  // Badge font (Pro) — free users always get "mono".
-  badgeFont: setting.enum(["mono", "sans", "serif", "rounded", "condensed", "display"], "mono"),
+  // Badge font — mono/sans/serif are free; custom system font is Pro.
+  badgeFont: setting.enum(["mono", "sans", "serif", "custom"], "mono"),
+  // Custom system font name (Pro) — used when badgeFont === "custom".
+  customFont: setting.string(""),
   // Badge enter/exit animation style (Pro) — free users get "pop".
   badgeAnimation: setting.enum(["pop", "slide", "bounce", "fade", "rise"], "pop"),
   badgeTranslucency: setting.number(0),

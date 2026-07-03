@@ -88,15 +88,6 @@ export const SettingsWindowFrame = ({
                 window.dispatchEvent(new CustomEvent("close-settings"));
                 if (isDesktop()) {
                   closeWindow();
-                } else {
-                  try {
-                    window.close();
-                  } catch (e) {
-                    console.error(e);
-                  }
-                  if (window.location.search.includes("settings=1")) {
-                    window.location.href = "/";
-                  }
                 }
               }}
               className={f.doneButton}
@@ -112,7 +103,13 @@ export const SettingsWindowFrame = ({
 };
 
 /** Panel chrome for the embedded (web demo) settings variant. */
-export const EmbeddedSettingsPanel = ({ children }: { children: React.ReactNode }) => {
+export const EmbeddedSettingsPanel = ({
+  appName,
+  children,
+}: {
+  appName?: string;
+  children: React.ReactNode;
+}) => {
   const { palette } = useSettingsUI();
   return (
     <div
@@ -120,17 +117,40 @@ export const EmbeddedSettingsPanel = ({ children }: { children: React.ReactNode 
       style={{
         backgroundColor: palette.panel,
         borderRadius: "24px",
-        padding: "24px",
         border: "3px solid hsl(var(--foreground))",
         boxShadow: "6px 6px 0px hsl(var(--foreground))",
-        // Web demo keeps a fixed card size (the desktop frame fills its window).
-        width: "820px",
-        height: "580px",
+        width: "960px",
+        height: "680px",
         maxWidth: "100%",
         maxHeight: "90vh",
       }}
     >
-      {children}
+      {appName && (
+        <header
+          className="px-6 pb-4 pt-5 shrink-0"
+          style={{ borderBottom: `1px solid ${palette.divider}` }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-lg"
+              style={{ backgroundColor: palette.card }}
+            >
+              <Settings className="h-5 w-5" style={{ color: palette.text }} />
+            </div>
+            <div>
+              <div className="text-lg font-bold leading-tight" style={{ color: palette.text }}>
+                Settings
+              </div>
+              <div className="text-xs leading-tight" style={{ color: palette.muted }}>
+                {appName} preferences
+              </div>
+            </div>
+          </div>
+        </header>
+      )}
+      <div className="flex-1 flex flex-col overflow-hidden px-6 py-4">
+        {children}
+      </div>
     </div>
   );
 };

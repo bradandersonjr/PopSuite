@@ -1,4 +1,5 @@
 import { useStore } from "@/store/useStore";
+import { isDesktop } from "@/lib/platform";
 import { BrandingOverlay as SharedBrandingOverlay } from "@shared/components/BrandingOverlay";
 import { blockedBrandingCorner } from "@/lib/branding";
 
@@ -17,7 +18,8 @@ const BrandingOverlay = () => {
     scaleFactor,
   } = useStore();
 
-  if (!isPro || !brandingEnabled) return null;
+  const effectiveIsPro = !isDesktop() || isPro;
+  if (!effectiveIsPro || !brandingEnabled) return null;
 
   return (
     <SharedBrandingOverlay

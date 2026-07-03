@@ -13,7 +13,7 @@ the other one."
 ### Highlights
 - ✏️ **Marker, pen & highlighter** — three tools with pressure-style strokes (powered by perfect-freehand)
 - 🎯 **Radial tool menu** — pop a wheel under your cursor to switch tool, color, and size without leaving the canvas
-- 🎨 **6 color palettes & 4 menu styles** — make it yours
+- 🎨 **8 color palettes & 4 menu styles** — make it yours
 - 🌗 **Dark / light themes & animations**
 - ⌨️ **Custom keyboard shortcuts** — bind the overlay toggle and tools to whatever fits your muscle memory
 - 🪟 **Transparent overlay over any app** — works on top of browsers, editors, slides, video calls
@@ -82,7 +82,7 @@ xattr -dr com.apple.quarantine /Applications/PopJot.app
 
 ## Free & open source
 
-PopJot is free forever. If it saves you time, **PopSuite Pro** ($9 one-time) unlocks
+PopJot is free forever. If it saves you time, **PopSuite Pro** ($7 one-time) unlocks
 extra perks — custom color palettes, a custom radial-menu center icon, and a scalable
 center shape — and includes its sister app **PopKey**. It's open core: you *can* build
 the desktop app yourself, and buying Pro is mostly a way to support development. 💛

@@ -151,11 +151,13 @@ const RadialMenu = () => {
   const menuBgAlpha = 1 - menuTranslucency / 100;
   const menuFlatBase = themeMode === "dark" ? "#242424" : "#F8F8F6";
   const scaleFactor = useStore(state => state.scaleFactor);
+  const scaleMultiplier = useStore(state => state.scaleMultiplier);
+  const effectiveScale = scaleFactor * scaleMultiplier;
   const pageZoomFactor = useStore(state => state.pageZoomFactor);
 
   // Scaled radii
-  const RADIUS = BASE_RADIUS * scaleFactor;
-  const SUB_RADIUS = BASE_SUB_RADIUS * scaleFactor;
+  const RADIUS = BASE_RADIUS * effectiveScale;
+  const SUB_RADIUS = BASE_SUB_RADIUS * effectiveScale;
 
   /** Random pop colors — reshuffled each time the menu opens */
   const popColorsRef = useRef(pickPopColors(colorPalette, solidColor));
@@ -548,7 +550,7 @@ const RadialMenu = () => {
                     }}
                     onHoverEnd={clearHoverSelectionTimer}
                   >
-                    <Icon size={28 * scaleFactor} strokeWidth={2} />
+                    <Icon size={28 * effectiveScale} strokeWidth={2} />
                   </RadialButton>
                 );
               })}
@@ -606,8 +608,8 @@ const RadialMenu = () => {
                         >
                           {item.color ? (
                             <div style={{
-                              width: 28 * scaleFactor,
-                              height: 28 * scaleFactor,
+                              width: 28 * effectiveScale,
+                              height: 28 * effectiveScale,
                               borderRadius: `${buttonRoundness / 2}%`,
                               flexShrink: 0,
                               background: item.gradientStops && item.gradientStops.length > 1
@@ -615,7 +617,7 @@ const RadialMenu = () => {
                                 : item.color,
                             }} />
                           ) : (
-                            <SubIcon size={28 * scaleFactor} strokeWidth={2} fill="none" color="currentColor" />
+                            <SubIcon size={28 * effectiveScale} strokeWidth={2} fill="none" color="currentColor" />
                           )}
                         </RadialButton>
                       );
@@ -629,11 +631,11 @@ const RadialMenu = () => {
             {(() => {
               // Branding logo replaces the center shape (Pro). Stored in
               // settings so it renders in every build, gated on Pro + enabled.
-              const brandingActive = isPro && brandingEnabled && brandingImage !== "";
+              const brandingActive = (!isDesktop() || isPro) && brandingEnabled && brandingImage !== "";
               const proScale = activeIndex === null && brandingActive ? brandingScale : 1;
               const proIcon = brandingActive ? brandingImage : null;
-              const circleSize = 48 * scaleFactor * proScale;
-              const iconSize = 22 * scaleFactor * proScale;
+              const circleSize = 48 * effectiveScale * proScale;
+              const iconSize = 22 * effectiveScale * proScale;
               const centerBorderRadius = `${buttonRoundness / 2}%`;
               return (
                 <motion.div

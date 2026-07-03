@@ -78,6 +78,16 @@ Press Alt+Shift+A (or Cmd+Shift+A on macOS) and hold. The overlay activates whil
 ### Persistent Mode (toggle)
 Press Alt+Shift+S (or Cmd+Shift+S on macOS) once to activate. The canvas stays open until you press Esc. Your annotations persist while the overlay is active. Best for extended annotation sessions, whiteboard-style explanations, or recording tutorials. You can take screenshots with Print Screen or your platform's screenshot tool while in persistent mode.
 
+## Configuration (tray / settings)
+
+- **Menu style**: flat, flat-outline, pop, glow (default **pop**) — with roundness and translucency controls
+- **Color palette**: muted, vibrant, retro, neon, pastel, gradient, glitter, and solid (8 total)
+- **Text / icon color**: follow the style, or force white / black
+- **Theme**: dark or light
+- **Animation intensity**: low, medium, high
+- **Whiteboard / grid**: transparent, dark, or light background with optional grid or dot guides
+- **Branding** (Pro): replace the radial-menu center with a custom logo, with a scalable center shape
+
 ## Notes
 
 - Current overlay/screenshot behavior is centered on the primary display.

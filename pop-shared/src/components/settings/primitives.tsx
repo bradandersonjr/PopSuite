@@ -424,15 +424,6 @@ export const SettingsColumns = ({
               window.dispatchEvent(new CustomEvent("close-settings"));
               if (isDesktop() && isSettingsWindow()) {
                 closeWindow();
-              } else if (!isDesktop()) {
-                try {
-                  window.close();
-                } catch (e) {
-                  console.error(e);
-                }
-                if (window.location.search.includes("settings=1")) {
-                  window.location.href = "/";
-                }
               }
             }}
             className="w-full rounded-[12px] px-4 py-2.5 text-base font-semibold transition-all duration-200 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] shadow-sm text-center"
