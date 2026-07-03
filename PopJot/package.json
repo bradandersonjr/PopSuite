@@ -1,7 +1,7 @@
 {
   "name": "PopJot",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Screen-annotation overlay with a radial tool menu and freehand drawing canvas.",
   "homepage": "https://popjot.app",
   "author": "Brad Anderson <brad@bradandersonjr.com>",
