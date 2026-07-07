@@ -26,7 +26,7 @@
  *                                  falls back to its own local tray automatically.
  */
 
-import { app, Tray, Menu, nativeImage, dialog } from "electron";
+import { app, Tray, Menu, nativeImage, dialog, shell } from "electron";
 import { spawn } from "child_process";
 import { join } from "path";
 import { existsSync } from "fs";
@@ -134,13 +134,44 @@ if (requestedModule) {
       }
     }
 
+    // ─── Launcher open-at-login (registers PopSuite.exe, not a module) ──
+    // In the suite the thing that should launch at login is the LAUNCHER
+    // (PopSuite.exe with no args), which then spawns both modules on boot —
+    // the whole point of "one install". This is the launcher process's OWN
+    // Electron `app` login registration, entirely separate from each module's
+    // per-process login toggle (which standalone apps keep independently).
+    function getLauncherOpenAtLogin(): boolean {
+      return app.getLoginItemSettings().openAtLogin;
+    }
+
+    function setLauncherOpenAtLogin(enabled: boolean): void {
+      app.setLoginItemSettings({ openAtLogin: enabled, path: process.execPath });
+    }
+
+    // Open a suite-wide external link in the default browser. The URLs are
+    // hardcoded literals, but we validate with the same guard the shared shell
+    // uses for renderer-opened links so the code path stays consistent.
+    function openSuiteLink(url: string): void {
+      if (/^(https?:|mailto:)/i.test(url)) void shell.openExternal(url);
+    }
+
     function rebuildMenu(): void {
       if (!tray || tray.isDestroyed() || !trayServer) return;
-      const template = buildSuiteTrayMenu(trayServer.getModules(), {
-        onToggle: (appName) => trayServer?.toggle(appName),
-        onAction: (appName, actionId) => trayServer?.action(appName, actionId),
-        onQuitAll: () => quitAll(),
-      });
+      const template = buildSuiteTrayMenu(
+        trayServer.getModules(),
+        {
+          onToggle: (appName) => trayServer?.toggle(appName),
+          onAction: (appName, actionId) => trayServer?.action(appName, actionId),
+          onOpenAtLoginToggle: () => {
+            setLauncherOpenAtLogin(!getLauncherOpenAtLogin());
+            // Rebuild so the checkbox reflects the new state immediately.
+            rebuildMenu();
+          },
+          onOpenLink: (url) => openSuiteLink(url),
+          onQuitAll: () => quitAll(),
+        },
+        { launcherOpenAtLogin: getLauncherOpenAtLogin() }
+      );
       tray.setContextMenu(Menu.buildFromTemplate(template as Electron.MenuItemConstructorOptions[]));
     }
 
