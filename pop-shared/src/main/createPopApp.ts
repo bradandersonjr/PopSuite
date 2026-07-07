@@ -41,6 +41,14 @@ import {
 import type { SettingsSchema, SettingsValues, SettingValue } from "../settings/schema";
 import { createSuiteTrayClient, type SuiteTrayClient } from "./suiteTrayClient";
 import type { SuiteModuleState, SuiteTrayAction } from "./suiteTray";
+import {
+  initialSuppressionState,
+  applyManualToggle,
+  applySuppression,
+  clearSuppression,
+  effectiveActive,
+  type SuppressionState,
+} from "./suiteSuppression";
 
 export type ShortcutUpdateResult =
   | { ok: true; shortcut: string }
@@ -74,6 +82,29 @@ export interface PopAppContext<S extends SettingsSchema> {
   /** Cursor position in the overlay window's coordinate space (DIPs). */
   getCursorDipPosition(): { x: number; y: number };
   openSettingsWindow(): void;
+  /**
+   * Suite-only: report this app's annotating on/off transition up through the
+   * unified-tray pipe (PopJot uses this to tell the launcher it is drawing, so
+   * PopKey auto-hides). No-op outside the suite (owned tray / standalone) and
+   * for apps that don't annotate. Additive: cheap and safe to call always.
+   */
+  reportSuiteAnnotating(annotating: boolean): void;
+  /**
+   * Suite-suppressible apps (PopKey): route a manual toggle (shortcut or tray)
+   * through the shared suppression reducer instead of flipping state directly.
+   * Normally this just flips visibility; while a sibling is annotating it updates
+   * the remembered request but keeps the overlay hidden ("PopJot always wins"),
+   * so the toggle is honored once the sibling stops. No-op if the app didn't set
+   * `suiteSuppressible` (standalone apps without this feature use their own path).
+   */
+  suiteManualToggle(): void;
+  /**
+   * True while a sibling module is currently auto-suppressing this app's overlay
+   * (suite-only). Lets a suppressible app distinguish an effective-visibility
+   * change caused by suppression from one caused by the user's own toggle. Always
+   * false for apps that didn't set `suiteSuppressible`.
+   */
+  isSuiteSuppressed(): boolean;
 }
 
 export interface PopShortcut<S extends SettingsSchema> {
@@ -134,6 +165,30 @@ export interface PopAppOptions<S extends SettingsSchema> {
     getEnabled: () => boolean;
     onToggle: () => void;
   };
+  /**
+   * Suite-only auto-suppression (PopKey opts in). When set, the shared shell
+   * runs the pure suppression reducer (see suiteSuppression.ts) so that while a
+   * sibling module (PopJot) is annotating, this app's overlay is force-hidden
+   * and manual toggles are deferred ("PopJot always wins"); when the sibling
+   * stops, the overlay restores to the user's last requested state.
+   *
+   * The app supplies:
+   *   - initialActive: the user's initial requested visibility (usually true).
+   *   - applyActive(active): drive the overlay to `active` (show/hide). Called
+   *     with the effective visibility whenever it changes. The app must NOT flip
+   *     its own state here — this IS the source of truth for visibility.
+   *
+   * When this is set, `trayToggle` and the module's toggle shortcut should route
+   * their toggles through `ctx`... — but to keep the shell the single owner, the
+   * shell instead intercepts the suite toggle/tray path itself and calls
+   * `applyActive`. Standalone (owned tray, no suite pipe) never suppresses, so
+   * applyActive is only ever called with the plain toggled value there.
+   */
+  suiteSuppressible?: {
+    initialActive: boolean;
+    /** Drive the overlay to the given effective visibility. */
+    applyActive: (active: boolean) => void;
+  };
   /** What launching a second instance should do. Defaults to "focus-main". */
   secondInstance?: "focus-main" | "open-settings";
   onReady?: (ctx: PopAppContext<S>) => void;
@@ -184,6 +239,9 @@ function createInertContext<S extends SettingsSchema>(): PopAppContext<S> {
     isPro: () => false,
     getCursorDipPosition: () => ({ x: 0, y: 0 }),
     openSettingsWindow: () => {},
+    reportSuiteAnnotating: () => {},
+    suiteManualToggle: () => {},
+    isSuiteSuppressed: () => false,
   };
 }
 
@@ -221,6 +279,15 @@ export function createPopApp<S extends SettingsSchema>(
   // Suite unified-tray client. Only created when tray.mode === "reported". Null
   // in standalone/owned mode and after a fallback to a local tray.
   let suiteTrayClient: SuiteTrayClient | null = null;
+  // Suite-only annotating flag (PopJot): reported up so the launcher can relay
+  // it to PopKey as a suppress command. Always false for non-annotating apps.
+  let suiteAnnotating = false;
+  // Suite-only auto-suppression state (PopKey opts in via options.suiteSuppressible).
+  // Null when the app doesn't participate. Tracks the user's requested visibility
+  // separately from whether a sibling is currently forcing us hidden.
+  let suppression: SuppressionState | null = options.suiteSuppressible
+    ? initialSuppressionState(options.suiteSuppressible.initialActive)
+    : null;
 
   const shortcutState: Record<string, string> = {};
   for (const sc of options.shortcuts) {
@@ -505,6 +572,39 @@ export function createPopApp<S extends SettingsSchema>(
     settingsWindow.focus();
   }
 
+  // ─── Suite auto-suppression (PopKey) ─────────────────────────────────
+  // Drive the overlay to the current effective visibility (userRequested AND NOT
+  // suppressed) and keep the suite tray's autoSuppressed label current. Only ever
+  // does anything when the app opted in via options.suiteSuppressible.
+
+  function applyEffectiveActive(): void {
+    if (!suppression || !options.suiteSuppressible) return;
+    options.suiteSuppressible.applyActive(effectiveActive(suppression));
+    // Reflect the (possibly changed) active/suppressed state in the unified tray.
+    reportSuiteState();
+  }
+
+  function suiteManualToggle(): void {
+    if (!suppression) return;
+    suppression = applyManualToggle(suppression);
+    applyEffectiveActive();
+  }
+
+  function applySuiteSuppression(suppressed: boolean): void {
+    if (!suppression) return;
+    suppression = applySuppression(suppression, suppressed);
+    applyEffectiveActive();
+  }
+
+  function clearSuiteSuppression(): void {
+    if (!suppression) return;
+    const wasSuppressed = suppression.suppressed;
+    suppression = clearSuppression(suppression);
+    // Only re-drive the overlay if we actually were suppressed, so a normal
+    // fallback (never suppressed) doesn't needlessly touch the renderer.
+    if (wasSuppressed) applyEffectiveActive();
+  }
+
   // ─── Context handed to app callbacks ─────────────────────────────────
 
   const ctx: PopAppContext<S> = {
@@ -523,6 +623,15 @@ export function createPopApp<S extends SettingsSchema>(
     isPro: () => licenseController?.isPro() ?? false,
     getCursorDipPosition,
     openSettingsWindow,
+    reportSuiteAnnotating: (annotating: boolean) => {
+      // Only meaningful in suite reported mode; harmless otherwise (no client →
+      // report is a no-op). Re-report only on an actual change to avoid pipe spam.
+      if (suiteAnnotating === annotating) return;
+      suiteAnnotating = annotating;
+      reportSuiteState();
+    },
+    suiteManualToggle,
+    isSuiteSuppressed: () => suppression?.suppressed ?? false,
   };
 
   // ─── Common IPC ──────────────────────────────────────────────────────
@@ -747,7 +856,14 @@ export function createPopApp<S extends SettingsSchema>(
   }
 
   function currentSuiteState(): SuiteModuleState {
-    const enabled = options.trayToggle ? options.trayToggle.getEnabled() : trayActive;
+    // For a suppressible app the reported `active` is the user's REQUESTED state
+    // (so the tray checkbox tracks what they asked for), not the effective/hidden
+    // state — the auto-hidden condition is surfaced separately via autoSuppressed.
+    const enabled = suppression
+      ? suppression.userRequested
+      : options.trayToggle
+        ? options.trayToggle.getEnabled()
+        : trayActive;
     return {
       appName,
       active: enabled,
@@ -759,6 +875,11 @@ export function createPopApp<S extends SettingsSchema>(
         : undefined,
       canToggle: Boolean(options.trayToggle),
       actions: suiteActions(),
+      // Only annotating apps (PopJot) ever set this; false otherwise.
+      annotating: suiteAnnotating ? true : undefined,
+      // Only suppressible apps (PopKey) ever set this; reflects a sibling forcing
+      // us hidden right now so the launcher can label the entry "(auto-hidden)".
+      autoSuppressed: suppression?.suppressed ? true : undefined,
     };
   }
 
@@ -778,14 +899,21 @@ export function createPopApp<S extends SettingsSchema>(
           else if (id === SUITE_ACTION_ABOUT) showAboutDialog();
         },
         onQuit: () => app.quit(),
+        onSuppress: (suppressed) => {
+          // Launcher relayed PopJot's annotating state: force-hide / restore.
+          applySuiteSuppression(suppressed);
+        },
       },
       {
         onReady: () => reportSuiteState(),
         onUnavailable: () => {
           // Launcher absent or gone: drop the client and stand up a local tray so
-          // this module is never left without one.
+          // this module is never left without one. Also clear any auto-suppression
+          // so a PopKey that was hidden by PopJot isn't stuck hidden forever once
+          // the suite glue is gone — the user regains normal manual control.
           suiteTrayClient?.dispose();
           suiteTrayClient = null;
+          clearSuiteSuppression();
           if (!tray || tray.isDestroyed()) createTray();
         },
       }
