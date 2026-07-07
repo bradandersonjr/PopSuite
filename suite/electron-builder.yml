@@ -1,0 +1,73 @@
+appId: com.popsuite.app
+productName: PopSuite
+copyright: Copyright © 2026 PopSuite
+
+directories:
+  output: release
+
+files:
+  - out/**/*
+  - "!node_modules/**/*"
+
+# Per-module resources, namespaced so createPopApp's resourceSubdir ("popjot" /
+# "popkey") resolves the right tray/app icons at process.resourcesPath/<module>/.
+extraResources:
+  - from: ../PopJot/assets/tray-icon.png
+    to: popjot/tray-icon.png
+  - from: ../PopJot/assets/tray-icon@2x.png
+    to: popjot/tray-icon@2x.png
+  - from: ../PopJot/assets/tray-icon-active.png
+    to: popjot/tray-icon-active.png
+  - from: ../PopJot/assets/tray-icon-active@2x.png
+    to: popjot/tray-icon-active@2x.png
+  - from: ../PopJot/assets/icon.png
+    to: popjot/icon.png
+  - from: ../PopKey/assets/tray-icon.png
+    to: popkey/tray-icon.png
+  - from: ../PopKey/assets/tray-icon@2x.png
+    to: popkey/tray-icon@2x.png
+  - from: ../PopKey/assets/tray-icon-active.png
+    to: popkey/tray-icon-active.png
+  - from: ../PopKey/assets/tray-icon-active@2x.png
+    to: popkey/tray-icon-active@2x.png
+  - from: ../PopKey/assets/icon.png
+    to: popkey/icon.png
+
+asar: true
+
+# uiohook-napi ships a native .node binding that cannot run from inside the asar
+# archive — unpack it so the PopKey module process can dlopen it at runtime.
+asarUnpack:
+  - "**/node_modules/uiohook-napi/**"
+
+# ─── Windows (primary target) ───────────────────────────────────────
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: ../PopJot/assets/icon.png
+
+nsis:
+  oneClick: true
+  perMachine: false
+
+# ─── macOS (mirror of the per-app configs) ──────────────────────────
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  icon: ../PopJot/assets/icon-512.png
+  category: public.app-category.utilities
+  extendInfo:
+    NSHighResolutionCapable: true
+
+dmg:
+  sign: false
+
+# ─── Linux (mirror of the per-app configs) ──────────────────────────
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  icon: ../PopJot/assets/icon-512.png
+  category: Utility

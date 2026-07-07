@@ -4,7 +4,8 @@
   "workspaces": [
     "pop-shared",
     "PopJot",
-    "PopKey"
+    "PopKey",
+    "suite"
   ],
   "scripts": {
     "dev": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run dev --prefix PopJot\" \"npm run dev --prefix PopKey\"",
@@ -19,7 +20,11 @@
     "test": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run test --prefix PopJot\" \"npm run test --prefix PopKey\"",
     "verify": "npm run typecheck && npm run lint && npm run test",
     "release:popjot": "node scripts/release.mjs popjot",
-    "release:popkey": "node scripts/release.mjs popkey"
+    "release:popkey": "node scripts/release.mjs popkey",
+    "dev:suite": "concurrently -n suite:popjot,suite:popkey -c cyan,magenta \"npm run dev:popjot --prefix suite\" \"npm run dev:popkey --prefix suite\"",
+    "build:suite": "npm run build --prefix suite",
+    "typecheck:suite": "npm run typecheck --prefix suite",
+    "package:suite": "npm run package:win --prefix suite"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

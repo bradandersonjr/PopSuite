@@ -1,0 +1,13 @@
+{
+  "extends": "../pop-shared/tsconfig/electron.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node"],
+    "paths": {
+      "@shared/*": ["../pop-shared/src/*"]
+    }
+  },
+  "include": [
+    "src/**/*"
+  ]
+}

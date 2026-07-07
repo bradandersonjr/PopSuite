@@ -1,0 +1,27 @@
+{
+  "name": "popsuite-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "PopSuite single-install shell: one Electron binary that launches PopJot and PopKey as independent module processes.",
+  "author": "Brad Anderson <brad@bradandersonjr.com>",
+  "main": "out/main/index.js",
+  "dependencies": {
+    "uiohook-napi": "^1.5.4"
+  },
+  "scripts": {
+    "dev:popjot": "electron-vite dev --config electron.vite.popjot.ts",
+    "dev:popkey": "electron-vite dev --config electron.vite.popkey.ts",
+    "build:popjot": "electron-vite build --config electron.vite.popjot.ts",
+    "build:popkey": "electron-vite build --config electron.vite.popkey.ts",
+    "build:launcher": "vite build --config vite.launcher.ts",
+    "build": "npm run build:popjot && npm run build:popkey && npm run build:launcher",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "package": "npm run build && electron-builder --win --config electron-builder.yml",
+    "package:win": "npm run build && electron-builder --win --config electron-builder.yml"
+  },
+  "devDependencies": {
+    "electron": "40.10.3",
+    "electron-builder": "^26.8.1",
+    "electron-vite": "^5.0.0"
+  }
+}
