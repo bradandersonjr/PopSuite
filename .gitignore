@@ -41,5 +41,5 @@ lerna-debug.log*
 # Packaged archives
 *.zip
 
-# High-res logo master (kept locally for re-exporting; not shipped — see PopJot/public/popjot-logo.png)
-PopJot/assets/popjot-logo-master.png
+# High-res logo master (kept locally for re-exporting; not shipped — see app/modules/popjot/public/popjot-logo.png)
+app/modules/popjot/assets/popjot-logo-master.png
