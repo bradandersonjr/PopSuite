@@ -155,6 +155,23 @@ if (requestedModule) {
       if (/^(https?:|mailto:)/i.test(url)) void shell.openExternal(url);
     }
 
+    // Single product-level About for the whole suite. Launcher-local: uses the
+    // launcher's OWN app.getVersion() (suite/package.json), independent of either
+    // module's version, and never relays to a module process — so it works even
+    // when no module is connected. The standalone modules keep their own per-app
+    // About dialog (createPopApp.showAboutDialog); this is the suite presentation.
+    function showSuiteAboutDialog(): void {
+      dialog.showMessageBox({
+        type: "info",
+        title: "About PopSuite",
+        message: "PopSuite",
+        detail:
+          `Version ${app.getVersion()}\n` +
+          "Screen-annotation overlay and keystroke visualizer in one place.",
+        buttons: ["OK"],
+      });
+    }
+
     function rebuildMenu(): void {
       if (!tray || tray.isDestroyed() || !trayServer) return;
       const template = buildSuiteTrayMenu(
@@ -168,6 +185,7 @@ if (requestedModule) {
             rebuildMenu();
           },
           onOpenLink: (url) => openSuiteLink(url),
+          onAbout: () => showSuiteAboutDialog(),
           onQuitAll: () => quitAll(),
         },
         { launcherOpenAtLogin: getLauncherOpenAtLogin() }
