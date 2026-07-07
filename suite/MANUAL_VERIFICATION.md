@@ -30,8 +30,9 @@ npm run package:suite      # from repo root, or: npm run package:win --prefix su
    - a FLAT checkbox toggle per connected module ("Disable PopJot
      (Alt+Shift+A)", "Disable PopKey  (Alt+Shift+K)") directly under the title —
      NOT wrapped in per-module submenus — with a checkmark when active;
-   - "Edit Settings" (submenu / picker) listing "PopJot Settings", "PopJot
-     About", "PopKey Settings", "PopKey About";
+   - "Edit Settings" (submenu / picker) listing ONLY "PopJot Settings" and
+     "PopKey Settings" — NO per-module About entries in the picker anymore;
+   - a single "About PopSuite" item (one product-level About, not one per module);
    - a separator, then "Launch Preferences" (submenu) containing the single
      "Open PopSuite at Login" checkbox;
    - a separator, then "Changelog" and "Documentation";
@@ -48,11 +49,20 @@ npm run package:suite      # from repo root, or: npm run package:win --prefix su
    own hotkey instead and re-open the menu: the checkmark/label reflects the new
    state (state is pushed back to the launcher over the pipe).
 
-4. **Edit Settings picker opens the correct module's window; About still works.**
+4. **Edit Settings picker opens the correct module's window (Settings only).**
    From "Edit Settings > PopJot Settings" the PopJot settings window opens; from
-   "Edit Settings > PopKey Settings" the PopKey settings window opens. From
-   "Edit Settings > PopJot About" / "PopKey About" the matching module's About
-   box appears. Both relay over the existing per-module action pipe.
+   "Edit Settings > PopKey Settings" the PopKey settings window opens. Both relay
+   over the existing per-module action pipe. The picker no longer contains any
+   "About" entries — those moved out to the single "About PopSuite" item (below).
+
+4-About. **Single "About PopSuite" shows the suite's own version.**
+   Click "About PopSuite" (a top-level item, shown ONCE, not per module — it is
+   present even with no module connected). A dialog titled "About PopSuite" with
+   message "PopSuite" appears, whose version line reads the SUITE's own version
+   (from `suite/package.json`, currently 1.0.0) — NOT PopJot's or PopKey's
+   individual version. The detail also names both capabilities as one product
+   (screen-annotation overlay + keystroke visualizer). This is launcher-local: no
+   round-trip to a module, so it works even if a module is not running/connected.
 
 4a. **Launch Preferences registers PopSuite.exe for login.**
    Open "Launch Preferences > Open PopSuite at Login" and tick it. Confirm
@@ -94,10 +104,15 @@ npm run package:suite      # from repo root, or: npm run package:win --prefix su
    exactly as before — the unified tray is suite-only (`tray.mode: "reported"` is
    passed only by the suite module entries; standalone omits it, defaulting to
    "owned"). The new unified-menu layout (flat toggles / Edit Settings picker /
-   Launch Preferences / Changelog / Documentation / Quit PopSuite) lives entirely
-   in the launcher; the standalone per-app menu (Enable/Disable, Settings, About,
-   Quit <App>) and each app's own per-app login-at-startup toggle in its settings
-   window are untouched by this change.
+   About PopSuite / Launch Preferences / Changelog / Documentation / Quit
+   PopSuite) lives entirely in the launcher; the standalone per-app menu
+   (Enable/Disable, Settings, About, Quit <App>) and each app's own per-app
+   login-at-startup toggle in its settings window are untouched by this change.
+   In particular, standalone PopJot.exe's "About" and standalone PopKey.exe's
+   "About" each STILL show their OWN per-app dialog with their OWN module version
+   and their own `aboutDetail` copy — the per-module About was only removed from
+   the SUITE's unified picker, not from the standalone trays (which build their
+   menu via a separate code path, `createTray`/`buildTrayMenu` in createPopApp).
 
 ### PopJot annotation auto-hides PopKey (suite-only)
 
