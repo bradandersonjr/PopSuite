@@ -9,22 +9,23 @@
   ],
   "scripts": {
     "dev": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run dev --prefix PopJot\" \"npm run dev --prefix PopKey\"",
-    "dev:electron": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run dev:electron --prefix PopJot\" \"npm run dev:electron --prefix PopKey\"",
     "dev:popjot": "npm run dev --prefix PopJot",
     "dev:popkey": "npm run dev --prefix PopKey",
     "build": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run build --prefix PopJot\" \"npm run build --prefix PopKey\"",
     "build:popjot": "npm run build --prefix PopJot",
     "build:popkey": "npm run build --prefix PopKey",
-    "typecheck": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run typecheck --prefix PopJot\" \"npm run typecheck --prefix PopKey\"",
-    "lint": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run lint --prefix PopJot\" \"npm run lint --prefix PopKey\"",
-    "test": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run test --prefix PopJot\" \"npm run test --prefix PopKey\"",
-    "verify": "npm run typecheck && npm run lint && npm run test",
-    "release:popjot": "node scripts/release.mjs popjot",
-    "release:popkey": "node scripts/release.mjs popkey",
+
+    "dev:module:popjot": "npm run dev:electron --prefix PopJot",
+    "dev:module:popkey": "npm run dev:electron --prefix PopKey",
     "dev:suite": "concurrently -n suite:popjot,suite:popkey -c cyan,magenta \"npm run dev:popjot --prefix suite\" \"npm run dev:popkey --prefix suite\"",
     "build:suite": "npm run build --prefix suite",
     "typecheck:suite": "npm run typecheck --prefix suite",
-    "package:suite": "npm run package:win --prefix suite"
+    "package:suite": "npm run package:win --prefix suite",
+
+    "typecheck": "concurrently -n PopJot,PopKey,suite -c cyan,magenta,green \"npm run typecheck --prefix PopJot\" \"npm run typecheck --prefix PopKey\" \"npm run typecheck --prefix suite\"",
+    "lint": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run lint --prefix PopJot\" \"npm run lint --prefix PopKey\"",
+    "test": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run test --prefix PopJot\" \"npm run test --prefix PopKey\"",
+    "verify": "npm run typecheck && npm run lint && npm run test"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
