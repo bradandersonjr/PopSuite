@@ -4,11 +4,14 @@ import path from "path";
 
 /**
  * Shared Tailwind config for PopSuite apps.
- * App-relative globs resolve against the process CWD (the app root). pop-shared
- * is a sibling of the app, so its source is referenced by an absolute POSIX glob
- * (a leading "../" glob is unreliable with fast-glob).
+ * App-relative globs resolve against the process CWD (the app module root,
+ * app/modules/<name>). shared/ lives at the repo root, three levels up, so its
+ * source is referenced by an absolute POSIX glob (a leading "../" glob is
+ * unreliable with fast-glob). The suite build overrides `content` entirely via
+ * app/tailwind.suite.ts, so this CWD assumption only applies to the standalone
+ * per-app website/desktop builds run from the module directory.
  */
-const sharedSrc = path.resolve(process.cwd(), "../pop-shared/src").replace(/\\/g, "/");
+const sharedSrc = path.resolve(process.cwd(), "../../../shared/src").replace(/\\/g, "/");
 
 export default {
   darkMode: ["class"],

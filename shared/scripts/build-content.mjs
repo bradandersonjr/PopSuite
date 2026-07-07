@@ -9,10 +9,10 @@
  * esbuild builds a true IIFE without reordering declarations across modules,
  * so const/let scoping is always correct.
  *
- * Lives in pop-shared and runs against the consuming app's root (process.cwd(),
- * since npm runs this script from the app dir). pop-shared is a sibling of the
- * app at ../pop-shared. The IIFE global name is derived from the app's
- * package.json name (e.g. "PopJot" → "PopJotContent").
+ * Lives in shared/ and runs against the consuming app's root (process.cwd(),
+ * since npm runs this script from the app module dir). shared/ is at the repo
+ * root, three levels up from app/modules/<name>. The IIFE global name is
+ * derived from the app's package.json name (e.g. "PopJot" → "PopJotContent").
  */
 
 import esbuild from "esbuild";
@@ -23,7 +23,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const root = process.cwd();
-const sharedRoot = path.resolve(root, "../pop-shared");
+const sharedRoot = path.resolve(root, "../../../shared");
 const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 const globalName = `${pkg.name}Content`;
 const outFile = path.join(root, "dist-extension", "content.js");

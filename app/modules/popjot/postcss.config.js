@@ -1,1 +1,1 @@
-module.exports = require("../pop-shared/config/postcss.cjs");
+module.exports = require("../../../shared/config/postcss.cjs");

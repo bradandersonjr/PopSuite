@@ -1,1 +1,1 @@
-export { default } from "../pop-shared/config/tailwind-preset";
+export { default } from "../../../shared/config/tailwind-preset";

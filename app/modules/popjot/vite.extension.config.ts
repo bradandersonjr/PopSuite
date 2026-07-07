@@ -1,3 +1,3 @@
-import { createExtensionConfig } from "../pop-shared/config/vite";
+import { createExtensionConfig } from "../../../shared/config/vite";
 
 export default createExtensionConfig({ root: __dirname, popupGlobalName: "PopJotPopup" });

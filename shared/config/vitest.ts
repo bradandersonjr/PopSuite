@@ -5,9 +5,11 @@ import { aliases } from "./vite";
 
 /** Shared Vitest config (vitest.config.ts). */
 export function createVitestConfig({ root }: { root: string }) {
-  // pop-shared is a sibling of the app, so its tests/setup live outside the app
-  // root. Use an absolute POSIX glob (fast-glob/tinyglobby reject leading "../").
-  const sharedSrc = path.resolve(root, "../pop-shared/src").replace(/\\/g, "/");
+  // shared/ lives at the repo root; each app module is nested at
+  // app/modules/<name>, so shared src is three levels up. Its tests/setup live
+  // outside the app root; use an absolute POSIX glob (fast-glob/tinyglobby
+  // reject leading "../").
+  const sharedSrc = path.resolve(root, "../../../shared/src").replace(/\\/g, "/");
   return defineConfig({
     plugins: [react()],
     test: {

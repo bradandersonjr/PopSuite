@@ -1,3 +1,3 @@
-import { createVitestConfig } from "../pop-shared/config/vitest";
+import { createVitestConfig } from "../../../shared/config/vitest";
 
 export default createVitestConfig({ root: __dirname });

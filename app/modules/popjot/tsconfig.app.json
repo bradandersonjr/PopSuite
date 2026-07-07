@@ -1,11 +1,11 @@
 {
-  "extends": "../pop-shared/tsconfig/app.json",
+  "extends": "../../../shared/tsconfig/app.json",
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["../pop-shared/src/*"]
+      "@shared/*": ["../../../shared/src/*"]
     }
   },
-  "include": ["src", "../pop-shared/src"]
+  "include": ["src", "../../../shared/src"]
 }

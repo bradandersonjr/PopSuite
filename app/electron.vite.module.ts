@@ -22,24 +22,25 @@ import suiteTailwindConfig from "./tailwind.suite";
 
 const SUITE_ROOT = __dirname;
 const REPO_ROOT = resolve(SUITE_ROOT, "..");
+const MODULES_ROOT = resolve(SUITE_ROOT, "modules");
 
 interface ModuleBuildOptions {
   /** "popjot" | "popkey" */
   module: string;
-  /** Directory name of the app package under the repo root, e.g. "PopJot". */
+  /** Directory name of the app package under app/modules, e.g. "popjot". */
   appDir: string;
 }
 
 export function createModuleConfig({ module, appDir }: ModuleBuildOptions) {
-  const appRoot = resolve(REPO_ROOT, appDir);
+  const appRoot = resolve(MODULES_ROOT, appDir);
 
-  // Aliases: `@` → this module's src, `@shared` → pop-shared, plus @popjot/@popkey
+  // Aliases: `@` → this module's src, `@shared` → shared/, plus @popjot/@popkey
   // so the suite module entry can import the app's register().
   const alias = {
     "@": resolve(appRoot, "src"),
-    "@shared": resolve(REPO_ROOT, "pop-shared/src"),
-    "@popjot": resolve(REPO_ROOT, "PopJot/src"),
-    "@popkey": resolve(REPO_ROOT, "PopKey/src"),
+    "@shared": resolve(REPO_ROOT, "shared/src"),
+    "@popjot": resolve(MODULES_ROOT, "popjot/src"),
+    "@popkey": resolve(MODULES_ROOT, "popkey/src"),
   };
 
   return defineConfig({

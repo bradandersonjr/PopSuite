@@ -1,19 +1,19 @@
 {
-  "extends": "../pop-shared/tsconfig/app.json",
+  "extends": "../../../shared/tsconfig/app.json",
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["../pop-shared/src/*"]
+      "@shared/*": ["../../../shared/src/*"]
     }
   },
-  "include": ["src", "../pop-shared/src"],
+  "include": ["src", "../../../shared/src"],
   // PopKey ships no browser extension; these shared files are PopJot-only and
   // assume PopJot's store shape, so they are excluded from PopKey's typecheck.
   "exclude": [
-    "../pop-shared/src/roots/ExtensionRoot.tsx",
-    "../pop-shared/src/roots/ExtensionPopup.tsx",
-    "../pop-shared/src/extension",
-    "../pop-shared/src/utils/extensionStorage.ts"
+    "../../../shared/src/roots/ExtensionRoot.tsx",
+    "../../../shared/src/roots/ExtensionPopup.tsx",
+    "../../../shared/src/extension",
+    "../../../shared/src/utils/extensionStorage.ts"
   ]
 }

@@ -16,7 +16,7 @@ import { resolve } from "path";
 export default defineConfig({
   resolve: {
     alias: {
-      "@shared": resolve(__dirname, "../pop-shared/src"),
+      "@shared": resolve(__dirname, "../shared/src"),
     },
   },
   build: {

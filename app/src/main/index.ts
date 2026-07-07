@@ -75,10 +75,10 @@ function spawnModules(): void {
 
 /** Resolve the launcher's own tray icon. Reuses PopJot's brand icon (also the
  *  suite app icon). Packaged: extraResources at resourcesPath/suite/. Dev: read
- *  straight from PopJot's assets dir (a sibling package). */
+ *  straight from the popjot module's assets dir (app/modules/popjot/assets). */
 function launcherTrayIconPath(): string {
   if (app.isPackaged) return join(process.resourcesPath, "suite", "tray-icon.png");
-  return join(app.getAppPath(), "..", "PopJot", "assets", "tray-icon.png");
+  return join(app.getAppPath(), "modules", "popjot", "assets", "tray-icon.png");
 }
 
 const requestedModule = parseModuleArg(process.argv);

@@ -4,8 +4,8 @@
  * Post-build script: copies static extension assets into dist-extension/
  * so it becomes a self-contained, loadable Chrome unpacked extension.
  *
- * Lives in pop-shared and runs against the consuming app's root (process.cwd(),
- * since npm runs this script from the app dir). Run automatically via
+ * Lives in shared/ and runs against the consuming app's root (process.cwd(),
+ * since npm runs this script from the app module dir). Run automatically via
  * `npm run build:extension`.
  */
 

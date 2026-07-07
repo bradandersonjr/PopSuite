@@ -90,7 +90,7 @@ export function createExtensionConfig({ root, popupGlobalName }: ExtensionConfig
       outDir,
       emptyOutDir: true,
       lib: {
-        entry: path.resolve(root, "../pop-shared/src/extension/popup.tsx"),
+        entry: path.resolve(root, "../../../shared/src/extension/popup.tsx"),
         name: popupGlobalName,
         formats: ["iife" as const],
         fileName: () => "popup.js",
@@ -109,6 +109,6 @@ export function createExtensionConfig({ root, popupGlobalName }: ExtensionConfig
 export function aliases(root: string): Record<string, string> {
   return {
     "@": path.resolve(root, "./src"),
-    "@shared": path.resolve(root, "../pop-shared/src"),
+    "@shared": path.resolve(root, "../../../shared/src"),
   };
 }

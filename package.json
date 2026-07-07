@@ -2,29 +2,29 @@
   "name": "popsuite",
   "private": true,
   "workspaces": [
-    "pop-shared",
-    "PopJot",
-    "PopKey",
-    "suite"
+    "shared",
+    "app/modules/popjot",
+    "app/modules/popkey",
+    "app"
   ],
   "scripts": {
-    "dev": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run dev --prefix PopJot\" \"npm run dev --prefix PopKey\"",
-    "dev:popjot": "npm run dev --prefix PopJot",
-    "dev:popkey": "npm run dev --prefix PopKey",
-    "build": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run build --prefix PopJot\" \"npm run build --prefix PopKey\"",
-    "build:popjot": "npm run build --prefix PopJot",
-    "build:popkey": "npm run build --prefix PopKey",
+    "dev": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run dev --prefix app/modules/popjot\" \"npm run dev --prefix app/modules/popkey\"",
+    "dev:popjot": "npm run dev --prefix app/modules/popjot",
+    "dev:popkey": "npm run dev --prefix app/modules/popkey",
+    "build": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run build --prefix app/modules/popjot\" \"npm run build --prefix app/modules/popkey\"",
+    "build:popjot": "npm run build --prefix app/modules/popjot",
+    "build:popkey": "npm run build --prefix app/modules/popkey",
 
-    "dev:module:popjot": "npm run dev:electron --prefix PopJot",
-    "dev:module:popkey": "npm run dev:electron --prefix PopKey",
-    "dev:suite": "concurrently -n suite:popjot,suite:popkey -c cyan,magenta \"npm run dev:popjot --prefix suite\" \"npm run dev:popkey --prefix suite\"",
-    "build:suite": "npm run build --prefix suite",
-    "typecheck:suite": "npm run typecheck --prefix suite",
-    "package:suite": "npm run package:win --prefix suite",
+    "dev:module:popjot": "npm run dev:electron --prefix app/modules/popjot",
+    "dev:module:popkey": "npm run dev:electron --prefix app/modules/popkey",
+    "dev:suite": "concurrently -n suite:popjot,suite:popkey -c cyan,magenta \"npm run dev:popjot --prefix app\" \"npm run dev:popkey --prefix app\"",
+    "build:suite": "npm run build --prefix app",
+    "typecheck:suite": "npm run typecheck --prefix app",
+    "package:suite": "npm run package:win --prefix app",
 
-    "typecheck": "concurrently -n PopJot,PopKey,suite -c cyan,magenta,green \"npm run typecheck --prefix PopJot\" \"npm run typecheck --prefix PopKey\" \"npm run typecheck --prefix suite\"",
-    "lint": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run lint --prefix PopJot\" \"npm run lint --prefix PopKey\"",
-    "test": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run test --prefix PopJot\" \"npm run test --prefix PopKey\"",
+    "typecheck": "concurrently -n PopJot,PopKey,suite -c cyan,magenta,green \"npm run typecheck --prefix app/modules/popjot\" \"npm run typecheck --prefix app/modules/popkey\" \"npm run typecheck --prefix app\"",
+    "lint": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run lint --prefix app/modules/popjot\" \"npm run lint --prefix app/modules/popkey\"",
+    "test": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run test --prefix app/modules/popjot\" \"npm run test --prefix app/modules/popkey\"",
     "verify": "npm run typecheck && npm run lint && npm run test"
   },
   "devDependencies": {

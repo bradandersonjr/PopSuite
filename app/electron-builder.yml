@@ -15,31 +15,31 @@ files:
 # Per-module resources, namespaced so createPopApp's resourceSubdir ("popjot" /
 # "popkey") resolves the right tray/app icons at process.resourcesPath/<module>/.
 extraResources:
-  - from: ../PopJot/assets/tray-icon.png
+  - from: modules/popjot/assets/tray-icon.png
     to: popjot/tray-icon.png
-  - from: ../PopJot/assets/tray-icon@2x.png
+  - from: modules/popjot/assets/tray-icon@2x.png
     to: popjot/tray-icon@2x.png
-  - from: ../PopJot/assets/tray-icon-active.png
+  - from: modules/popjot/assets/tray-icon-active.png
     to: popjot/tray-icon-active.png
-  - from: ../PopJot/assets/tray-icon-active@2x.png
+  - from: modules/popjot/assets/tray-icon-active@2x.png
     to: popjot/tray-icon-active@2x.png
-  - from: ../PopJot/assets/icon.png
+  - from: modules/popjot/assets/icon.png
     to: popjot/icon.png
-  - from: ../PopKey/assets/tray-icon.png
+  - from: modules/popkey/assets/tray-icon.png
     to: popkey/tray-icon.png
-  - from: ../PopKey/assets/tray-icon@2x.png
+  - from: modules/popkey/assets/tray-icon@2x.png
     to: popkey/tray-icon@2x.png
-  - from: ../PopKey/assets/tray-icon-active.png
+  - from: modules/popkey/assets/tray-icon-active.png
     to: popkey/tray-icon-active.png
-  - from: ../PopKey/assets/tray-icon-active@2x.png
+  - from: modules/popkey/assets/tray-icon-active@2x.png
     to: popkey/tray-icon-active@2x.png
-  - from: ../PopKey/assets/icon.png
+  - from: modules/popkey/assets/icon.png
     to: popkey/icon.png
   # Launcher's own unified tray icon (reuses PopJot's brand mark, which is also
   # the suite app icon). Resolved at process.resourcesPath/suite/tray-icon.png.
-  - from: ../PopJot/assets/tray-icon.png
+  - from: modules/popjot/assets/tray-icon.png
     to: suite/tray-icon.png
-  - from: ../PopJot/assets/tray-icon@2x.png
+  - from: modules/popjot/assets/tray-icon@2x.png
     to: suite/tray-icon@2x.png
 
 asar: true
@@ -54,7 +54,7 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  icon: ../PopJot/assets/icon.png
+  icon: modules/popjot/assets/icon.png
 
 nsis:
   oneClick: true
@@ -65,7 +65,7 @@ mac:
   target:
     - target: dmg
       arch: [x64, arm64]
-  icon: ../PopJot/assets/icon-512.png
+  icon: modules/popjot/assets/icon-512.png
   category: public.app-category.utilities
   extendInfo:
     NSHighResolutionCapable: true
@@ -78,5 +78,5 @@ linux:
   target:
     - target: AppImage
       arch: [x64]
-  icon: ../PopJot/assets/icon-512.png
+  icon: modules/popjot/assets/icon-512.png
   category: Utility
