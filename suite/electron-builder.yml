@@ -7,7 +7,10 @@ directories:
 
 files:
   - out/**/*
-  - "!node_modules/**/*"
+  # Production deps (uiohook-napi, PopKey's native input hook) are auto-included
+  # by electron-builder's dependency tracing and unpacked via asarUnpack below.
+  # We intentionally do NOT blanket-exclude node_modules — that would strip the
+  # native binding and break PopKey's input capture.
 
 # Per-module resources, namespaced so createPopApp's resourceSubdir ("popjot" /
 # "popkey") resolves the right tray/app icons at process.resourcesPath/<module>/.
