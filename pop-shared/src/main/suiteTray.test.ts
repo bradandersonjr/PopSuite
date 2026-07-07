@@ -32,6 +32,7 @@ function noopHandlers(): SuiteTrayHandlers {
     onAction: vi.fn(),
     onOpenAtLoginToggle: vi.fn(),
     onOpenLink: vi.fn(),
+    onAbout: vi.fn(),
     onQuitAll: vi.fn(),
   };
 }
@@ -54,6 +55,7 @@ describe("buildSuiteTrayMenu", () => {
       "PopSuite",
       "<separator>",
       "No modules running",
+      "About PopSuite",
       "<separator>",
       "Launch Preferences",
       "<separator>",
@@ -99,7 +101,7 @@ describe("buildSuiteTrayMenu", () => {
     expect(menu[3].label).toContain("PopKey");
   });
 
-  it("builds an Edit Settings picker with per-module Settings/About entries", () => {
+  it("builds an Edit Settings picker with per-module Settings entries only (no About)", () => {
     const menu = buildSuiteTrayMenu(
       [makeModule({ appName: "PopKey" }), makeModule({ appName: "PopJot" })],
       noopHandlers(),
@@ -107,12 +109,9 @@ describe("buildSuiteTrayMenu", () => {
     );
     const picker = menu.find((i) => i.label === "Edit Settings");
     expect(picker?.submenu).toBeDefined();
-    expect(labels(picker!.submenu!)).toEqual([
-      "PopJot Settings",
-      "PopJot About",
-      "PopKey Settings",
-      "PopKey About",
-    ]);
+    // About is omitted from the unified picker — the suite shows one product-level
+    // "About PopSuite" instead of one About per module.
+    expect(labels(picker!.submenu!)).toEqual(["PopJot Settings", "PopKey Settings"]);
   });
 
   it("wires Edit Settings entries to the per-module action relay", () => {
@@ -121,8 +120,22 @@ describe("buildSuiteTrayMenu", () => {
     const picker = menu.find((i) => i.label === "Edit Settings")!;
     picker.submenu!.find((i) => i.label === "PopKey Settings")!.click!();
     expect(handlers.onAction).toHaveBeenCalledWith("PopKey", "settings");
-    picker.submenu!.find((i) => i.label === "PopKey About")!.click!();
-    expect(handlers.onAction).toHaveBeenCalledWith("PopKey", "about");
+    // No per-module About in the picker to relay anymore.
+    expect(picker.submenu!.some((i) => i.label === "PopKey About")).toBe(false);
+  });
+
+  it("shows a single About PopSuite item wired to onAbout", () => {
+    const handlers = noopHandlers();
+    const menu = buildSuiteTrayMenu(
+      [makeModule({ appName: "PopKey" }), makeModule({ appName: "PopJot" })],
+      handlers,
+      opts()
+    );
+    // Exactly one About item, product-level, not per module.
+    const abouts = menu.filter((i) => i.label?.startsWith("About"));
+    expect(labels(abouts)).toEqual(["About PopSuite"]);
+    abouts[0].click!();
+    expect(handlers.onAbout).toHaveBeenCalledTimes(1);
   });
 
   it("shows Launch Preferences with a login checkbox reflecting the passed-in state", () => {

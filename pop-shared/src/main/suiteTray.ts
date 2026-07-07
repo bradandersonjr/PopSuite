@@ -176,6 +176,8 @@ export interface SuiteTrayHandlers {
   onOpenAtLoginToggle(): void;
   /** Open an external URL in the default browser (Changelog / Documentation). */
   onOpenLink(url: string): void;
+  /** Show the single suite-level About dialog (launcher-local, suite version). */
+  onAbout(): void;
   onQuitAll(): void;
 }
 
@@ -192,7 +194,8 @@ export interface SuiteTrayMenuOptions {
  *   - a disabled "PopSuite" title,
  *   - a flat toggle checkbox per connected module (reflecting `active`, label
  *     carrying the shortcut hint and any "(auto-hidden)" suppression suffix),
- *   - an "Edit Settings" picker submenu with per-module Settings/About entries,
+ *   - an "Edit Settings" picker submenu with per-module Settings entries,
+ *   - a single "About PopSuite" item (one product, suite version),
  *   - a "Launch Preferences" submenu holding the "Open PopSuite at Login" toggle,
  *   - suite-wide "Changelog" / "Documentation" links,
  *   - "Quit PopSuite".
@@ -239,13 +242,17 @@ export function buildSuiteTrayMenu(
     }
   }
 
-  // Edit Settings picker: one submenu that lists each module's own actions
-  // (Settings, About) so the user picks which module's window to open. Reuses
-  // the existing per-module action relay (SUITE_ACTION_SETTINGS/ABOUT). Only
-  // shown when at least one module exposes actions.
+  // Edit Settings picker: one submenu that lists each module's Settings entry
+  // so the user picks which module's window to open. Reuses the existing
+  // per-module action relay (SUITE_ACTION_SETTINGS). About is deliberately
+  // omitted here — the suite presents a single product-level "About PopSuite"
+  // below instead of one About per module (the modules still report their About
+  // action for their own standalone trays; we just don't surface it in the
+  // unified picker). Only shown when at least one module exposes a Settings action.
   const editSettings: SuiteMenuItem[] = [];
   for (const mod of sorted) {
     for (const action of mod.actions) {
+      if (action.id === SUITE_ACTION_ABOUT) continue;
       editSettings.push({
         label: `${mod.appName} ${action.label}`,
         click: () => handlers.onAction(mod.appName, action.id),
@@ -255,6 +262,11 @@ export function buildSuiteTrayMenu(
   if (editSettings.length > 0) {
     items.push({ label: "Edit Settings", submenu: editSettings });
   }
+
+  // Single product-level About: one "About PopSuite" for the whole suite,
+  // launcher-local (shows the suite's own version), never per module. Always
+  // shown — it's about the product, not a connected module.
+  items.push({ label: "About PopSuite", click: () => handlers.onAbout() });
 
   // ─── Launcher-local items (never depend on a connected module) ─────────
   items.push({ type: "separator" });
