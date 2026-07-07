@@ -69,6 +69,51 @@ npm run package:suite      # from repo root, or: npm run package:win --prefix su
    passed only by the suite module entries; standalone omits it, defaulting to
    "owned").
 
+### PopJot annotation auto-hides PopKey (suite-only)
+
+A1. **Annotating PopJot auto-hides PopKey.**
+   With BOTH modules running under the launcher and PopKey's visualizer ON,
+   activate PopJot (Alt+Shift+A) and start drawing. PopKey's visualizer overlay
+   should disappear the moment PopJot becomes active (key/click badges stop
+   showing). This is driven over the suite pipe — PopJot's main process reports
+   "annotating" up to the launcher, which relays a suppress command to PopKey.
+
+A2. **Stopping annotation restores PopKey to its prior state.**
+   Dismiss PopJot's overlay (Escape / click away, so annotation ends). PopKey's
+   visualizer reappears in whatever state it was before (ON if it was ON). If you
+   had PopKey OFF before PopJot activated, it stays OFF — it restores to your last
+   requested state, not blindly to ON.
+
+A3. **PopJot always wins: toggling PopKey while PopJot is active does not show
+   it, but is honored afterward.**
+   While PopJot is actively annotating (PopKey auto-hidden), press PopKey's hotkey
+   (Alt+Shift+K) or click its tray toggle. PopKey must STAY hidden (PopJot wins).
+   Then end PopJot's annotation: PopKey should now reflect that toggle — i.e. if
+   it was ON and you toggled once while suppressed, it comes back OFF; toggle
+   again while suppressed and it comes back ON. The LATEST request wins; requests
+   are never silently dropped.
+
+A4. **Tray shows the auto-hidden state.**
+   While PopKey is auto-hidden by PopJot, open the suite tray menu: PopKey's entry
+   is suffixed "(auto-hidden)". Its checkbox still reflects your requested state
+   (checked if you last asked for it ON). The suffix clears once PopJot stops.
+
+A5. **Killing the launcher mid-suppression un-sticks PopKey.**
+   With PopJot annotating and PopKey auto-hidden, end the LAUNCHER `PopSuite.exe`
+   process in Task Manager. PopKey must NOT stay stuck hidden: it falls back to
+   its own local tray (per check 6) AND clears the auto-suppression, returning to
+   normal manual control (visualizer restores to your last requested state, hotkey
+   toggles work immediately).
+
+A6. **Standalone PopJot.exe + PopKey.exe side-by-side do NOT interact
+   (regression / out-of-scope check).**
+   Launch the STANDALONE `PopJot.exe` and `PopKey.exe` (not via the suite
+   launcher) at the same time. Annotate with PopJot: PopKey's visualizer must be
+   COMPLETELY UNAFFECTED (stays visible, keeps showing keys/clicks). The auto-hide
+   feature is gated entirely behind the suite pipe, so it must not engage for
+   standalone apps. Same when running a module directly via `--module=` with no
+   launcher.
+
 ### Regression checks (unchanged behavior)
 
 9. **PopJot annotation activation / focus works with PopKey running (CRITICAL
@@ -131,3 +176,14 @@ npm run package:suite      # from repo root, or: npm run package:win --prefix su
   lock lives at `%APPDATA%/PopSuite` (no `modules/` segment).
 - Licensing is untouched: both modules use the `suite` Pro product and the same
   offline license layer as the standalone apps.
+- **PopJot annotation auto-hide (suite-only).** PopJot's main process reports its
+  annotating on/off transitions (surfaced from the existing renderer
+  `overlay-activated` / `overlay-deactivated` IPC — RadialMenu's activation logic
+  is untouched) up the unified-tray pipe. The launcher relays a `suppress` message
+  to PopKey, which runs a pure state reducer (`suiteSuppression.ts`): while
+  suppressed it force-hides its overlay (absolute `set-app-enabled`, not a toggle)
+  and defers manual toggles, restoring the user's last requested state when PopJot
+  stops. It is gated entirely behind the suite pipe — outside the suite (standalone
+  or `--module=` with no launcher) no suppression ever engages, and if the pipe
+  drops mid-suppression the fallback to a local tray also clears the suppression so
+  PopKey can never get stuck hidden.
