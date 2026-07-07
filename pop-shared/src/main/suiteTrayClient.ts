@@ -30,6 +30,13 @@ export interface SuiteTrayClientHandlers {
   onAction(id: string): void;
   /** Quit this module process (launcher asked, via "Quit All"). */
   onQuit(): void;
+  /**
+   * Suite-only: the launcher relayed a sibling's annotating state. When true,
+   * force-hide this overlay and defer manual toggles; when false, restore to the
+   * user's last requested state. Optional so modules that never suppress (PopJot)
+   * can omit it. Defaults to a no-op.
+   */
+  onSuppress?(suppressed: boolean): void;
 }
 
 export interface SuiteTrayClient {
@@ -89,6 +96,9 @@ export function createSuiteTrayClient(
           break;
         case "quit":
           handlers.onQuit();
+          break;
+        case "suppress":
+          handlers.onSuppress?.(msg.suppressed);
           break;
       }
     }

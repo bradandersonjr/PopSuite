@@ -53,6 +53,21 @@ export interface SuiteModuleState {
   canToggle: boolean;
   /** Extra per-module actions (settings, about, ...). */
   actions: SuiteTrayAction[];
+  /**
+   * Suite-only cross-module signal: true while this module is actively
+   * annotating (PopJot drawing mode on). The launcher relays this to the other
+   * module as a suppress command so, e.g., PopKey auto-hides while PopJot draws.
+   * Undefined/absent for modules that never annotate (PopKey). Purely additive:
+   * a module that never sets it behaves exactly as before.
+   */
+  annotating?: boolean;
+  /**
+   * Suite-only: true while this module's overlay is auto-suppressed by a sibling
+   * (e.g. PopKey hidden because PopJot is annotating). Reported back so the
+   * unified tray can label the entry distinctly. Distinct from `active`, which
+   * still reflects the user's own manually-requested state.
+   */
+  autoSuppressed?: boolean;
 }
 
 // ─── Wire messages ──────────────────────────────────────────────────────
@@ -79,10 +94,21 @@ export interface QuitMessage {
   type: "quit";
 }
 
+/**
+ * Launcher → module: suite-only auto-suppress command. Sent to PopKey when a
+ * sibling module (PopJot) starts/stops annotating. While suppressed the module
+ * force-hides its overlay and defers the user's manual toggle requests; when it
+ * clears, the module restores to the user's last manually-requested state.
+ */
+export interface SuppressMessage {
+  type: "suppress";
+  suppressed: boolean;
+}
+
 /** Everything a module may send up the pipe. */
 export type ModuleToLauncher = StateMessage;
 /** Everything the launcher may send down the pipe. */
-export type LauncherToModule = ToggleMessage | ActionMessage | QuitMessage;
+export type LauncherToModule = ToggleMessage | ActionMessage | QuitMessage | SuppressMessage;
 
 // ─── Newline-delimited JSON framing ─────────────────────────────────────
 // A single socket carries many messages; frame each as one JSON object on its
@@ -168,8 +194,13 @@ export function buildSuiteTrayMenu(
   for (const mod of sorted) {
     if (mod.canToggle) {
       const hint = mod.shortcuts.length ? `  (${mod.shortcuts.join(", ")})` : "";
+      // While auto-suppressed by a sibling (PopJot annotating), flag it so the
+      // user understands the overlay is hidden by the suite, not by them. The
+      // checkbox still reflects their own requested `active` state, and toggling
+      // is still relayed (the module defers it until suppression clears).
+      const suffix = mod.autoSuppressed ? " (auto-hidden)" : "";
       const label =
-        (mod.toggleLabel ?? `${mod.active ? "Disable" : "Enable"} ${mod.appName}`) + hint;
+        (mod.toggleLabel ?? `${mod.active ? "Disable" : "Enable"} ${mod.appName}`) + hint + suffix;
       items.push({
         label,
         type: "checkbox",

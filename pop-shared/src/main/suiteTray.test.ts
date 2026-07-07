@@ -94,6 +94,27 @@ describe("buildSuiteTrayMenu", () => {
     expect(handlers.onQuitAll).toHaveBeenCalledTimes(1);
   });
 
+  it("marks an auto-suppressed module's toggle label with (auto-hidden)", () => {
+    const menu = buildSuiteTrayMenu(
+      [makeModule({ appName: "PopKey", active: true, autoSuppressed: true })],
+      noopHandlers()
+    );
+    const toggle = menu.find((i) => i.type === "checkbox")!;
+    // Checkbox still reflects the user's own requested state (active)...
+    expect(toggle.checked).toBe(true);
+    // ...but the label flags that a sibling is forcing it hidden.
+    expect(toggle.label).toContain("(auto-hidden)");
+  });
+
+  it("does not add (auto-hidden) when a module is not suppressed", () => {
+    const menu = buildSuiteTrayMenu(
+      [makeModule({ appName: "PopKey", autoSuppressed: undefined })],
+      noopHandlers()
+    );
+    const toggle = menu.find((i) => i.type === "checkbox")!;
+    expect(toggle.label).not.toContain("(auto-hidden)");
+  });
+
   it("renders a non-toggling module as a disabled heading", () => {
     const menu = buildSuiteTrayMenu(
       [makeModule({ canToggle: false, toggleLabel: undefined })],

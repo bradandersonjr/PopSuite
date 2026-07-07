@@ -37,6 +37,11 @@ export interface SuiteTrayServer {
   toggle(appName: string): void;
   /** Send an action command to the named module. */
   action(appName: string, actionId: string): void;
+  /**
+   * Send a suite-only auto-suppress command to the named module (no-op if not
+   * connected). Used to hide/restore PopKey while PopJot annotates.
+   */
+  suppress(appName: string, suppressed: boolean): void;
   /** Ask every connected module to quit itself. */
   quitAll(): void;
   /** Stop listening and drop all connections. */
@@ -126,6 +131,10 @@ export function createSuiteTrayServer(
     action(appName: string, actionId: string): void {
       const conn = findByApp(appName);
       if (conn) send(conn, { type: "action", id: actionId });
+    },
+    suppress(appName: string, suppressed: boolean): void {
+      const conn = findByApp(appName);
+      if (conn) send(conn, { type: "suppress", suppressed });
     },
     quitAll(): void {
       for (const conn of connections) send(conn, { type: "quit" });

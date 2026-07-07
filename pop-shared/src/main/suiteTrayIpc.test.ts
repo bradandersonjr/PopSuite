@@ -94,6 +94,57 @@ describe("suite-tray IPC", () => {
     expect(onAction).toHaveBeenCalledWith("settings");
   });
 
+  it("relays a suppress command to the named module", async () => {
+    const path = pipePath();
+    const server = createSuiteTrayServer(vi.fn(), path);
+    cleanups.push(() => server.dispose());
+
+    const suppressCalls: boolean[] = [];
+    let ready = false;
+    const client = createSuiteTrayClient(
+      {
+        onToggle: vi.fn(),
+        onAction: vi.fn(),
+        onQuit: vi.fn(),
+        onSuppress: (s) => suppressCalls.push(s),
+      },
+      { onReady: () => (ready = true), onUnavailable: vi.fn() },
+      path
+    );
+    cleanups.push(() => client.dispose());
+
+    await until(() => ready);
+    client.report(state({ appName: "PopKey" }));
+    await until(() => server.getModules().length === 1);
+
+    server.suppress("PopKey", true);
+    await until(() => suppressCalls.length === 1);
+    expect(suppressCalls[0]).toBe(true);
+
+    server.suppress("PopKey", false);
+    await until(() => suppressCalls.length === 2);
+    expect(suppressCalls[1]).toBe(false);
+  });
+
+  it("carries the annotating flag through a reported state", async () => {
+    const path = pipePath();
+    const server = createSuiteTrayServer(vi.fn(), path);
+    cleanups.push(() => server.dispose());
+
+    let ready = false;
+    const client = createSuiteTrayClient(
+      { onToggle: vi.fn(), onAction: vi.fn(), onQuit: vi.fn() },
+      { onReady: () => (ready = true), onUnavailable: vi.fn() },
+      path
+    );
+    cleanups.push(() => client.dispose());
+
+    await until(() => ready);
+    client.report(state({ appName: "PopJot", annotating: true }));
+    await until(() => server.getModules().length === 1);
+    expect(server.getModules()[0].annotating).toBe(true);
+  });
+
   it("quitAll asks every connected module to quit", async () => {
     const path = pipePath();
     const server = createSuiteTrayServer(vi.fn(), path);
