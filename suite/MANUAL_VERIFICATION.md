@@ -24,14 +24,22 @@ npm run package:suite      # from repo root, or: npm run package:win --prefix su
    module (popjot, popkey). The launcher no longer exits after spawning — it
    stays alive to own the tray.
 
-2. **Menu reflects both modules once both are running.**
+2. **Menu reflects the new layout once both modules are running.**
    Left- or right-click the suite tray icon. The menu shows, top to bottom:
-   a disabled "PopSuite" title, a checkbox toggle per connected module
-   ("Disable PopJot  (Alt+Shift+A)", "Disable PopKey  (Alt+Shift+K)") with a
-   checkmark when the module is active, a "PopJot Options" / "PopKey Options"
-   submenu (Open Settings, About), and finally "Quit All". Modules appear only
-   once they have connected over the pipe; the list updates live as modules
-   connect/disconnect.
+   - a disabled "PopSuite" title, then a separator;
+   - a FLAT checkbox toggle per connected module ("Disable PopJot
+     (Alt+Shift+A)", "Disable PopKey  (Alt+Shift+K)") directly under the title —
+     NOT wrapped in per-module submenus — with a checkmark when active;
+   - "Edit Settings" (submenu / picker) listing "PopJot Settings", "PopJot
+     About", "PopKey Settings", "PopKey About";
+   - a separator, then "Launch Preferences" (submenu) containing the single
+     "Open PopSuite at Login" checkbox;
+   - a separator, then "Changelog" and "Documentation";
+   - a separator, then "Quit PopSuite".
+   Modules appear only once they have connected over the pipe; the toggles and
+   the Edit Settings picker update live as modules connect/disconnect, while
+   Launch Preferences / Changelog / Documentation / Quit PopSuite are always
+   present regardless of connected modules.
 
 3. **Toggling from the tray menu activates/deactivates the correct module.**
    Click "Disable PopJot" — PopJot's shortcuts suspend and its checkbox clears;
@@ -40,14 +48,32 @@ npm run package:suite      # from repo root, or: npm run package:win --prefix su
    own hotkey instead and re-open the menu: the checkmark/label reflects the new
    state (state is pushed back to the launcher over the pipe).
 
-4. **Per-module settings entries open the correct window.**
-   From "PopJot Options > Open Settings" the PopJot settings window opens; from
-   "PopKey Options > Settings" the PopKey settings window opens. "About" in each
-   submenu shows that module's About box.
+4. **Edit Settings picker opens the correct module's window; About still works.**
+   From "Edit Settings > PopJot Settings" the PopJot settings window opens; from
+   "Edit Settings > PopKey Settings" the PopKey settings window opens. From
+   "Edit Settings > PopJot About" / "PopKey About" the matching module's About
+   box appears. Both relay over the existing per-module action pipe.
 
-5. **Quit All exits everything.**
-   Click "Quit All". Both module processes and the launcher/tray-owner exit; the
-   tray icon disappears and no `PopSuite.exe` processes remain in Task Manager.
+4a. **Launch Preferences registers PopSuite.exe for login.**
+   Open "Launch Preferences > Open PopSuite at Login" and tick it. Confirm
+   PopSuite (PopSuite.exe with NO `--module` arg) now appears enabled in Windows
+   Settings > Apps > Startup (or Task Manager > Startup apps tab). Untick it and
+   confirm the entry is removed/disabled. Re-open the tray menu each time: the
+   checkbox reflects the current state. Reboot (or sign out/in): PopSuite should
+   auto-launch and bring up both modules when the toggle is on, and NOT launch
+   when off — the state persists across relaunch (it lives in the OS login-items
+   registry, not in app state). This registers the LAUNCHER only; a module's own
+   standalone per-app login toggle is independent and unaffected.
+
+4b. **Changelog / Documentation open the correct URLs.**
+   Click "Changelog" — the default browser opens https://popjot.app/changelog.
+   Click "Documentation" — it opens https://popjot.app/docs. Both are suite-wide
+   (not per-module) and remain available even with no modules connected.
+
+5. **Quit PopSuite exits everything.**
+   Click "Quit PopSuite" (formerly "Quit All"; same behavior). Both module
+   processes and the launcher/tray-owner exit; the tray icon disappears and no
+   `PopSuite.exe` processes remain in Task Manager.
 
 6. **Launcher death → each module falls back to its own tray (graceful
    degradation).**
@@ -63,11 +89,15 @@ npm run package:suite      # from repo root, or: npm run package:win --prefix su
    Because the pipe is unavailable, PopJot immediately falls back to its own tray
    icon and behaves exactly like standalone PopJot. Same for `--module=popkey`.
 
-8. **Standalone PopJot.exe / PopKey.exe are unaffected.**
+8. **Standalone PopJot.exe / PopKey.exe are unaffected (redesign regression).**
    The standalone builds still create their own independent tray icons and menus
    exactly as before — the unified tray is suite-only (`tray.mode: "reported"` is
    passed only by the suite module entries; standalone omits it, defaulting to
-   "owned").
+   "owned"). The new unified-menu layout (flat toggles / Edit Settings picker /
+   Launch Preferences / Changelog / Documentation / Quit PopSuite) lives entirely
+   in the launcher; the standalone per-app menu (Enable/Disable, Settings, About,
+   Quit <App>) and each app's own per-app login-at-startup toggle in its settings
+   window are untouched by this change.
 
 ### PopJot annotation auto-hides PopKey (suite-only)
 
