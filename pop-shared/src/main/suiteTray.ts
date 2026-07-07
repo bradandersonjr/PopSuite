@@ -159,11 +159,30 @@ export interface SuiteMenuItem {
   submenu?: SuiteMenuItem[];
 }
 
-/** Click handlers the launcher supplies; keyed by module appName. */
+/** Suite-wide external links, always shown regardless of connected modules. */
+export const SUITE_CHANGELOG_URL = "https://popjot.app/changelog";
+export const SUITE_DOCS_URL = "https://popjot.app/docs";
+
+/** Action ids modules honor for the Edit Settings picker (mirror createPopApp). */
+export const SUITE_ACTION_SETTINGS = "settings";
+export const SUITE_ACTION_ABOUT = "about";
+
+/** Click handlers the launcher supplies. Toggle/action are per-module relays;
+ *  login toggle and link opens are launcher-local (no pipe round-trip). */
 export interface SuiteTrayHandlers {
   onToggle(appName: string): void;
   onAction(appName: string, actionId: string): void;
+  /** Toggle whether the launcher (PopSuite.exe) is registered to run at login. */
+  onOpenAtLoginToggle(): void;
+  /** Open an external URL in the default browser (Changelog / Documentation). */
+  onOpenLink(url: string): void;
   onQuitAll(): void;
+}
+
+/** Extra inputs to the menu builder beyond the connected-module list. */
+export interface SuiteTrayMenuOptions {
+  /** Current launcher open-at-login state; drives the checkbox in the submenu. */
+  launcherOpenAtLogin: boolean;
 }
 
 /**
@@ -171,26 +190,33 @@ export interface SuiteTrayHandlers {
  *
  * Layout (top to bottom):
  *   - a disabled "PopSuite" title,
- *   - per module: a toggle item (checkbox reflecting `active`, label carrying the
- *     shortcut hint) followed by that module's extra actions in a submenu,
- *   - a global separator, then "Quit All".
+ *   - a flat toggle checkbox per connected module (reflecting `active`, label
+ *     carrying the shortcut hint and any "(auto-hidden)" suppression suffix),
+ *   - an "Edit Settings" picker submenu with per-module Settings/About entries,
+ *   - a "Launch Preferences" submenu holding the "Open PopSuite at Login" toggle,
+ *   - suite-wide "Changelog" / "Documentation" links,
+ *   - "Quit PopSuite".
  *
- * When no modules are connected we still return a coherent menu (title + a
- * disabled "No modules running" line + Quit All) so the icon is never dead.
+ * The module-dependent section (toggles + Edit Settings) collapses to a disabled
+ * "No modules running" line when nothing has connected yet; the launcher-local
+ * items (Launch Preferences, links, Quit) are always shown so the icon is never
+ * dead and those capabilities never depend on a module being up.
  */
 export function buildSuiteTrayMenu(
   modules: SuiteModuleState[],
-  handlers: SuiteTrayHandlers
+  handlers: SuiteTrayHandlers,
+  options: SuiteTrayMenuOptions
 ): SuiteMenuItem[] {
   const items: SuiteMenuItem[] = [{ label: "PopSuite", enabled: false }, { type: "separator" }];
-
-  if (modules.length === 0) {
-    items.push({ label: "No modules running", enabled: false });
-  }
 
   // Stable ordering so the menu doesn't jump around as connections race in.
   const sorted = [...modules].sort((a, b) => a.appName.localeCompare(b.appName));
 
+  if (sorted.length === 0) {
+    items.push({ label: "No modules running", enabled: false });
+  }
+
+  // Flat toggles: one checkbox per module directly under the title.
   for (const mod of sorted) {
     if (mod.canToggle) {
       const hint = mod.shortcuts.length ? `  (${mod.shortcuts.join(", ")})` : "";
@@ -208,25 +234,48 @@ export function buildSuiteTrayMenu(
         click: () => handlers.onToggle(mod.appName),
       });
     } else {
-      // No toggle: still show the module name as a heading so its actions group.
+      // No toggle: still show the module name as a heading so it isn't lost.
       items.push({ label: mod.appName, enabled: false });
-    }
-
-    // Extra actions (settings/about/...) grouped under the module's own submenu
-    // to keep the top level short as more modules connect.
-    if (mod.actions.length > 0) {
-      items.push({
-        label: `${mod.appName} Options`,
-        submenu: mod.actions.map((action) => ({
-          label: action.label,
-          click: () => handlers.onAction(mod.appName, action.id),
-        })),
-      });
     }
   }
 
+  // Edit Settings picker: one submenu that lists each module's own actions
+  // (Settings, About) so the user picks which module's window to open. Reuses
+  // the existing per-module action relay (SUITE_ACTION_SETTINGS/ABOUT). Only
+  // shown when at least one module exposes actions.
+  const editSettings: SuiteMenuItem[] = [];
+  for (const mod of sorted) {
+    for (const action of mod.actions) {
+      editSettings.push({
+        label: `${mod.appName} ${action.label}`,
+        click: () => handlers.onAction(mod.appName, action.id),
+      });
+    }
+  }
+  if (editSettings.length > 0) {
+    items.push({ label: "Edit Settings", submenu: editSettings });
+  }
+
+  // ─── Launcher-local items (never depend on a connected module) ─────────
   items.push({ type: "separator" });
-  items.push({ label: "Quit All", click: () => handlers.onQuitAll() });
+  items.push({
+    label: "Launch Preferences",
+    submenu: [
+      {
+        label: "Open PopSuite at Login",
+        type: "checkbox",
+        checked: options.launcherOpenAtLogin,
+        click: () => handlers.onOpenAtLoginToggle(),
+      },
+    ],
+  });
+
+  items.push({ type: "separator" });
+  items.push({ label: "Changelog", click: () => handlers.onOpenLink(SUITE_CHANGELOG_URL) });
+  items.push({ label: "Documentation", click: () => handlers.onOpenLink(SUITE_DOCS_URL) });
+
+  items.push({ type: "separator" });
+  items.push({ label: "Quit PopSuite", click: () => handlers.onQuitAll() });
 
   return items;
 }

@@ -3,8 +3,11 @@ import {
   buildSuiteTrayMenu,
   encodeFrame,
   decodeFrames,
+  SUITE_CHANGELOG_URL,
+  SUITE_DOCS_URL,
   type SuiteModuleState,
   type SuiteTrayHandlers,
+  type SuiteTrayMenuOptions,
   type SuiteMenuItem,
   type LauncherToModule,
 } from "./suiteTray";
@@ -15,13 +18,26 @@ function makeModule(overrides: Partial<SuiteModuleState> = {}): SuiteModuleState
     active: true,
     shortcuts: ["Alt+Shift+A"],
     canToggle: true,
-    actions: [{ id: "settings", label: "Open Settings" }],
+    actions: [
+      { id: "settings", label: "Settings" },
+      { id: "about", label: "About" },
+    ],
     ...overrides,
   };
 }
 
 function noopHandlers(): SuiteTrayHandlers {
-  return { onToggle: vi.fn(), onAction: vi.fn(), onQuitAll: vi.fn() };
+  return {
+    onToggle: vi.fn(),
+    onAction: vi.fn(),
+    onOpenAtLoginToggle: vi.fn(),
+    onOpenLink: vi.fn(),
+    onQuitAll: vi.fn(),
+  };
+}
+
+function opts(overrides: Partial<SuiteTrayMenuOptions> = {}): SuiteTrayMenuOptions {
+  return { launcherOpenAtLogin: false, ...overrides };
 }
 
 /** Depth-first list of labels for shallow structural assertions. */
@@ -31,22 +47,30 @@ function labels(items: SuiteMenuItem[]): string[] {
 
 describe("buildSuiteTrayMenu", () => {
   it("shows a coherent menu with no modules connected", () => {
-    const menu = buildSuiteTrayMenu([], noopHandlers());
+    const menu = buildSuiteTrayMenu([], noopHandlers(), opts());
+    // Module-dependent section collapses to a disabled line; the launcher-local
+    // items (Launch Preferences / links / Quit) are always present.
     expect(labels(menu)).toEqual([
       "PopSuite",
       "<separator>",
       "No modules running",
       "<separator>",
-      "Quit All",
+      "Launch Preferences",
+      "<separator>",
+      "Changelog",
+      "Documentation",
+      "<separator>",
+      "Quit PopSuite",
     ]);
   });
 
-  it("builds a toggle checkbox per module with shortcut hint and checked state", () => {
+  it("builds a flat toggle checkbox per module with shortcut hint and checked state", () => {
     const menu = buildSuiteTrayMenu(
       [makeModule({ appName: "PopJot", active: true, shortcuts: ["Alt+Shift+A"] })],
-      noopHandlers()
+      noopHandlers(),
+      opts()
     );
-    const toggle = menu.find((i) => i.type === "checkbox");
+    const toggle = menu.find((i) => i.type === "checkbox" && i.label?.includes("PopJot"));
     expect(toggle).toBeDefined();
     expect(toggle!.checked).toBe(true);
     expect(toggle!.label).toContain("Disable PopJot");
@@ -54,52 +78,109 @@ describe("buildSuiteTrayMenu", () => {
   });
 
   it("labels an inactive module as Enable and leaves the checkbox unchecked", () => {
-    const menu = buildSuiteTrayMenu([makeModule({ active: false })], noopHandlers());
-    const toggle = menu.find((i) => i.type === "checkbox")!;
+    const menu = buildSuiteTrayMenu([makeModule({ active: false })], noopHandlers(), opts());
+    const toggle = menu.find((i) => i.type === "checkbox" && i.label?.includes("PopJot"))!;
     expect(toggle.checked).toBe(false);
     expect(toggle.label).toContain("Enable PopJot");
   });
 
-  it("orders modules stably regardless of input order", () => {
+  it("puts flat toggles directly under the title in stable order", () => {
     const menu = buildSuiteTrayMenu(
       [makeModule({ appName: "PopKey" }), makeModule({ appName: "PopJot" })],
-      noopHandlers()
+      noopHandlers(),
+      opts()
     );
-    const toggles = menu.filter((i) => i.type === "checkbox").map((i) => i.label);
-    expect(toggles[0]).toContain("PopJot");
-    expect(toggles[1]).toContain("PopKey");
+    // The two checkboxes are the first two items after the title separator.
+    expect(menu[0].label).toBe("PopSuite");
+    expect(menu[1].type).toBe("separator");
+    expect(menu[2].type).toBe("checkbox");
+    expect(menu[2].label).toContain("PopJot");
+    expect(menu[3].type).toBe("checkbox");
+    expect(menu[3].label).toContain("PopKey");
   });
 
-  it("groups a module's extra actions into its own submenu", () => {
+  it("builds an Edit Settings picker with per-module Settings/About entries", () => {
     const menu = buildSuiteTrayMenu(
-      [makeModule({ actions: [{ id: "settings", label: "Open Settings" }, { id: "about", label: "About" }] })],
-      noopHandlers()
+      [makeModule({ appName: "PopKey" }), makeModule({ appName: "PopJot" })],
+      noopHandlers(),
+      opts()
     );
-    const submenuItem = menu.find((i) => i.submenu);
-    expect(submenuItem?.label).toBe("PopJot Options");
-    expect(labels(submenuItem!.submenu!)).toEqual(["Open Settings", "About"]);
+    const picker = menu.find((i) => i.label === "Edit Settings");
+    expect(picker?.submenu).toBeDefined();
+    expect(labels(picker!.submenu!)).toEqual([
+      "PopJot Settings",
+      "PopJot About",
+      "PopKey Settings",
+      "PopKey About",
+    ]);
   });
 
-  it("wires toggle / action / quit clicks to the handlers with the right args", () => {
+  it("wires Edit Settings entries to the per-module action relay", () => {
     const handlers = noopHandlers();
-    const menu = buildSuiteTrayMenu([makeModule({ appName: "PopKey" })], handlers);
+    const menu = buildSuiteTrayMenu([makeModule({ appName: "PopKey" })], handlers, opts());
+    const picker = menu.find((i) => i.label === "Edit Settings")!;
+    picker.submenu!.find((i) => i.label === "PopKey Settings")!.click!();
+    expect(handlers.onAction).toHaveBeenCalledWith("PopKey", "settings");
+    picker.submenu!.find((i) => i.label === "PopKey About")!.click!();
+    expect(handlers.onAction).toHaveBeenCalledWith("PopKey", "about");
+  });
 
-    menu.find((i) => i.type === "checkbox")!.click!();
+  it("shows Launch Preferences with a login checkbox reflecting the passed-in state", () => {
+    const off = buildSuiteTrayMenu([], noopHandlers(), opts({ launcherOpenAtLogin: false }));
+    const offItem = off
+      .find((i) => i.label === "Launch Preferences")!
+      .submenu!.find((i) => i.label === "Open PopSuite at Login")!;
+    expect(offItem.type).toBe("checkbox");
+    expect(offItem.checked).toBe(false);
+
+    const on = buildSuiteTrayMenu([], noopHandlers(), opts({ launcherOpenAtLogin: true }));
+    const onItem = on
+      .find((i) => i.label === "Launch Preferences")!
+      .submenu!.find((i) => i.label === "Open PopSuite at Login")!;
+    expect(onItem.checked).toBe(true);
+  });
+
+  it("wires the login toggle to onOpenAtLoginToggle", () => {
+    const handlers = noopHandlers();
+    const menu = buildSuiteTrayMenu([], handlers, opts());
+    menu
+      .find((i) => i.label === "Launch Preferences")!
+      .submenu!.find((i) => i.label === "Open PopSuite at Login")!
+      .click!();
+    expect(handlers.onOpenAtLoginToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows Changelog / Documentation wired to the hardcoded suite URLs", () => {
+    const handlers = noopHandlers();
+    const menu = buildSuiteTrayMenu([], handlers, opts());
+
+    menu.find((i) => i.label === "Changelog")!.click!();
+    expect(handlers.onOpenLink).toHaveBeenCalledWith(SUITE_CHANGELOG_URL);
+    expect(SUITE_CHANGELOG_URL).toBe("https://popjot.app/changelog");
+
+    menu.find((i) => i.label === "Documentation")!.click!();
+    expect(handlers.onOpenLink).toHaveBeenCalledWith(SUITE_DOCS_URL);
+    expect(SUITE_DOCS_URL).toBe("https://popjot.app/docs");
+  });
+
+  it("wires toggle and Quit PopSuite clicks to the handlers", () => {
+    const handlers = noopHandlers();
+    const menu = buildSuiteTrayMenu([makeModule({ appName: "PopKey" })], handlers, opts());
+
+    menu.find((i) => i.type === "checkbox" && i.label?.includes("PopKey"))!.click!();
     expect(handlers.onToggle).toHaveBeenCalledWith("PopKey");
 
-    menu.find((i) => i.submenu)!.submenu![0].click!();
-    expect(handlers.onAction).toHaveBeenCalledWith("PopKey", "settings");
-
-    menu.find((i) => i.label === "Quit All")!.click!();
+    menu.find((i) => i.label === "Quit PopSuite")!.click!();
     expect(handlers.onQuitAll).toHaveBeenCalledTimes(1);
   });
 
   it("marks an auto-suppressed module's toggle label with (auto-hidden)", () => {
     const menu = buildSuiteTrayMenu(
       [makeModule({ appName: "PopKey", active: true, autoSuppressed: true })],
-      noopHandlers()
+      noopHandlers(),
+      opts()
     );
-    const toggle = menu.find((i) => i.type === "checkbox")!;
+    const toggle = menu.find((i) => i.type === "checkbox" && i.label?.includes("PopKey"))!;
     // Checkbox still reflects the user's own requested state (active)...
     expect(toggle.checked).toBe(true);
     // ...but the label flags that a sibling is forcing it hidden.
@@ -109,16 +190,18 @@ describe("buildSuiteTrayMenu", () => {
   it("does not add (auto-hidden) when a module is not suppressed", () => {
     const menu = buildSuiteTrayMenu(
       [makeModule({ appName: "PopKey", autoSuppressed: undefined })],
-      noopHandlers()
+      noopHandlers(),
+      opts()
     );
-    const toggle = menu.find((i) => i.type === "checkbox")!;
+    const toggle = menu.find((i) => i.type === "checkbox" && i.label?.includes("PopKey"))!;
     expect(toggle.label).not.toContain("(auto-hidden)");
   });
 
   it("renders a non-toggling module as a disabled heading", () => {
     const menu = buildSuiteTrayMenu(
       [makeModule({ canToggle: false, toggleLabel: undefined })],
-      noopHandlers()
+      noopHandlers(),
+      opts()
     );
     expect(menu.some((i) => i.type === "checkbox")).toBe(false);
     const heading = menu.find((i) => i.label === "PopJot");
