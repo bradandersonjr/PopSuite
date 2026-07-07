@@ -127,6 +127,16 @@ export function onShortcutToggle(callback: (enabled: boolean) => void): () => vo
   return window.electronAPI.onShortcutToggle(callback);
 }
 
+/**
+ * Main → renderer: set the visualizer's enabled state to an absolute value.
+ * Used by the suite's auto-suppression so hide/restore land on an exact state
+ * (rather than a relative toggle that could drift out of sync).
+ */
+export function onSetAppEnabled(callback: (enabled: boolean) => void): () => void {
+  if (!window.electronAPI) return () => {};
+  return window.electronAPI.onSetAppEnabled(callback);
+}
+
 export function onInputKeyDown(callback: (e: KeyEvent) => void): () => void {
   if (!window.electronAPI) return () => {};
   return window.electronAPI.onInputKeyDown(callback);

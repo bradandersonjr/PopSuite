@@ -28,8 +28,11 @@ export function registerPopKey(
   layout?: PopAppOptions<typeof PopKeySchema>["layout"],
   trayMode?: "owned" | "reported"
 ): void {
-  // Mirrors the renderer's `appEnabled` (defaults on). The toggle shortcut is the
-  // only thing that flips it, so tracking it here keeps the tray indicator in sync.
+  // Mirrors the renderer's `appEnabled` (defaults on). Now owned by the shared
+  // shell's suite-suppression reducer: `active` tracks the user's REQUESTED
+  // visibility (what the tray checkbox shows), which is what applyActive receives
+  // whenever the effective visibility changes. Outside the suite (or when PopJot
+  // isn't annotating) effective == requested, so this behaves exactly as before.
   let active = true;
 
   const popApp = createPopApp({
@@ -48,20 +51,34 @@ export function registerPopKey(
       {
         name: "main",
         default: isMac ? "Cmd+Shift+K" : "Alt+Shift+K",
-        handler: (ctx) => {
-          active = !active;
-          ctx.sendToMainWindow("shortcut-toggle");
-          ctx.setTrayActive(active);
-        },
+        // Route through the shell's suppression reducer. While PopJot annotates
+        // this flips the remembered request but keeps the overlay hidden; the
+        // reducer calls applyActive below with the resulting effective state.
+        handler: (ctx) => ctx.suiteManualToggle(),
       },
     ],
     tray: { settingsLabel: "Settings", doubleClickOpensSettings: true, mode: trayMode },
     trayToggle: {
+      // The user's requested state (mirrors the reducer's userRequested); drives
+      // the local fallback tray's Enable/Disable label. In the suite the launcher
+      // labels the entry from the reported state instead.
       getEnabled: () => active,
-      onToggle: () => {
-        active = !active;
-        popApp.sendToMainWindow("shortcut-toggle");
-        popApp.setTrayActive(active);
+      onToggle: () => popApp.suiteManualToggle(),
+    },
+    // Suite-only auto-suppression: while PopJot is annotating, hide the visualizer
+    // and defer manual toggles; restore afterward. applyActive receives the
+    // EFFECTIVE visibility and is the single place the overlay state is driven.
+    suiteSuppressible: {
+      initialActive: true,
+      applyActive: (visible) => {
+        // Track the user's requested state for the local tray label: it only
+        // changes on a manual toggle, which happens when NOT suppressed, so the
+        // effective value equals the requested value in that case.
+        if (!popApp.isSuiteSuppressed()) active = visible;
+        // Absolute set (not toggle) so hide/restore land exactly, never drift.
+        popApp.sendToMainWindow("set-app-enabled", visible);
+        // Tray icon reflects whether the visualizer is actually showing.
+        popApp.setTrayActive(visible);
       },
     },
     secondInstance: "open-settings",

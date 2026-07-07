@@ -10,6 +10,7 @@ import {
   onInputDragMove,
   onInputFocusLost,
   onShortcutToggle,
+  onSetAppEnabled,
 } from "@/lib/platform";
 import type { KeyEvent, ClickEvent, WheelEventData } from "@/lib/platform";
 
@@ -342,6 +343,9 @@ export function useInputCapture() {
     // Only clear held state when the OS explicitly signals focus loss (Win/Meta key).
     cleanups.push(onInputFocusLost(clearAllHeld));
     cleanups.push(onShortcutToggle(() => setAppEnabled(!useStore.getState().appEnabled)));
+    // Suite auto-suppression drives an absolute enabled state (hide while PopJot
+    // annotates, restore afterward) so it can't drift like a relative toggle.
+    cleanups.push(onSetAppEnabled((enabled) => setAppEnabled(enabled)));
 
     if (!appEnabled) return () => cleanups.forEach((fn) => fn());
 

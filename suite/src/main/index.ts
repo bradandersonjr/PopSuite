@@ -106,6 +106,33 @@ if (requestedModule) {
     // Guards a graceful shutdown so module "close" events during Quit All don't
     // re-trigger menu rebuilds against a torn-down tray.
     let quitting = false;
+    // Last relayed annotating state so we only send a suppress command on an
+    // actual transition, not on every unrelated state report (shortcut rebind,
+    // toggle, etc.). PopJot annotating -> PopKey suppressed, and vice versa.
+    let lastAnnotating = false;
+
+    /**
+     * Relay PopJot's annotating state to PopKey as an auto-suppress command.
+     * Suite-only cross-module glue: when PopJot starts drawing, PopKey hides;
+     * when PopJot stops, PopKey restores to the user's last requested state.
+     * Only fires on a real change so a PopKey that connects late still gets the
+     * current suppression via getModules()->rebuild is not enough — so we also
+     * re-assert on every change below.
+     */
+    function relaySuppression(): void {
+      if (!trayServer || quitting) return;
+      const modules = trayServer.getModules();
+      const popjot = modules.find((m) => m.appName === "PopJot");
+      const annotating = Boolean(popjot?.annotating);
+      if (annotating !== lastAnnotating) {
+        lastAnnotating = annotating;
+        trayServer.suppress("PopKey", annotating);
+      } else if (annotating) {
+        // PopJot still annotating: re-assert to any PopKey that (re)connected
+        // after the original transition, so a late/reconnecting PopKey is hidden.
+        trayServer.suppress("PopKey", true);
+      }
+    }
 
     function rebuildMenu(): void {
       if (!tray || tray.isDestroyed() || !trayServer) return;
@@ -137,7 +164,12 @@ if (requestedModule) {
       // Start the pipe server first so modules can connect the instant they boot,
       // then rebuild the menu on every connect/disconnect/state change.
       trayServer = createSuiteTrayServer(() => {
-        if (!quitting) rebuildMenu();
+        if (quitting) return;
+        // Relay PopJot annotating -> PopKey suppress before rebuilding the menu
+        // so the menu reflects PopKey's resulting auto-hidden label in the same
+        // pass once PopKey reports back its autoSuppressed state.
+        relaySuppression();
+        rebuildMenu();
       });
 
       // Windows/macOS: double-click the icon to re-spawn any missing modules.

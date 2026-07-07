@@ -146,6 +146,9 @@ export function registerPopJot(
   // ─── Overlay activation (PopJot-specific) ────────────────────────────
 
   ipcMain.on("overlay-activated", () => {
+    // Suite-only: tell the launcher we're annotating so PopKey auto-hides. No-op
+    // outside the suite (no pipe client) and for standalone PopJot.exe.
+    popApp.reportSuiteAnnotating(true);
     const win = popApp.getMainWindow();
     if (!win) return;
     win.setIgnoreMouseEvents(false);
@@ -153,6 +156,8 @@ export function registerPopJot(
   });
 
   ipcMain.on("overlay-deactivated", () => {
+    // Suite-only: annotation ended, let the launcher restore PopKey.
+    popApp.reportSuiteAnnotating(false);
     const win = popApp.getMainWindow();
     if (!win) return;
     // Drop { forward: true } when inactive — forwarding keeps the window in the

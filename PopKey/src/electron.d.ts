@@ -44,6 +44,7 @@ declare global {
 
       // PopKey-specific
       onShortcutToggle: (callback: (enabled: boolean) => void) => () => void;
+      onSetAppEnabled: (callback: (enabled: boolean) => void) => () => void;
       onInputKeyDown: (callback: (e: RawKeyEvent) => void) => () => void;
       onInputKeyUp: (callback: (e: RawKeyEvent) => void) => () => void;
       onInputClick: (callback: (e: RawClickEvent) => void) => () => void;

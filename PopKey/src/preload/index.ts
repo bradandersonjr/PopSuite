@@ -17,6 +17,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Main → Renderer: global shortcut toggle
   onShortcutToggle: subscribe("shortcut-toggle"),
 
+  // Main → Renderer: absolute enabled state (suite auto-suppression sets a
+  // specific value rather than toggling, so hide/restore can't drift).
+  onSetAppEnabled: subscribe("set-app-enabled"),
+
   // Main → Renderer: raw input events from uiohook
   onInputKeyDown: subscribe("input:keydown"),
   onInputKeyUp: subscribe("input:keyup"),
