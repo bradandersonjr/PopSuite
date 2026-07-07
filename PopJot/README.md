@@ -47,7 +47,7 @@ npm run dev:electron
 Build the browser bundle:
 
 ```sh
-npm run build:web
+npm run build
 ```
 
 Build the Electron app:
@@ -56,11 +56,19 @@ Build the Electron app:
 npm run build:electron
 ```
 
-Package a Windows desktop build:
+Desktop distribution is no longer per app: PopJot ships as part of the
+**PopSuite** desktop install (one Electron binary that launches PopJot and
+PopKey as module processes under a unified tray). Standalone per-app installer
+scripts have been removed. To build/package the desktop app, use the suite from
+the repo root:
 
 ```sh
-npm run package
+npm run package:suite
 ```
+
+See [`../suite/README.md`](../suite/README.md) for the suite's architecture and
+packaging details. `dev:electron` above (and `dev:module:popjot` from the repo
+root) remain the dev workflow for running PopJot standalone.
 
 Run the quality gates:
 

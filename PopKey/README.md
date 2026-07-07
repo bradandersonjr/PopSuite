@@ -54,13 +54,19 @@ npm run build       # web bundle
 npm run build:electron
 ```
 
-Package a desktop build:
+Desktop distribution is no longer per app: PopKey ships as part of the
+**PopSuite** desktop install (one Electron binary that launches PopJot and
+PopKey as module processes under a unified tray). Standalone per-app installer
+scripts have been removed. To build/package the desktop app, use the suite from
+the repo root:
 
 ```sh
-npm run package        # Windows (default)
-npm run package:mac
-npm run package:linux
+npm run package:suite
 ```
+
+See [`../suite/README.md`](../suite/README.md) for the suite's architecture and
+packaging details. `dev:electron` above (and `dev:module:popkey` from the repo
+root) remain the dev workflow for running PopKey standalone.
 
 Run the quality gates:
 

@@ -1,5 +1,12 @@
 # PopKey — Audit
 
+> **Note (2026-07-07):** This audit predates the PopSuite single-app restructure.
+> File layout and scripts have changed since (e.g. desktop packaging now goes
+> through `suite/`, not per-app `package`/`package:mac`/`package:linux` scripts).
+> See the root [README](../README.md) for the current structure. The findings
+> below are kept as a historical point-in-time snapshot and were not
+> re-verified against the restructure.
+
 **Date:** 2026-05-30
 **Scope:** PopKey app (`src/`) + consumed `pop-shared` foundation (sibling dir in the PopSuite workspace).
 
