@@ -11,9 +11,9 @@
  */
 
 declare module "@popjot/main/register" {
-  export function registerPopJot(layout?: unknown): void;
+  export function registerPopJot(layout?: unknown, trayMode?: "owned" | "reported"): void;
 }
 
 declare module "@popkey/main/register" {
-  export function registerPopKey(layout?: unknown): void;
+  export function registerPopKey(layout?: unknown, trayMode?: "owned" | "reported"): void;
 }

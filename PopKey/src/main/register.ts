@@ -25,7 +25,8 @@ const isMac = process.platform === "darwin";
  * point the shared shell at PopKey's per-module renderer/preload/icons.
  */
 export function registerPopKey(
-  layout?: PopAppOptions<typeof PopKeySchema>["layout"]
+  layout?: PopAppOptions<typeof PopKeySchema>["layout"],
+  trayMode?: "owned" | "reported"
 ): void {
   // Mirrors the renderer's `appEnabled` (defaults on). The toggle shortcut is the
   // only thing that flips it, so tracking it here keeps the tray indicator in sync.
@@ -54,7 +55,7 @@ export function registerPopKey(
         },
       },
     ],
-    tray: { settingsLabel: "Settings", doubleClickOpensSettings: true },
+    tray: { settingsLabel: "Settings", doubleClickOpensSettings: true, mode: trayMode },
     trayToggle: {
       getEnabled: () => active,
       onToggle: () => {

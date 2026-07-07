@@ -71,7 +71,8 @@ function warmupScreenshotCapture(): Promise<void> {
  * point the shared shell at PopJot's per-module renderer/preload/icons.
  */
 export function registerPopJot(
-  layout?: PopAppOptions<typeof PopJotSchema>["layout"]
+  layout?: PopAppOptions<typeof PopJotSchema>["layout"],
+  trayMode?: "owned" | "reported"
 ): void {
   // Whether shortcuts fire. Starts enabled; tray "Disable PopJot" suspends them.
   let enabled = true;
@@ -118,7 +119,7 @@ export function registerPopJot(
         },
       },
     ],
-    tray: { settingsLabel: "Open Settings" },
+    tray: { settingsLabel: "Open Settings", mode: trayMode },
     trayToggle: {
       getEnabled: () => enabled,
       onToggle: () => {

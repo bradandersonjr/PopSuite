@@ -39,6 +39,8 @@ import {
   type LicenseController,
 } from "./license";
 import type { SettingsSchema, SettingsValues, SettingValue } from "../settings/schema";
+import { createSuiteTrayClient, type SuiteTrayClient } from "./suiteTrayClient";
+import type { SuiteModuleState, SuiteTrayAction } from "./suiteTray";
 
 export type ShortcutUpdateResult =
   | { ok: true; shortcut: string }
@@ -108,6 +110,19 @@ export interface PopAppOptions<S extends SettingsSchema> {
     /** Label for the settings item, defaults to "Settings". */
     settingsLabel?: string;
     doubleClickOpensSettings?: boolean;
+    /**
+     * How this app's tray is owned.
+     *   - "owned" (default): create and manage its own OS tray icon. This is the
+     *     standalone behavior and MUST stay the default so PopJot.exe/PopKey.exe
+     *     are unaffected.
+     *   - "reported": don't create an OS tray. Instead connect to the PopSuite
+     *     launcher's unified-tray pipe and report state / receive click commands,
+     *     so the suite shows ONE icon for both modules. If the launcher isn't
+     *     reachable (started standalone, or launcher died), automatically falls
+     *     back to "owned" and creates a local tray — a module never ends up with
+     *     no tray.
+     */
+    mode?: "owned" | "reported";
   };
   /**
    * When provided, adds an Enable/Disable item to the tray right-click menu.
@@ -203,6 +218,9 @@ export function createPopApp<S extends SettingsSchema>(
   let trayActiveImage: Electron.NativeImage | null = null;
   let trayActive = false;
   let licenseController: LicenseController | null = null;
+  // Suite unified-tray client. Only created when tray.mode === "reported". Null
+  // in standalone/owned mode and after a fallback to a local tray.
+  let suiteTrayClient: SuiteTrayClient | null = null;
 
   const shortcutState: Record<string, string> = {};
   for (const sc of options.shortcuts) {
@@ -422,6 +440,9 @@ export function createPopApp<S extends SettingsSchema>(
    */
   function setTrayActive(active: boolean): void {
     trayActive = active;
+    // Suite reported mode: push the new active state to the launcher so its
+    // unified menu checkmark/label stays current (e.g. after a shortcut toggle).
+    reportSuiteState();
     if (!tray || tray.isDestroyed()) return;
     const next = active && trayActiveImage ? trayActiveImage : trayIdleImage;
     if (next) tray.setImage(next);
@@ -606,6 +627,8 @@ export function createPopApp<S extends SettingsSchema>(
       const result = updateShortcuts({ ...shortcutState, [sc.name]: electronFormat });
       if (result.ok) {
         sendToRenderers(`tray-set-${sc.name}-shortcut`, electronFormat);
+        // Keep the suite menu's shortcut hint current after a rebind.
+        reportSuiteState();
         return { ok: true, shortcut: electronFormat };
       }
       return result;
@@ -615,6 +638,16 @@ export function createPopApp<S extends SettingsSchema>(
   ipcMain.handle("get-shortcuts", () => ({ ...shortcutState }));
 
   // ─── System tray ─────────────────────────────────────────────────────
+
+  function showAboutDialog(): void {
+    dialog.showMessageBox({
+      type: "info",
+      title: `About ${appName}`,
+      message: appName,
+      detail: `Version ${app.getVersion()}\n${options.aboutDetail}`,
+      buttons: ["OK"],
+    });
+  }
 
   function createTray(): void {
     const iconPath = trayIconPath();
@@ -660,15 +693,7 @@ export function createPopApp<S extends SettingsSchema>(
         },
         {
           label: "About",
-          click: () => {
-            dialog.showMessageBox({
-              type: "info",
-              title: `About ${appName}`,
-              message: appName,
-              detail: `Version ${app.getVersion()}\n${options.aboutDetail}`,
-              buttons: ["OK"],
-            });
-          },
+          click: () => showAboutDialog(),
         },
         { type: "separator" },
         {
@@ -703,6 +728,70 @@ export function createPopApp<S extends SettingsSchema>(
     });
   }
 
+  // ─── Suite unified tray (reported mode) ──────────────────────────────
+  // In the suite build the launcher owns ONE tray icon; this module reports its
+  // state over a pipe instead of creating its own tray. Extra actions map to the
+  // same handlers the local tray uses (open settings, about). If the pipe is
+  // unavailable at connect time or drops later, we fall back to a local tray so
+  // the module always has a working tray (standalone parity / graceful degrade).
+
+  // Action ids kept stable so the launcher can echo them back unambiguously.
+  const SUITE_ACTION_SETTINGS = "settings";
+  const SUITE_ACTION_ABOUT = "about";
+
+  function suiteActions(): SuiteTrayAction[] {
+    return [
+      { id: SUITE_ACTION_SETTINGS, label: options.tray?.settingsLabel ?? "Settings" },
+      { id: SUITE_ACTION_ABOUT, label: "About" },
+    ];
+  }
+
+  function currentSuiteState(): SuiteModuleState {
+    const enabled = options.trayToggle ? options.trayToggle.getEnabled() : trayActive;
+    return {
+      appName,
+      active: enabled,
+      shortcuts: Object.values(shortcutState),
+      toggleLabel: options.trayToggle
+        ? enabled
+          ? `Disable ${appName}`
+          : `Enable ${appName}`
+        : undefined,
+      canToggle: Boolean(options.trayToggle),
+      actions: suiteActions(),
+    };
+  }
+
+  function reportSuiteState(): void {
+    suiteTrayClient?.report(currentSuiteState());
+  }
+
+  function connectSuiteTray(): void {
+    suiteTrayClient = createSuiteTrayClient(
+      {
+        onToggle: () => {
+          options.trayToggle?.onToggle();
+          reportSuiteState();
+        },
+        onAction: (id) => {
+          if (id === SUITE_ACTION_SETTINGS) openSettingsWindow();
+          else if (id === SUITE_ACTION_ABOUT) showAboutDialog();
+        },
+        onQuit: () => app.quit(),
+      },
+      {
+        onReady: () => reportSuiteState(),
+        onUnavailable: () => {
+          // Launcher absent or gone: drop the client and stand up a local tray so
+          // this module is never left without one.
+          suiteTrayClient?.dispose();
+          suiteTrayClient = null;
+          if (!tray || tray.isDestroyed()) createTray();
+        },
+      }
+    );
+  }
+
   // ─── App lifecycle ───────────────────────────────────────────────────
 
   app.whenReady().then(() => {
@@ -714,7 +803,13 @@ export function createPopApp<S extends SettingsSchema>(
     }
 
     mainWindow = createWindow();
-    createTray();
+    if (options.tray?.mode === "reported") {
+      // Suite: hand our tray to the launcher's unified icon. Falls back to a
+      // local tray inside connectSuiteTray if the launcher isn't reachable.
+      connectSuiteTray();
+    } else {
+      createTray();
+    }
 
     // Register sync IPC + start watching the shared file for the sibling app's
     // changes (applies enabled synced values and live-updates toggle state).
@@ -742,6 +837,8 @@ export function createPopApp<S extends SettingsSchema>(
 
   app.on("will-quit", () => {
     options.onWillQuit?.();
+    suiteTrayClient?.dispose();
+    suiteTrayClient = null;
     settingsSync.dispose();
     globalShortcut.unregisterAll();
     settingsWindow?.destroy();

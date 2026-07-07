@@ -13,4 +13,6 @@ import { applyModuleUserData, popkeyLayout } from "../main/moduleRuntime";
 
 applyModuleUserData("popkey");
 
-registerPopKey(popkeyLayout());
+// "reported": hand this module's tray to the suite launcher's single unified
+// icon (falls back to a local tray if the launcher isn't reachable).
+registerPopKey(popkeyLayout(), "reported");
