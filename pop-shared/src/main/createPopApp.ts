@@ -269,6 +269,8 @@ export function createPopApp<S extends SettingsSchema>(
 
   let mainWindow: BrowserWindow | null = null;
   let settingsWindow: BrowserWindow | null = null;
+  // Periodic fallback for reassertOverlayAlwaysOnTop; cleared on will-quit.
+  let overlayTopmostInterval: ReturnType<typeof setInterval> | null = null;
   let tray: Tray | null = null;
   // Idle/active tray images. The active variant (with an indicator dot) is
   // optional — apps that don't ship one fall back to the idle icon.
@@ -418,13 +420,29 @@ export function createPopApp<S extends SettingsSchema>(
   // window creation and later re-pins stay in sync.
   const OVERLAY_TOP_LEVEL = "screen-saver" as const;
 
+  // Desired on-top state, independent of what Windows may have silently
+  // reverted behind our back (see reassertOverlayAlwaysOnTop below).
+  let wantsOverlayAlwaysOnTop = true;
+
   function setOverlayAlwaysOnTop(onTop: boolean): void {
+    wantsOverlayAlwaysOnTop = onTop;
     if (!mainWindow || mainWindow.isDestroyed()) return;
     if (onTop) {
       mainWindow.setAlwaysOnTop(true, OVERLAY_TOP_LEVEL);
     } else {
       mainWindow.setAlwaysOnTop(false);
     }
+  }
+
+  // The Windows taskbar can reclaim topmost z-order on its own (e.g. on
+  // auto-hide/show, or when Explorer restarts) without notifying us, which
+  // leaves the overlay rendering underneath it. Re-pin whenever the work
+  // area changes (taskbar show/hide/resize) and on a light poll as a
+  // fallback for cases that fire no event at all.
+  function reassertOverlayAlwaysOnTop(): void {
+    if (!wantsOverlayAlwaysOnTop) return;
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.setAlwaysOnTop(true, OVERLAY_TOP_LEVEL);
   }
 
   function getCursorDipPosition(): { x: number; y: number } {
@@ -931,6 +949,13 @@ export function createPopApp<S extends SettingsSchema>(
     }
 
     mainWindow = createWindow();
+
+    // Re-pin the overlay above the taskbar whenever the work area changes
+    // (taskbar auto-hide/show, display changes) and on a light poll, since
+    // Windows can silently reclaim topmost without firing any event.
+    screen.on("display-metrics-changed", reassertOverlayAlwaysOnTop);
+    overlayTopmostInterval = setInterval(reassertOverlayAlwaysOnTop, 2000);
+
     if (options.tray?.mode === "reported") {
       // Suite: hand our tray to the launcher's unified icon. Falls back to a
       // local tray inside connectSuiteTray if the launcher isn't reachable.
@@ -965,6 +990,11 @@ export function createPopApp<S extends SettingsSchema>(
 
   app.on("will-quit", () => {
     options.onWillQuit?.();
+    screen.removeListener("display-metrics-changed", reassertOverlayAlwaysOnTop);
+    if (overlayTopmostInterval) {
+      clearInterval(overlayTopmostInterval);
+      overlayTopmostInterval = null;
+    }
     suiteTrayClient?.dispose();
     suiteTrayClient = null;
     settingsSync.dispose();
