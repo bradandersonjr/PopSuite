@@ -123,6 +123,31 @@ export interface PopAppOptions<S extends SettingsSchema> {
   secondInstance?: "focus-main" | "open-settings";
   onReady?: (ctx: PopAppContext<S>) => void;
   onWillQuit?: () => void;
+  /**
+   * Layout overrides for the PopSuite single-install build, where one Electron
+   * binary hosts both modules and each module's renderer/preload/extraResources
+   * live in a per-module subdirectory. Standalone builds omit this and get the
+   * flat, historical paths (out/main → ../renderer/index.html, ../preload/index.js,
+   * process.resourcesPath/tray-icon.png).
+   */
+  layout?: {
+    /**
+     * Renderer HTML relative to the main bundle's __dirname. Defaults to
+     * "../renderer/index.html". Suite passes e.g. "../renderer/popjot/index.html".
+     */
+    rendererHtml?: string;
+    /**
+     * Preload script relative to the main bundle's __dirname. Defaults to
+     * "../preload/index.js". Suite passes e.g. "../preload/popjot/index.js".
+     */
+    preloadScript?: string;
+    /**
+     * Subdirectory under process.resourcesPath (packaged) or ../../assets (dev)
+     * where this module's tray/app icons live. Defaults to "" (flat). Suite
+     * passes e.g. "popjot".
+     */
+    resourceSubdir?: string;
+  };
 }
 
 /**
@@ -151,6 +176,12 @@ export function createPopApp<S extends SettingsSchema>(
   options: PopAppOptions<S>
 ): PopAppContext<S> {
   const { appName, settingsSchema } = options;
+
+  // Layout paths: flat by default (standalone build), per-module subdirs when
+  // the suite passes overrides. Resolved once so every window + tray call agrees.
+  const rendererHtmlRel = options.layout?.rendererHtml ?? "../renderer/index.html";
+  const preloadScriptRel = options.layout?.preloadScript ?? "../preload/index.js";
+  const resourceSubdir = options.layout?.resourceSubdir ?? "";
 
   // ─── Single instance lock ────────────────────────────────────────────
   // When we lose the lock a sibling instance is already running: quit and
@@ -195,7 +226,7 @@ export function createPopApp<S extends SettingsSchema>(
       return;
     }
 
-    win.loadFile(join(__dirname, "../renderer/index.html"), query ? { query } : undefined);
+    win.loadFile(join(__dirname, rendererHtmlRel), query ? { query } : undefined);
   }
 
   function sendToRenderers(channel: string, value: unknown): void {
@@ -340,7 +371,7 @@ export function createPopApp<S extends SettingsSchema>(
       show: false,
       title: appName,
       webPreferences: {
-        preload: join(__dirname, "../preload/index.js"),
+        preload: join(__dirname, preloadScriptRel),
         contextIsolation: true,
       },
     });
@@ -374,9 +405,15 @@ export function createPopApp<S extends SettingsSchema>(
   }
 
   function trayIconPath(file = "tray-icon.png"): string {
-    return app.isPackaged
-      ? join(process.resourcesPath, file)
-      : join(__dirname, `../../assets/${file}`);
+    // Packaged: extraResources land under process.resourcesPath, namespaced by
+    // resourceSubdir in the suite ("" for standalone). Dev: icons live in the
+    // module's assets dir; SUITE_ASSETS_DIR (set by the suite dev entry) points
+    // at the composed module's assets, otherwise fall back to ../../assets.
+    if (app.isPackaged) {
+      return join(process.resourcesPath, resourceSubdir, file);
+    }
+    const devAssets = process.env.SUITE_ASSETS_DIR ?? join(__dirname, "../../assets");
+    return join(devAssets, file);
   }
 
   /**
@@ -413,7 +450,7 @@ export function createPopApp<S extends SettingsSchema>(
       backgroundColor: "#171717",
       icon: existsSync(iconPath) ? iconPath : undefined,
       webPreferences: {
-        preload: join(__dirname, "../preload/index.js"),
+        preload: join(__dirname, preloadScriptRel),
         contextIsolation: true,
       },
     });
