@@ -35,6 +35,12 @@ extraResources:
     to: popkey/tray-icon-active@2x.png
   - from: ../PopKey/assets/icon.png
     to: popkey/icon.png
+  # Launcher's own unified tray icon (reuses PopJot's brand mark, which is also
+  # the suite app icon). Resolved at process.resourcesPath/suite/tray-icon.png.
+  - from: ../PopJot/assets/tray-icon.png
+    to: suite/tray-icon.png
+  - from: ../PopJot/assets/tray-icon@2x.png
+    to: suite/tray-icon@2x.png
 
 asar: true
 

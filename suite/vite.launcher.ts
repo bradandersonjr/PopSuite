@@ -5,7 +5,8 @@
  * modules as detached children and exits.
  *
  * Built as a plain CJS lib (no renderer/preload) so it stays a tiny standalone
- * entry. Electron built-ins and Node built-ins are externalized.
+ * entry. Electron built-ins and Node built-ins are externalized; the shared
+ * suite-tray server/model (@shared/*) is bundled in.
  */
 
 import { defineConfig } from "vite";
@@ -13,6 +14,11 @@ import { builtinModules } from "module";
 import { resolve } from "path";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@shared": resolve(__dirname, "../pop-shared/src"),
+    },
+  },
   build: {
     outDir: resolve(__dirname, "out/main"),
     // Do NOT wipe out/main — the per-module builds write out/main/<module> first.

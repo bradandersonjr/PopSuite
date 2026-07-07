@@ -1,27 +1,40 @@
 /**
- * PopSuite main entry — launcher + module router.
+ * PopSuite main entry — launcher/tray-owner + module router.
  *
  * ONE Electron binary, invoked in two modes:
  *
- *   PopSuite.exe                 → LAUNCHER: spawn a detached child process for
- *                                  each module (--module=popjot, --module=popkey)
- *                                  from this same executable, then exit. Net
- *                                  effect: double-clicking PopSuite starts (or,
- *                                  via each module's own single-instance lock,
- *                                  focuses) both apps.
+ *   PopSuite.exe                 → LAUNCHER / TRAY OWNER: a resident, lightweight
+ *                                  hub process. It creates the SINGLE unified
+ *                                  system tray icon for the whole suite, spawns a
+ *                                  detached child process per module
+ *                                  (--module=popjot, --module=popkey), and stays
+ *                                  alive listening on a local pipe. Each module
+ *                                  reports its state over that pipe; the launcher
+ *                                  builds one dynamic menu from whichever modules
+ *                                  are connected and relays clicks back. The
+ *                                  launcher owns NO overlay/settings windows and
+ *                                  never touches a module's window/focus/overlay
+ *                                  behavior.
  *
  *   PopSuite.exe --module=<id>   → MODULE: boot that module's main process in
  *                                  this process (own userData, own lock, own
  *                                  overlay window — identical to the standalone
- *                                  app). Delegated to modules/<id>.ts.
- *
- * Each module keeps its OWN existing tray icon and UX. There is no suite-level
- * tray, window, or userData — the launcher process does no Electron UI work and
- * exits immediately after spawning.
+ *                                  app). Delegated to modules/<id>.ts, which runs
+ *                                  in "reported" tray mode so it reports to the
+ *                                  launcher instead of drawing its own tray. If
+ *                                  the launcher pipe is unreachable, the module
+ *                                  falls back to its own local tray automatically.
  */
 
-import { app } from "electron";
+import { app, Tray, Menu, nativeImage, dialog } from "electron";
 import { spawn } from "child_process";
+import { join } from "path";
+import { existsSync } from "fs";
+import {
+  createSuiteTrayServer,
+  type SuiteTrayServer,
+} from "@shared/main/suiteTrayServer";
+import { buildSuiteTrayMenu } from "@shared/main/suiteTray";
 
 const MODULES = ["popjot", "popkey"] as const;
 type ModuleId = (typeof MODULES)[number];
@@ -36,50 +49,127 @@ function parseModuleArg(argv: string[]): ModuleId | null {
   return null;
 }
 
+/**
+ * Spawn one detached child per module from this same executable. Packaged,
+ * process.execPath IS PopSuite.exe, so `execPath --module=x` re-launches the
+ * suite in module mode. In dev, process.execPath is electron.exe and the app
+ * directory must be forwarded as the first arg; app.getAppPath() gives that in
+ * both modes.
+ *
+ * Spawning is unconditional: a module whose single-instance lock is already held
+ * loses the lock in createPopApp and quits cleanly (focusing the running
+ * instance via the primary's second-instance handler). "Already running"
+ * resolves to a focus, never a duplicate.
+ */
+function spawnModules(): void {
+  const isPackaged = app.isPackaged;
+  const appPath = app.getAppPath();
+  for (const module of MODULES) {
+    const args = isPackaged ? [`--module=${module}`] : [appPath, `--module=${module}`];
+    const child = spawn(process.execPath, args, { detached: true, stdio: "ignore" });
+    // Detach so children outlive a launcher restart; the launcher tracks them via
+    // the pipe, not the child handle.
+    child.unref();
+  }
+}
+
+/** Resolve the launcher's own tray icon. Reuses PopJot's brand icon (also the
+ *  suite app icon). Packaged: extraResources at resourcesPath/suite/. Dev: read
+ *  straight from PopJot's assets dir (a sibling package). */
+function launcherTrayIconPath(): string {
+  if (app.isPackaged) return join(process.resourcesPath, "suite", "tray-icon.png");
+  return join(app.getAppPath(), "..", "PopJot", "assets", "tray-icon.png");
+}
+
 const requestedModule = parseModuleArg(process.argv);
 
 if (requestedModule) {
   // ─── Module process ────────────────────────────────────────────────
   // Delegate to the module entry, which sets its per-module userData BEFORE
-  // createPopApp requests the single-instance lock. Using require (not a static
-  // import) keeps the other module's code — and, for PopKey, uiohook-napi — out
-  // of this process entirely.
-  // The per-module bundles are emitted at out/main/<module>/index.js, siblings
-  // of this launcher at out/main/index.js. A computed require keeps the bundler
-  // from trying to resolve these at build time — they are loaded at runtime from
-  // the packaged tree.
+  // createPopApp requests the single-instance lock. A computed require keeps the
+  // bundler from resolving the per-module bundles at build time — they are loaded
+  // at runtime from out/main/<module>/index.js, siblings of this launcher.
   const modulePath = `./${requestedModule}/index.js`;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require(modulePath);
 } else {
-  // ─── Launcher process ──────────────────────────────────────────────
-  // Spawn one detached child per module from this same executable, then quit.
-  // In a packaged build process.execPath IS PopSuite.exe, so `execPath --module=x`
-  // re-launches the suite in module mode. In dev, process.execPath is electron.exe
-  // and the app directory must be forwarded as the first arg so Electron knows
-  // what to run; app.getAppPath() gives that path in both modes.
-  //
-  // We spawn unconditionally: a module whose single-instance lock is already
-  // held will lose the lock in createPopApp and quit cleanly (see
-  // createInertContext), which also focuses the running instance via the
-  // primary's second-instance handler. So "already running" resolves to a focus,
-  // never a duplicate.
-  const isPackaged = app.isPackaged;
-  const appPath = app.getAppPath();
+  // ─── Launcher / tray-owner process ─────────────────────────────────
+  // Single-instance lock so re-launching PopSuite doesn't stack multiple tray
+  // owners; the second instance just re-spawns modules (which focus via their
+  // own locks) and exits.
+  const gotLock = app.requestSingleInstanceLock();
+  if (!gotLock) {
+    app.quit();
+  } else {
+    let tray: Tray | null = null;
+    let trayServer: SuiteTrayServer | null = null;
+    // Guards a graceful shutdown so module "close" events during Quit All don't
+    // re-trigger menu rebuilds against a torn-down tray.
+    let quitting = false;
 
-  for (const module of MODULES) {
-    // Packaged: [PopSuite.exe] --module=x
-    // Dev:      [electron.exe] <appPath> --module=x
-    const args = isPackaged ? [`--module=${module}`] : [appPath, `--module=${module}`];
-    const child = spawn(process.execPath, args, {
-      detached: true,
-      stdio: "ignore",
+    function rebuildMenu(): void {
+      if (!tray || tray.isDestroyed() || !trayServer) return;
+      const template = buildSuiteTrayMenu(trayServer.getModules(), {
+        onToggle: (appName) => trayServer?.toggle(appName),
+        onAction: (appName, actionId) => trayServer?.action(appName, actionId),
+        onQuitAll: () => quitAll(),
+      });
+      tray.setContextMenu(Menu.buildFromTemplate(template as Electron.MenuItemConstructorOptions[]));
+    }
+
+    function quitAll(): void {
+      quitting = true;
+      // Ask every connected module to quit itself, then quit the launcher. The
+      // modules tear down their own windows/hooks via their will-quit handlers.
+      trayServer?.quitAll();
+      // Give the quit messages a moment to flush over the pipe before we go.
+      setTimeout(() => app.quit(), 200);
+    }
+
+    app.whenReady().then(() => {
+      const iconPath = launcherTrayIconPath();
+      const image = existsSync(iconPath)
+        ? nativeImage.createFromPath(iconPath)
+        : nativeImage.createEmpty();
+      tray = new Tray(image);
+      tray.setToolTip("PopSuite");
+
+      // Start the pipe server first so modules can connect the instant they boot,
+      // then rebuild the menu on every connect/disconnect/state change.
+      trayServer = createSuiteTrayServer(() => {
+        if (!quitting) rebuildMenu();
+      });
+
+      // Windows/macOS: double-click the icon to re-spawn any missing modules.
+      tray.on("double-click", () => spawnModules());
+
+      rebuildMenu();
+      spawnModules();
     });
-    // Fully detach so the child outlives this launcher process.
-    child.unref();
-  }
 
-  // Nothing else to do — the launcher owns no windows. Quit once spawns are away.
-  // (app never reaches "ready" work; we exit before creating any UI.)
-  app.quit();
+    // Re-launch of PopSuite while the launcher owns the tray: re-spawn modules so
+    // any that were quit come back; running ones focus via their own locks.
+    app.on("second-instance", () => {
+      spawnModules();
+    });
+
+    // The launcher owns no windows, so window-all-closed must NOT quit it — it
+    // must stay resident as the tray owner. (There are never any windows anyway.)
+    app.on("window-all-closed", () => {
+      // Intentionally empty: keep the launcher alive.
+    });
+
+    app.on("will-quit", () => {
+      trayServer?.dispose();
+      trayServer = null;
+      tray?.destroy();
+      tray = null;
+    });
+
+    // Surface a launcher-fatal error rather than dying silently with a dead icon.
+    process.on("uncaughtException", (err) => {
+      console.error(`PopSuite launcher error: ${String(err)}`);
+      if (app.isReady()) dialog.showErrorBox("PopSuite", `Launcher error: ${String(err)}`);
+    });
+  }
 }
