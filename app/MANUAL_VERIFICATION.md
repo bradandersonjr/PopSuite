@@ -249,6 +249,56 @@ is active — the overlay stays click-through, so it never enables `{ forward: t
    so it must NOT report `annotating=true` up the suite pipe and must NOT trigger
    PopKey auto-hide (contrast with real annotation in test #9, which does hide it).
 
+### One launcher-owned settings window (suite settings tabs)
+
+In the suite there is ONE settings window, owned by the launcher, with a tab per
+module ("PopJot | PopKey"). Each tab hosts that module's REAL settings renderer
+in a WebContentsView; its IPC is tunnelled over the suite pipe to the owning
+module process, so the UI is fully functional even though the window belongs to
+the launcher. These checks require a PACKAGED/installed suite (the launcher only
+exists in the built suite; in `dev` the modules run standalone with their own
+windows). Install from `release/PopSuite Setup 1.0.0.exe`.
+
+21. **Edit Settings opens one window with instant tabs.**
+   With both modules running under the launcher, right-click the suite tray icon
+   and choose Edit Settings > PopJot (Open) Settings. ONE frameless window opens
+   with a "PopJot | PopKey" tab strip at the top, PopJot's tab active. Choose Edit
+   Settings > PopKey Settings from the tray — the SAME window comes forward with
+   the PopKey tab selected (no second window is ever created).
+
+22. **Each tab is that module's real, fully-functional settings UI.**
+   On the PopJot tab, change a setting (e.g. a palette/toggle) and confirm the
+   overlay reflects it and the value persists (reopen to confirm). Rebind a
+   shortcut and confirm the new chord works. Do the same on the PopKey tab. Each
+   tab drives its OWN module process (they have separate settings files) — a change
+   on one tab must NOT alter the other module.
+
+23. **Switching tabs preserves in-progress state (no reload).**
+   On the PopJot tab, scroll partway down and start editing a field (e.g. focus the
+   license input and type a few characters WITHOUT saving). Click the PopKey tab,
+   then click back to PopJot. The scroll position and the half-typed field are
+   exactly as you left them — switching shows/hides the views, it never reloads or
+   navigates them.
+
+24. **Killing a module while its tab is open shows a graceful placeholder.**
+   With the settings window open on the PopKey tab, end the PopKey child
+   `PopSuite.exe` process (Task Manager) or use its Quit. The PopKey tab's content
+   is replaced by a centered "PopKey isn't running" placeholder (not a blank or
+   broken view), and its tab is dimmed with "(off)". Click the PopJot tab — it
+   still works normally. Re-spawn PopKey (double-click the tray icon); its tab
+   re-enables and its real settings UI returns.
+
+25. **Standalone module (no launcher) still gets its own local settings window.**
+   Launch a standalone `PopJot.exe` (or `PopSuite.exe --module=popjot` with no
+   launcher running). Its tray's Settings item opens the module's OWN local
+   settings window exactly as before — no launcher window, no tabs, pixel-identical
+   to the pre-suite behavior. Same for PopKey standalone.
+
+26. **Reopening after closing the settings window works.**
+   Close the launcher settings window (Done / window close). Choose Edit Settings
+   again from the tray — the window reopens with both tabs functional and current
+   values. Repeat a couple of times to confirm no stale/dead views.
+
 ## Notes
 
 - **Unified tray architecture.** The launcher (`PopSuite.exe` with no `--module`
@@ -283,3 +333,26 @@ is active — the overlay stays click-through, so it never enables `{ forward: t
   or `--module=` with no launcher) no suppression ever engages, and if the pipe
   drops mid-suppression the fallback to a local tray also clears the suppression so
   PopKey can never get stuck hidden.
+- **Launcher-owned settings window (suite-only "one window").** The launcher
+  creates ONE `BaseWindow` (`app/src/main/suiteSettingsWindow.ts`) holding a thin
+  tab-strip `WebContentsView` (its own `tabStrip.html`, no module bundle) plus one
+  settings `WebContentsView` per module, each loading that module's REAL renderer
+  (`out/renderer/<id>/index.html?settings=1`) resolved via the same layout paths
+  `moduleRuntime` uses. Tab switching only re-lays-out the views (attach/detach) —
+  never reload — so scroll/form state survive. A disconnected module's tab shows a
+  placeholder view instead of a blank one.
+  - **IPC relay (why the hosted UI works cross-process).** A hosted view's renderer
+    runs in the LAUNCHER process, so its IPC can't reach the owning module directly.
+    A launcher-only preload (`hostedPreload.ts`) patches `ipcRenderer` into a
+    forwarding transport, then requires the module's OWN unchanged preload so its
+    real `electronAPI` is rebuilt on top. Every send/invoke is tunnelled over the
+    suite pipe (`relaySend`/`relayInvoke`) to the module, answered from the module's
+    real handlers (`suiteSettingsRelay.ts`; `ipcMain.emit` for sends, a captured
+    handler map for invokes), and the module's main→renderer pushes are streamed
+    back (`relayPush`). None of the shared settings/preload/renderer code or the
+    standalone/web paths are modified — the relay is additive and engaged only while
+    the launcher hosts a module's tab.
+  - **Standalone fallback.** A module that isn't suite-connected never hosts: it
+    creates its own local settings window exactly as before (mirrors the existing
+    owned/reported tray fallback). The launcher opens the window itself and never
+    relays a settings action to a module, so the two paths can't both fire.
