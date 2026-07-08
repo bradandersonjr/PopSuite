@@ -1,0 +1,54 @@
+# PopSuite release: builds and publishes the Windows installer + update metadata
+# to a DRAFT GitHub Release whenever a v* tag is pushed. The tag is the SUITE
+# version and should match app/package.json's version (e.g. tag v1.0.0 for 1.0.0).
+#
+# electron-builder creates/uploads the draft release, the NSIS installer, and
+# latest.yml (the electron-updater feed) when GH_TOKEN is present. The release is
+# left as a DRAFT so the owner reviews notes before publishing.
+#
+# Windows-only for now: the mac/linux sections in electron-builder.yml are
+# unverified and deliberately not built here.
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# electron-builder needs write access to create the draft release and upload assets.
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Quality gate: typecheck + lint + test across all packages (must pass
+      # before we cut a release from this tag).
+      - name: Verify
+        run: npm run verify
+
+      # Cheap insurance that the module websites still build at this tag.
+      - name: Build websites
+        run: |
+          npm run build:popjot
+          npm run build:popkey
+
+      # Build the suite and publish the installer + latest.yml to a draft release.
+      # electron-builder uses the default GITHUB_TOKEN (contents:write above).
+      - name: Package and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run publish:suite
