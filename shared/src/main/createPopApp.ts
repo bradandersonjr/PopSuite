@@ -38,9 +38,14 @@ import {
   registerLicenseIpc,
   type LicenseController,
 } from "./license";
-import type { SettingsSchema, SettingsValues, SettingValue } from "../settings/schema";
+import { trayChannel, type SettingsSchema, type SettingsValues, type SettingValue } from "../settings/schema";
 import { createSuiteTrayClient, type SuiteTrayClient } from "./suiteTrayClient";
 import type { SuiteModuleState, SuiteTrayAction } from "./suiteTray";
+import {
+  captureInvokeHandlers,
+  createSuiteSettingsRelay,
+  type SuiteSettingsRelay,
+} from "./suiteSettingsRelay";
 import {
   initialSuppressionState,
   applyManualToggle,
@@ -267,6 +272,15 @@ export function createPopApp<S extends SettingsSchema>(
     return createInertContext<S>();
   }
 
+  // Suite reported mode only: install the recording shim over ipcMain.handle
+  // BEFORE any invoke handler is registered below, so the settings relay can
+  // answer a launcher-hosted renderer's invokes from this process. The shim only
+  // records + delegates (real handler behavior is unchanged) and is never
+  // installed for standalone/owned apps, which keep the untouched ipcMain.
+  if (options.tray?.mode === "reported") {
+    captureInvokeHandlers();
+  }
+
   let mainWindow: BrowserWindow | null = null;
   let settingsWindow: BrowserWindow | null = null;
   // Periodic fallback for reassertOverlayAlwaysOnTop; cleared on will-quit.
@@ -290,6 +304,13 @@ export function createPopApp<S extends SettingsSchema>(
   let suppression: SuppressionState | null = options.suiteSuppressible
     ? initialSuppressionState(options.suiteSuppressible.initialActive)
     : null;
+  // Settings-window relay (suite-only). Engaged while the launcher's single
+  // settings window hosts THIS module's settings renderer in a WebContentsView:
+  // that renderer runs in the launcher's process, so its IPC is tunnelled to us
+  // here and our main→renderer pushes are streamed back. Null until connected;
+  // inert (never `hosting`) unless the launcher opens our tab, so standalone is
+  // completely unaffected. See suiteSettingsRelay.ts.
+  let suiteSettingsRelay: SuiteSettingsRelay | null = null;
 
   const shortcutState: Record<string, string> = {};
   for (const sc of options.shortcuts) {
@@ -319,6 +340,10 @@ export function createPopApp<S extends SettingsSchema>(
   function sendToRenderers(channel: string, value: unknown): void {
     mainWindow?.webContents.send(channel, value);
     settingsWindow?.webContents.send(channel, value);
+    // While the launcher hosts our settings tab there is no local settings
+    // window, so mirror settings-bound pushes into the relay too (no-op unless
+    // hosting). The overlay (mainWindow) is unaffected — it always stays local.
+    suiteSettingsRelay?.pushToHost(channel, [value]);
   }
 
   // ─── Settings IPC + cross-app sync ───────────────────────────────────
@@ -404,6 +429,28 @@ export function createPopApp<S extends SettingsSchema>(
     for (const name of Object.keys(shortcutState)) {
       win.webContents.send(`tray-set-${name}-shortcut`, shortcutState[name]);
     }
+  }
+
+  /**
+   * Seed the launcher-hosted settings renderer with the same initial state
+   * `syncTraySettingsToWindow` pushes into a local window: every non-volatile
+   * setting value, the open-at-login flag, and each shortcut. Sent through the
+   * relay (not a window) when the launcher opens/refreshes our settings tab so
+   * the hosted UI renders the real values on load, exactly like a local window.
+   */
+  function seedHostedSettings(): void {
+    if (!suiteSettingsRelay?.hosting) return;
+    for (const key of Object.keys(settingsSchema) as Array<keyof S & string>) {
+      if (settingsSchema[key].volatile) continue;
+      suiteSettingsRelay.pushToHost(trayChannel(key), [settingsController.values[key]]);
+    }
+    suiteSettingsRelay.pushToHost("tray-open-at-login", [getOpenAtLoginState()]);
+    for (const name of Object.keys(shortcutState)) {
+      suiteSettingsRelay.pushToHost(`tray-set-${name}-shortcut`, [shortcutState[name]]);
+    }
+    // License status is pushed by the license controller via sendToRenderers on
+    // change; the hosted renderer also pulls it with a license:status invoke on
+    // mount, so no separate seed is needed here.
   }
 
   // ─── Multi-monitor helpers ───────────────────────────────────────────
@@ -587,6 +634,12 @@ export function createPopApp<S extends SettingsSchema>(
   }
 
   function openSettingsWindow(): void {
+    // While the launcher's single settings window hosts our settings tab, the
+    // module must not also open a local window — the launcher's window covers it.
+    // (The launcher opens/selects the tab itself; it never relays a settings
+    // action to us in that case.) Standalone / fallback keeps the local window.
+    if (suiteSettingsRelay?.hosting) return;
+
     if (!settingsWindow || settingsWindow.isDestroyed()) {
       settingsWindow = createSettingsWindow();
       return;
@@ -914,7 +967,23 @@ export function createPopApp<S extends SettingsSchema>(
     suiteTrayClient?.report(currentSuiteState());
   }
 
+  // Control channels the launcher-hosted settings preload uses (over the relay's
+  // send path) to bracket a hosting session: start when the WebContentsView's
+  // renderer has mounted (begin serving + seed initial state), stop when the tab
+  // or window goes away (fall back to local behavior). Kept as reserved channel
+  // names so they can't collide with a real settings IPC channel.
+  const SUITE_HOST_START = "__suite_host_start";
+  const SUITE_HOST_STOP = "__suite_host_stop";
+
   function connectSuiteTray(): void {
+    // Create the settings relay for this connection. It captures our invoke
+    // handlers up front (a no-op recording shim over ipcMain.handle) so a relayed
+    // invoke from the hosted renderer can be answered from this process, and it
+    // forwards our main→renderer pushes up the pipe while hosting.
+    suiteSettingsRelay = createSuiteSettingsRelay((channel, args) =>
+      suiteTrayClient?.relayPush(channel, args)
+    );
+
     suiteTrayClient = createSuiteTrayClient(
       {
         onToggle: () => {
@@ -930,6 +999,28 @@ export function createPopApp<S extends SettingsSchema>(
           // Launcher relayed PopJot's annotating state: force-hide / restore.
           applySuiteSuppression(suppressed);
         },
+        onRelaySend: (channel, args) => {
+          // Settings-window relay: a fire-and-forget IPC from our hosted renderer.
+          // The two reserved control channels bracket a hosting session; everything
+          // else is replayed against our own ipcMain listeners.
+          if (channel === SUITE_HOST_START) {
+            suiteSettingsRelay?.start();
+            // Seed the freshly-mounted hosted renderer with current settings so it
+            // shows real values immediately, just like a local window's load.
+            seedHostedSettings();
+            return;
+          }
+          if (channel === SUITE_HOST_STOP) {
+            suiteSettingsRelay?.stop();
+            return;
+          }
+          suiteSettingsRelay?.handleSend(channel, args);
+        },
+        onRelayInvoke: (channel, args) =>
+          // Answer a relayed request/response invoke against our own handler.
+          suiteSettingsRelay
+            ? suiteSettingsRelay.handleInvoke(channel, args)
+            : Promise.reject(new Error("relay unavailable")),
       },
       {
         onReady: () => reportSuiteState(),
@@ -937,7 +1028,10 @@ export function createPopApp<S extends SettingsSchema>(
           // Launcher absent or gone: drop the client and stand up a local tray so
           // this module is never left without one. Also clear any auto-suppression
           // so a PopKey that was hidden by PopJot isn't stuck hidden forever once
-          // the suite glue is gone — the user regains normal manual control.
+          // the suite glue is gone — the user regains normal manual control. Drop
+          // the relay too so any later local settings window behaves normally.
+          suiteSettingsRelay?.stop();
+          suiteSettingsRelay = null;
           suiteTrayClient?.dispose();
           suiteTrayClient = null;
           clearSuiteSuppression();
@@ -1004,6 +1098,8 @@ export function createPopApp<S extends SettingsSchema>(
       clearInterval(overlayTopmostInterval);
       overlayTopmostInterval = null;
     }
+    suiteSettingsRelay?.stop();
+    suiteSettingsRelay = null;
     suiteTrayClient?.dispose();
     suiteTrayClient = null;
     settingsSync.dispose();

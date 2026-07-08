@@ -21,6 +21,7 @@ import {
   decodeFrames,
   type SuiteModuleState,
   type LauncherToModule,
+  type ModuleToLauncher,
 } from "./suiteTray";
 
 export interface SuiteTrayClientHandlers {
@@ -37,11 +38,29 @@ export interface SuiteTrayClientHandlers {
    * can omit it. Defaults to a no-op.
    */
   onSuppress?(suppressed: boolean): void;
+  /**
+   * Suite-only: the launcher-owned settings window relayed a fire-and-forget IPC
+   * send from this module's hosted settings renderer. Replay it against the
+   * module's own ipcMain. Optional; defaults to a no-op.
+   */
+  onRelaySend?(channel: string, args: unknown[]): void;
+  /**
+   * Suite-only: the launcher relayed a request/response IPC invoke from this
+   * module's hosted settings renderer. Answer it and resolve the returned promise
+   * with the outcome; the client sends the correlated result back. Optional.
+   */
+  onRelayInvoke?(channel: string, args: unknown[]): Promise<unknown>;
 }
 
 export interface SuiteTrayClient {
   /** Push a fresh state snapshot to the launcher (no-op if not connected). */
   report(state: SuiteModuleState): void;
+  /**
+   * Suite-only: forward a main→renderer push (what the module would send to its
+   * own settings window) up to the launcher, which delivers it into the hosted
+   * settings renderer. No-op if not connected.
+   */
+  relayPush(channel: string, args: unknown[]): void;
   /** Tear down the socket. */
   dispose(): void;
 }
@@ -72,6 +91,16 @@ export function createSuiteTrayClient(
     callbacks.onUnavailable();
   }
 
+  /** Write one framed message up the pipe; silent no-op if the socket is gone. */
+  function writeFrame(msg: ModuleToLauncher): void {
+    if (!socket || socket.destroyed) return;
+    try {
+      socket.write(encodeFrame(msg));
+    } catch {
+      // Write after close: the close/error handler already handles fallback.
+    }
+  }
+
   const s = connect(pipePath);
   socket = s;
 
@@ -100,6 +129,27 @@ export function createSuiteTrayClient(
         case "suppress":
           handlers.onSuppress?.(msg.suppressed);
           break;
+        case "relaySend":
+          // Hosted settings renderer fired a fire-and-forget send; replay it.
+          handlers.onRelaySend?.(msg.channel, msg.args);
+          break;
+        case "relayInvoke": {
+          // Hosted settings renderer issued a request/response call. Answer it
+          // and ack the launcher with the same id so it can resolve the promise.
+          const { id, channel, args } = msg;
+          const answer = handlers.onRelayInvoke?.(channel, args);
+          if (!answer) {
+            // No relay wired (shouldn't happen when hosting): reject cleanly.
+            writeFrame({ type: "relayInvokeResult", id, error: "relay unavailable" });
+            break;
+          }
+          void answer.then(
+            (result) => writeFrame({ type: "relayInvokeResult", id, result }),
+            (err: unknown) =>
+              writeFrame({ type: "relayInvokeResult", id, error: String(err) })
+          );
+          break;
+        }
       }
     }
   });
@@ -116,12 +166,10 @@ export function createSuiteTrayClient(
 
   return {
     report(state: SuiteModuleState): void {
-      if (!socket || socket.destroyed) return;
-      try {
-        socket.write(encodeFrame({ type: "state", state }));
-      } catch {
-        // Write after close: the close/error handler already handles fallback.
-      }
+      writeFrame({ type: "state", state });
+    },
+    relayPush(channel: string, args: unknown[]): void {
+      writeFrame({ type: "relayPush", channel, args });
     },
     dispose(): void {
       disposed = true;

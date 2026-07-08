@@ -42,6 +42,19 @@ export interface SuiteTrayServer {
    * connected). Used to hide/restore PopKey while PopJot annotates.
    */
   suppress(appName: string, suppressed: boolean): void;
+  /** True when the named module is currently connected (its tab can host). */
+  isConnected(appName: string): boolean;
+  /**
+   * Settings-window relay: forward a fire-and-forget IPC send from the launcher-
+   * hosted settings renderer down to the owning module. No-op if not connected.
+   */
+  relaySend(appName: string, channel: string, args: unknown[]): void;
+  /**
+   * Settings-window relay: forward a request/response IPC invoke from the hosted
+   * settings renderer down to the owning module. The module's answer comes back
+   * via the `onRelay` callback as a relayInvokeResult. No-op if not connected.
+   */
+  relayInvoke(appName: string, id: number, channel: string, args: unknown[]): void;
   /** Ask every connected module to quit itself. */
   quitAll(): void;
   /** Stop listening and drop all connections. */
@@ -50,11 +63,16 @@ export interface SuiteTrayServer {
 
 /**
  * Start the tray server. `onChange` fires whenever the live module set or any
- * module's state changes, so the launcher can rebuild its menu.
+ * module's state changes, so the launcher can rebuild its menu. `onRelay` fires
+ * for module→launcher settings-relay traffic (a hosted renderer's invoke result
+ * or a main→renderer push), tagged with the sending module's appName so the
+ * launcher can route it to the right settings tab. Omitted when the launcher
+ * isn't hosting settings.
  */
 export function createSuiteTrayServer(
   onChange: () => void,
-  pipePath: string = SUITE_TRAY_PIPE
+  pipePath: string = SUITE_TRAY_PIPE,
+  onRelay?: (appName: string, msg: ModuleToLauncher) => void
 ): SuiteTrayServer {
   // Best-effort cleanup of a stale Unix socket file from a crashed prior run.
   // On Windows named pipes there is no filesystem node to remove.
@@ -96,6 +114,11 @@ export function createSuiteTrayServer(
         if (msg.type === "state") {
           conn.state = msg.state;
           changed = true;
+        } else if (msg.type === "relayInvokeResult" || msg.type === "relayPush") {
+          // Settings-window relay coming back from the module: hand it to the
+          // launcher tagged with the sender so it reaches the right hosted tab.
+          // Not a state change (no menu rebuild).
+          if (conn.state) onRelay?.(conn.state.appName, msg);
         }
       }
       if (changed) onChange();
@@ -135,6 +158,17 @@ export function createSuiteTrayServer(
     suppress(appName: string, suppressed: boolean): void {
       const conn = findByApp(appName);
       if (conn) send(conn, { type: "suppress", suppressed });
+    },
+    isConnected(appName: string): boolean {
+      return Boolean(findByApp(appName));
+    },
+    relaySend(appName: string, channel: string, args: unknown[]): void {
+      const conn = findByApp(appName);
+      if (conn) send(conn, { type: "relaySend", channel, args });
+    },
+    relayInvoke(appName: string, id: number, channel: string, args: unknown[]): void {
+      const conn = findByApp(appName);
+      if (conn) send(conn, { type: "relayInvoke", id, channel, args });
     },
     quitAll(): void {
       for (const conn of connections) send(conn, { type: "quit" });

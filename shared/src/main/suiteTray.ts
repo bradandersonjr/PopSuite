@@ -105,10 +105,66 @@ export interface SuppressMessage {
   suppressed: boolean;
 }
 
+// ─── Settings-IPC relay (launcher-owned settings window) ─────────────────
+// The launcher owns ONE settings window hosting each module's REAL settings
+// renderer in a WebContentsView. That renderer runs in the launcher's process,
+// so its IPC would otherwise reach the launcher's main, not the module's. These
+// three message shapes tunnel the settings renderer's IPC over the suite pipe to
+// the OWNING module process (which has the real handlers + state) and stream the
+// module's renderer-push messages back, so the hosted UI is fully functional
+// without duplicating any per-module settings logic in the launcher.
+
+/**
+ * Launcher → module: the hosted settings renderer sent a fire-and-forget IPC
+ * message (`ipcRenderer.send`). Replayed against the module's own ipcMain.
+ */
+export interface RelaySendMessage {
+  type: "relaySend";
+  channel: string;
+  args: unknown[];
+}
+
+/**
+ * Launcher → module: the hosted settings renderer issued a request/response IPC
+ * call (`ipcRenderer.invoke`). `id` correlates the module's relayInvokeResult.
+ */
+export interface RelayInvokeMessage {
+  type: "relayInvoke";
+  id: number;
+  channel: string;
+  args: unknown[];
+}
+
+/** Module → launcher: the result of a relayInvoke, keyed by the same `id`. */
+export interface RelayInvokeResultMessage {
+  type: "relayInvokeResult";
+  id: number;
+  result?: unknown;
+  error?: string;
+}
+
+/**
+ * Module → launcher: a main→renderer push the module would normally send to its
+ * own settings window (`webContents.send`). The launcher forwards it into the
+ * hosted WebContents so subscriptions (tray-set-*, license-changed, sync-prefs-
+ * changed, ...) still fire.
+ */
+export interface RelayPushMessage {
+  type: "relayPush";
+  channel: string;
+  args: unknown[];
+}
+
 /** Everything a module may send up the pipe. */
-export type ModuleToLauncher = StateMessage;
+export type ModuleToLauncher = StateMessage | RelayInvokeResultMessage | RelayPushMessage;
 /** Everything the launcher may send down the pipe. */
-export type LauncherToModule = ToggleMessage | ActionMessage | QuitMessage | SuppressMessage;
+export type LauncherToModule =
+  | ToggleMessage
+  | ActionMessage
+  | QuitMessage
+  | SuppressMessage
+  | RelaySendMessage
+  | RelayInvokeMessage;
 
 // ─── Newline-delimited JSON framing ─────────────────────────────────────
 // A single socket carries many messages; frame each as one JSON object on its
