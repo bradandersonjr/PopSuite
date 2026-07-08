@@ -15,6 +15,9 @@ import {
   sendGridSize,
   sendMenuStyle,
   sendOverlayMode,
+  sendSpotlightDimOpacity,
+  sendSpotlightRadius,
+  sendSpotlightFeather,
   sendGlowIntensity,
   sendTextColor,
   sendButtonRoundness,
@@ -24,6 +27,7 @@ import {
   sendThemeMode,
   setMainShortcut,
   setPersistentShortcut,
+  setSpotlightShortcut,
 } from "@/lib/platform";
 import {
   DropdownMenu,
@@ -189,6 +193,14 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     setHotkey,
     persistentHotkey,
     setPersistentHotkey,
+    spotlightHotkey,
+    setSpotlightHotkey,
+    spotlightDimOpacity,
+    setSpotlightDimOpacity: setSpotlightDimOpacityLocal,
+    spotlightRadius,
+    setSpotlightRadius: setSpotlightRadiusLocal,
+    spotlightFeather,
+    setSpotlightFeather: setSpotlightFeatherLocal,
     menuStyle,
     setMenuStyle: setMenuStyleLocal,
     glowIntensity,
@@ -251,13 +263,19 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
   const commitShortcut = useCallback(
     async (kind: string, formatted: string) => {
       const result =
-        kind === "main" ? await setMainShortcut(formatted) : await setPersistentShortcut(formatted);
+        kind === "main"
+          ? await setMainShortcut(formatted)
+          : kind === "persistent"
+            ? await setPersistentShortcut(formatted)
+            : await setSpotlightShortcut(formatted);
       if (result.ok) {
-        (kind === "main" ? setHotkey : setPersistentHotkey)(formatted);
+        const apply =
+          kind === "main" ? setHotkey : kind === "persistent" ? setPersistentHotkey : setSpotlightHotkey;
+        apply(formatted);
       }
       return result;
     },
-    [setHotkey, setPersistentHotkey]
+    [setHotkey, setPersistentHotkey, setSpotlightHotkey]
   );
 
   const { recordingKind, activeKeys, shortcutError, startRecording } = useShortcutRecorder({
@@ -269,17 +287,18 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     if (!desktop) return;
 
     let mounted = true;
-    void getShortcuts().then(({ main, persistent }) => {
+    void getShortcuts().then(({ main, persistent, spotlight }) => {
       if (mounted) {
         setHotkey(main);
         setPersistentHotkey(persistent);
+        setSpotlightHotkey(spotlight);
       }
     });
 
     return () => {
       mounted = false;
     };
-  }, [desktop, setHotkey, setPersistentHotkey]);
+  }, [desktop, setHotkey, setPersistentHotkey, setSpotlightHotkey]);
 
   const applyThemeMode = (mode: ThemeMode) => {
     setThemeModeLocal(mode);
@@ -345,6 +364,21 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
   const applyOverlayMode = (mode: OverlayMode) => {
     setOverlayModeLocal(mode);
     sendOverlayMode(mode);
+  };
+
+  const applySpotlightDimOpacity = (val: number) => {
+    setSpotlightDimOpacityLocal(val);
+    sendSpotlightDimOpacity(val);
+  };
+
+  const applySpotlightRadius = (val: number) => {
+    setSpotlightRadiusLocal(val);
+    sendSpotlightRadius(val);
+  };
+
+  const applySpotlightFeather = (val: boolean) => {
+    setSpotlightFeatherLocal(val);
+    sendSpotlightFeather(val);
   };
 
   const themeModeOptions: Option<ThemeMode>[] = [
@@ -597,6 +631,39 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
         </SettingGroup>,
         <SettingGroup key="overlay" title="Overlay Mode" description="Choose between live drawing or snapshot capture">
           <OptionGrid options={overlayModeOptions} columns="grid-cols-2" />
+        </SettingGroup>,
+        <SettingGroup
+          key="spotlight"
+          title="Spotlight"
+          description={
+            desktop
+              ? `Dim the screen except a circle that follows your cursor. Toggle with ${spotlightHotkey}.`
+              : "Dim the screen except a circle that follows your cursor (desktop app)."
+          }
+        >
+          <div className="space-y-4">
+            {desktop && (
+              <ShortcutButton
+                currentShortcut={spotlightHotkey}
+                isRecording={recordingKind === "spotlight"}
+                activeKeys={activeKeys}
+                onStartRecording={() => startRecording("spotlight")}
+              />
+            )}
+            <div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Dim</div>
+              <SliderRow value={spotlightDimOpacity} min={0} max={100} step={5} onChange={applySpotlightDimOpacity} valueSuffix="%" defaultValue={65} />
+            </div>
+            <div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Radius</div>
+              <SliderRow value={spotlightRadius} min={80} max={400} step={10} onChange={applySpotlightRadius} valueSuffix="px" defaultValue={180} />
+            </div>
+            <ToggleRow
+              label="Soft edge"
+              checked={spotlightFeather}
+              onChange={() => applySpotlightFeather(!spotlightFeather)}
+            />
+          </div>
         </SettingGroup>,
         <SettingGroup key="grid" title="Canvas Grid" description="Display reference grid or dots on canvas">
           <OptionGrid options={gridModeOptions} columns="grid-cols-3" compact />

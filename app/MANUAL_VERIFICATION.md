@@ -198,6 +198,57 @@ A6. **Standalone PopJot.exe + PopKey.exe side-by-side do NOT interact
    module process must NOT load uiohook — its bundle contains zero references to
    it (verified at build time).
 
+### PopJot spotlight presenter mode
+
+Spotlight dims the whole screen except a soft circle that follows the cursor —
+a presentation aid like snapshot mode, with NO drawing while it is active. It is
+a PopJot-internal mode (the unified suite tray is untouched). Cursor position is
+polled in PopJot's main process (~60Hz) and pushed to the overlay while spotlight
+is active — the overlay stays click-through, so it never enables `{ forward: true }`
+(which the shared shell warns intercepts Huion-stylus synthetic clicks).
+
+14. **Shortcut toggles spotlight on and off.**
+   With PopJot running, press `Alt+Shift+D` (`Cmd+Shift+D` on macOS). The screen
+   dims to a black overlay with a bright circle at the cursor. Press it again —
+   the dim clears completely. Confirm the chord does NOT collide with the main
+   (`Alt+Shift+A`), persistent (`Alt+Shift+S`), or PopKey (`Alt+Shift+K`)
+   shortcuts: those still work independently.
+
+15. **Circle follows the cursor smoothly.**
+   With spotlight on, move the mouse around. The transparent circle tracks the
+   cursor across the whole display with no visible stutter or React re-render lag.
+   Move to a second monitor: the overlay follows to whichever display the cursor
+   was on when spotlight was toggled (it covers one display, like the other modes).
+
+16. **Clicks pass through to the apps underneath.**
+   With spotlight on, click a button in the app below (e.g. switch browser tabs,
+   click a taskbar item). The click lands on that app — spotlight never steals it.
+   This is the core presenter requirement: keep presenting/clicking while dimmed.
+
+17. **Escape exits spotlight.**
+   With spotlight on, press `Escape`. The dim clears. Confirm this does NOT
+   interfere with persistent drawing mode's own Escape (test #9 above).
+
+18. **Annotation shortcut while spotlighted force-exits spotlight (CRITICAL).**
+   Turn spotlight ON, then press PopJot's activate hotkey (`Alt+Shift+A`) or
+   persistent (`Alt+Shift+S`). Spotlight must instantly clear AND annotation must
+   activate normally — the radial menu appears and holds focus, drawing works.
+   Conversely, pressing the spotlight shortcut WHILE annotating is a no-op
+   (ignored). Spotlight must never break the focus-sensitive annotation state
+   machine: draw a stroke afterward to confirm the overlay still holds focus.
+
+19. **Settings sliders live-update the effect.**
+   Open PopJot Settings > Behavior > Spotlight. With spotlight active on screen,
+   drag the Dim slider (0-100%) and Radius slider (80-400px), and toggle Soft edge
+   on/off. Each change updates the on-screen effect immediately. Rebind the
+   spotlight shortcut with the shortcut widget and confirm the new chord toggles it.
+
+20. **PopKey stays visible during spotlight (no suppression).**
+   With BOTH modules running and PopKey visualizing keys, turn spotlight ON.
+   PopKey's key/click visualizer must REMAIN visible — spotlight is not annotating,
+   so it must NOT report `annotating=true` up the suite pipe and must NOT trigger
+   PopKey auto-hide (contrast with real annotation in test #9, which does hide it).
+
 ## Notes
 
 - **Unified tray architecture.** The launcher (`PopSuite.exe` with no `--module`
