@@ -75,6 +75,13 @@ export function startSpotlightScroll(
     // A native hook failure (missing macOS permission, Wayland session on
     // Linux, etc.) must not crash the main process — spotlight still works,
     // it just won't support the scroll-to-resize gesture.
+    //
+    // TODO(mac): unlike PopKey's inputCapture (see register.ts's
+    // isTrustedAccessibilityClient prompt), this path does not proactively
+    // request Accessibility permission — it just silently degrades. On a fresh
+    // macOS install the scroll-to-resize gesture will quietly do nothing with
+    // no explanation to the user. Consider prompting for Accessibility the
+    // first time spotlight mode is entered on mac, mirroring PopKey's flow.
     console.error(`Failed to start spotlight scroll input capture (uIOhook): ${String(err)}`);
   }
 }

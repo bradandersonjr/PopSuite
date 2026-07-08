@@ -103,8 +103,26 @@ export function createSuiteUpdater(onUpdateReady: () => void): SuiteUpdater {
     return app.isPackaged;
   }
 
+  // Windows-only automatic checking. We DO publish latest-mac.yml/latest-linux.yml
+  // (the suite is now built and published for all three OSes — see
+  // .github/workflows/release.yml), so electron-updater's manual checkForUpdates()
+  // works fine cross-platform. But our mac/linux builds are unsigned (no Apple
+  // signing identity, no Linux code-signing cert): quitAndInstall on an unsigned
+  // mac build is unreliable/unsupported by electron-updater, and we have no
+  // hardware to validate the mac/linux update+relaunch path before this release.
+  // Rather than risk a silent background download+install attempt failing or
+  // behaving oddly on hardware we can't test, the automatic background check
+  // (start()/runCheck()) is restricted to win32. Manual "Check for Updates"
+  // (checkNow()) is left enabled on every platform: worst case it reports
+  // "unavailable"/"up-to-date" via the same handled paths already used today, and
+  // if it does find/download an update, installUpdate() is still gated behind an
+  // explicit user click.
+  function autoCheckEnabled(): boolean {
+    return enabled() && process.platform === "win32";
+  }
+
   async function runCheck(): Promise<void> {
-    if (!enabled()) return;
+    if (!autoCheckEnabled()) return;
     try {
       await autoUpdater.checkForUpdates();
     } catch (err) {
@@ -118,7 +136,7 @@ export function createSuiteUpdater(onUpdateReady: () => void): SuiteUpdater {
     },
 
     start(): void {
-      if (started || !enabled()) return;
+      if (started || !autoCheckEnabled()) return;
       started = true;
       setTimeout(() => void runCheck(), INITIAL_CHECK_DELAY_MS);
       interval = setInterval(() => void runCheck(), CHECK_INTERVAL_MS);

@@ -5,6 +5,11 @@ copyright: Copyright © 2026 PopSuite
 directories:
   output: release
 
+# Ship only the English Chromium locale — strips locales/*.pak on Windows/Linux
+# and the unused .lproj dirs on mac, trimming installer size significantly.
+electronLanguages:
+  - en-US
+
 # GitHub Releases as the update feed. electron-builder writes an app-update.yml
 # into the packaged app (so electron-updater knows where to look) and, in publish
 # mode (CI, GH_TOKEN present), creates/uploads the draft release with the NSIS
@@ -74,6 +79,19 @@ nsis:
   perMachine: false
 
 # ─── macOS (mirror of the per-app configs) ──────────────────────────
+# UNSIGNED: we have no Apple Developer signing identity. Consequences:
+#   - Gatekeeper blocks a plain double-click launch on first run; users must
+#     right-click -> Open (or `xattr -d com.apple.quarantine`) once.
+#   - electron-updater cannot verify/auto-install updates on an unsigned mac
+#     build, so the suite's automatic background update check is restricted to
+#     Windows (see app/src/main/updater.ts's autoCheckEnabled()). Manual
+#     "Check for Updates" still works and downloads latest-mac.yml correctly;
+#     it's the unattended auto-download/install path that's disabled on mac.
+#   - PopKey's global input capture and PopJot's spotlight scroll-resize need
+#     macOS Accessibility permission at runtime (see register.ts in each
+#     module) — PopKey prompts for it, PopJot's spotlight path currently
+#     degrades silently (TODO in spotlightScroll.ts).
+# None of this has been validated on real mac hardware yet.
 mac:
   target:
     - target: dmg

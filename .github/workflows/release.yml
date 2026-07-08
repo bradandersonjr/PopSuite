@@ -1,13 +1,19 @@
-# PopSuite release: builds and publishes the Windows installer + update metadata
-# to a DRAFT GitHub Release whenever a v* tag is pushed. The tag is the SUITE
-# version and should match app/package.json's version (e.g. tag v1.0.0 for 1.0.0).
+# PopSuite release: builds and publishes installers + update metadata for
+# Windows, macOS, and Linux to a DRAFT GitHub Release whenever a v* tag is
+# pushed. The tag is the SUITE version and should match app/package.json's
+# version (e.g. tag v1.0.0 for 1.0.0).
 #
-# electron-builder creates/uploads the draft release, the NSIS installer, and
-# latest.yml (the electron-updater feed) when GH_TOKEN is present. The release is
-# left as a DRAFT so the owner reviews notes before publishing.
+# Three independent OS jobs (no `needs:` between them) each build and publish
+# their own platform's artifacts. electron-builder aggregates all uploads onto
+# the same draft GitHub release, so one OS failing does not block the others
+# from publishing their assets. The Windows job is the only one that runs the
+# quality gate (typecheck + lint + test) — it stays a single source of truth
+# rather than tripling the same suite across three runners.
 #
-# Windows-only for now: the mac/linux sections in electron-builder.yml are
-# unverified and deliberately not built here.
+# mac and linux builds are unsigned (no Apple signing identity / no code-signing
+# cert) — see the comments in electron-builder.yml for the resulting Gatekeeper
+# and auto-update caveats.
+
 name: release
 
 on:
@@ -36,7 +42,7 @@ jobs:
         run: npm ci
 
       # Quality gate: typecheck + lint + test across all packages (must pass
-      # before we cut a release from this tag).
+      # before we cut a release from this tag). Runs once, here only.
       - name: Verify
         run: npm run verify
 
@@ -46,9 +52,55 @@ jobs:
           npm run build:popjot
           npm run build:popkey
 
-      # Build the suite and publish the installer + latest.yml to a draft release.
-      # electron-builder uses the default GITHUB_TOKEN (contents:write above).
-      - name: Package and publish
+      # Build the suite and publish the Windows installer + latest.yml to a
+      # draft release. electron-builder uses the default GITHUB_TOKEN (contents:write above).
+      - name: Package and publish (Windows)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run publish:suite
+
+  release-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Build the suite and publish the mac dmg(s) + latest-mac.yml to a draft
+      # release. Unsigned: Gatekeeper requires right-click -> Open on first
+      # launch, and electron-updater auto-checks are disabled on mac (see
+      # app/src/main/updater.ts) so this is a manual-download-only channel for now.
+      - name: Package and publish (macOS)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run publish:suite:mac
+
+  release-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Build the suite and publish the Linux AppImage + latest-linux.yml to a
+      # draft release.
+      - name: Package and publish (Linux)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run publish:suite:linux
