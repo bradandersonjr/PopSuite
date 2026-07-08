@@ -12,6 +12,15 @@ import { desktopCapturer, globalShortcut, ipcMain, screen } from "electron";
 import { createPopApp, type PopAppOptions } from "@shared/main/createPopApp";
 import type { settingsSchema as PopJotSchema } from "@/config/settingsSchema";
 import { settingsSchema } from "@/config/settingsSchema";
+import { startSpotlightDrag, stopSpotlightDrag } from "./spotlightDrag";
+
+// Spotlight radius slider range (mirrors settingsSchema's SliderRow bounds in
+// SystemTray.tsx: min=80 max=400) and feather percent range (0-100). Kept
+// here so the drag resize clamps to exactly what the sliders allow.
+const SPOTLIGHT_RADIUS_MIN = 80;
+const SPOTLIGHT_RADIUS_MAX = 400;
+const SPOTLIGHT_FEATHER_MIN = 0;
+const SPOTLIGHT_FEATHER_MAX = 100;
 
 const isMac = process.platform === "darwin";
 
@@ -84,6 +93,16 @@ export function registerPopJot(
   // deliberately do NOT enable { forward: true } on the overlay — the shared
   // shell warns it intercepts synthetic right/middle-click events from tablet
   // drivers (e.g. Huion stylus). Polling only runs while spotlight is active.
+  //
+  // Right-mouse-drag resize (spotlightDrag.ts) uses a separate global uiohook
+  // listener, for the same reason: the click-through overlay never sees a real
+  // mousedown. That listener is also only registered while spotlight is
+  // active. It observes the right button globally but does not consume or
+  // suppress the OS-level click — since { forward: true } is deliberately not
+  // enabled on the overlay (see above), a right-click during spotlight still
+  // reaches whatever app is under the cursor, same as every other button. That
+  // is an accepted tradeoff: swallowing the click at the OS level would need
+  // an approach this codebase already flagged as risky for stylus drivers.
   let spotlightActive = false;
   let cursorPollTimer: ReturnType<typeof setInterval> | null = null;
   // Mirrors renderer annotation state (from overlay-activated/deactivated) so the
@@ -116,6 +135,28 @@ export function registerPopJot(
       popApp.moveOverlayToCursorDisplay();
       win?.webContents.send("spotlight-cursor", popApp.getCursorDipPosition());
       startCursorPolling();
+      // Right-mouse-drag resize/soften. Only registered while spotlight is
+      // active (mirrors the cursor-poll lifecycle above) so the native uiohook
+      // listener carries zero cost — and never intercepts a real right-click —
+      // whenever spotlight is off. Values push through ctx.setSetting, the same
+      // path the tray/settings sliders use, so an open Settings window's
+      // sliders and the live paint loop both update in real time from the drag.
+      startSpotlightDrag(
+        () => popApp.settings.spotlightRadius,
+        () => popApp.settings.spotlightFeather,
+        {
+          radiusMin: SPOTLIGHT_RADIUS_MIN,
+          radiusMax: SPOTLIGHT_RADIUS_MAX,
+          featherMin: SPOTLIGHT_FEATHER_MIN,
+          featherMax: SPOTLIGHT_FEATHER_MAX,
+        },
+        {
+          onChange: (radius, featherPct) => {
+            popApp.setSetting("spotlightRadius", radius);
+            popApp.setSetting("spotlightFeather", featherPct);
+          },
+        }
+      );
       // Escape exits spotlight. The overlay stays click-through and unfocused
       // (so clicks reach the apps underneath), which means its renderer can't see
       // key events — so we listen globally, only while spotlight is active. This
@@ -123,6 +164,7 @@ export function registerPopJot(
       globalShortcut.register("Escape", () => setSpotlight(false));
     } else {
       stopCursorPolling();
+      stopSpotlightDrag();
       globalShortcut.unregister("Escape");
     }
     win?.webContents.send("spotlight-set", active);
@@ -186,6 +228,7 @@ export function registerPopJot(
     ],
     onWillQuit: () => {
       stopCursorPolling();
+      stopSpotlightDrag();
     },
     tray: { settingsLabel: "Open Settings", mode: trayMode },
     trayToggle: {

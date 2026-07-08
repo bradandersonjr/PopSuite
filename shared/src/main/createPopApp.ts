@@ -62,6 +62,13 @@ export type ShortcutUpdateResult =
 export interface PopAppContext<S extends SettingsSchema> {
   /** Live main-process settings state. */
   settings: SettingsValues<S>;
+  /**
+   * Drive a setting change from main as if it arrived over IPC from the
+   * tray/settings UI: updates `settings`, broadcasts to every renderer
+   * (overlay, settings window, launcher-hosted settings), persists, and runs
+   * cross-app sync — the same single path every other setting change uses.
+   */
+  setSetting<K extends keyof S & string>(key: K, value: SettingValue<S[K]>): void;
   getMainWindow(): BrowserWindow | null;
   getSettingsWindow(): BrowserWindow | null;
   /** Send to the overlay window only. */
@@ -234,6 +241,7 @@ export interface PopAppOptions<S extends SettingsSchema> {
 function createInertContext<S extends SettingsSchema>(): PopAppContext<S> {
   return {
     settings: {} as SettingsValues<S>,
+    setSetting: () => {},
     getMainWindow: () => null,
     getSettingsWindow: () => null,
     sendToMainWindow: () => {},
@@ -689,6 +697,7 @@ export function createPopApp<S extends SettingsSchema>(
 
   const ctx: PopAppContext<S> = {
     settings: settingsController.values,
+    setSetting: (key, value) => settingsController.applyChange(key, value),
     getMainWindow: () => mainWindow,
     getSettingsWindow: () => settingsWindow,
     sendToMainWindow: (channel, ...args) => {

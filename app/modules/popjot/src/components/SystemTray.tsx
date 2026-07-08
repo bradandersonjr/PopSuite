@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { activateLicense, deactivateLicense } from "@shared/license/renderer";
 import CustomPaletteSettings from "@/components/pro/CustomPaletteSettings";
 import CenterCircleSettings from "@/components/pro/CenterCircleSettings";
+import { DEFAULT_SPOTLIGHT_FEATHER_PCT } from "@/lib/spotlight";
 
 /** Ko-fi product page where buyers get a PopJot Pro key. */
 const POPJOT_PRO_URL = "https://ko-fi.com/s/264fd0031f";
@@ -376,7 +377,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     sendSpotlightRadius(val);
   };
 
-  const applySpotlightFeather = (val: boolean) => {
+  const applySpotlightFeather = (val: number) => {
     setSpotlightFeatherLocal(val);
     sendSpotlightFeather(val);
   };
@@ -637,7 +638,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
           title="Spotlight"
           description={
             desktop
-              ? `Dim the screen except a circle that follows your cursor. Toggle with ${spotlightHotkey}.`
+              ? `Dim the screen except a circle that follows your cursor. Toggle with ${spotlightHotkey}. Press Escape to exit.`
               : "Dim the screen except a circle that follows your cursor (desktop app)."
           }
         >
@@ -658,11 +659,10 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
               <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Radius</div>
               <SliderRow value={spotlightRadius} min={80} max={400} step={10} onChange={applySpotlightRadius} valueSuffix="px" defaultValue={180} />
             </div>
-            <ToggleRow
-              label="Soft edge"
-              checked={spotlightFeather}
-              onChange={() => applySpotlightFeather(!spotlightFeather)}
-            />
+            <div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Soft Edge</div>
+              <SliderRow value={spotlightFeather} min={0} max={100} step={5} onChange={applySpotlightFeather} valueSuffix="%" defaultValue={DEFAULT_SPOTLIGHT_FEATHER_PCT} />
+            </div>
           </div>
         </SettingGroup>,
         <SettingGroup key="grid" title="Canvas Grid" description="Display reference grid or dots on canvas">

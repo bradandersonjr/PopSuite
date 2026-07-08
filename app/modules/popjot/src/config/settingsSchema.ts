@@ -1,4 +1,5 @@
 import { setting } from "@shared/settings/schema";
+import { DEFAULT_SPOTLIGHT_FEATHER_PCT } from "@/lib/spotlight";
 
 /**
  * PopJot's tray-adjustable settings — the single source of truth for
@@ -44,7 +45,10 @@ export const settingsSchema = {
   // toggled by the "spotlight" global shortcut, not a stored on/off flag.
   spotlightDimOpacity: setting.number(65), // 0 = no dim, 100 = fully black
   spotlightRadius: setting.number(180, { positive: true }), // circle radius in px
-  spotlightFeather: setting.boolean(true), // soft (feathered) vs hard circle edge
+  // Edge softness: 0 = hard edge (ramp snaps at the radius), 100 = softest
+  // allowed (ramp starts at 20% of the radius). Default 50 reproduces roughly
+  // the old boolean feather's "true" look — see spotlight.ts for the curve.
+  spotlightFeather: setting.number(DEFAULT_SPOTLIGHT_FEATHER_PCT),
   scaleMultiplier: setting.number(1, { positive: true }),
   // Per-monitor UI scale — derived by each window, broadcast but never stored.
   scaleFactor: setting.number(1, { positive: true, volatile: true }),

@@ -53,7 +53,7 @@ export const sendSpotlightDimOpacity = (val: number): void =>
   settings.sendSetting("spotlightDimOpacity", val);
 export const sendSpotlightRadius = (val: number): void =>
   settings.sendSetting("spotlightRadius", val);
-export const sendSpotlightFeather = (val: boolean): void =>
+export const sendSpotlightFeather = (val: number): void =>
   settings.sendSetting("spotlightFeather", val);
 export const sendButtonRoundness = (val: number): void =>
   settings.sendSetting("buttonRoundness", val);

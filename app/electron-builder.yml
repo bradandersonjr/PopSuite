@@ -18,10 +18,11 @@ publish:
 
 files:
   - out/**/*
-  # Production deps (uiohook-napi, PopKey's native input hook) are auto-included
-  # by electron-builder's dependency tracing and unpacked via asarUnpack below.
-  # We intentionally do NOT blanket-exclude node_modules — that would strip the
-  # native binding and break PopKey's input capture.
+  # Production deps (uiohook-napi, the native global-input hook used by
+  # PopKey's input capture and PopJot's Spotlight right-drag resize) are
+  # auto-included by electron-builder's dependency tracing and unpacked via
+  # asarUnpack below. We intentionally do NOT blanket-exclude node_modules —
+  # that would strip the native binding and break both.
 
 # Per-module resources, namespaced so createPopApp's resourceSubdir ("popjot" /
 # "popkey") resolves the right tray/app icons at process.resourcesPath/<module>/.
@@ -56,7 +57,8 @@ extraResources:
 asar: true
 
 # uiohook-napi ships a native .node binding that cannot run from inside the asar
-# archive — unpack it so the PopKey module process can dlopen it at runtime.
+# archive — unpack it so the PopKey and PopJot module processes can dlopen it
+# at runtime.
 asarUnpack:
   - "**/node_modules/uiohook-napi/**"
 
