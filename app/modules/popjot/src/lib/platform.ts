@@ -49,6 +49,12 @@ export const sendGridMode = (mode: GridMode): void => settings.sendSetting("grid
 export const sendGridSize = (size: GridSize): void => settings.sendSetting("gridSize", size);
 export const sendOverlayMode = (mode: OverlayMode): void =>
   settings.sendSetting("overlayMode", mode);
+export const sendSpotlightDimOpacity = (val: number): void =>
+  settings.sendSetting("spotlightDimOpacity", val);
+export const sendSpotlightRadius = (val: number): void =>
+  settings.sendSetting("spotlightRadius", val);
+export const sendSpotlightFeather = (val: boolean): void =>
+  settings.sendSetting("spotlightFeather", val);
 export const sendButtonRoundness = (val: number): void =>
   settings.sendSetting("buttonRoundness", val);
 export const sendMenuTranslucency = (val: number): void =>
@@ -74,6 +80,18 @@ export function overlayDeactivated(): void {
   window.electronAPI?.overlayDeactivated();
 }
 
+// ─── Spotlight presenter mode ──────────────────────────────────────
+
+export function onSpotlightSet(callback: (active: boolean) => void): () => void {
+  if (!window.electronAPI) return () => {};
+  return window.electronAPI.onSpotlightSet(callback);
+}
+
+export function onSpotlightCursor(callback: (pos: Position) => void): () => void {
+  if (!window.electronAPI) return () => {};
+  return window.electronAPI.onSpotlightCursor(callback);
+}
+
 export function onShortcutActivate(
   callback: (pos: Position, snapshotDataUrl: string | null) => void
 ): () => void {
@@ -96,6 +114,10 @@ export async function setPersistentShortcut(shortcut: string): Promise<ShortcutU
   return setNamedShortcut("persistent", shortcut);
 }
 
-export async function getShortcuts(): Promise<{ main: string; persistent: string }> {
-  return getNamedShortcuts({ main: "", persistent: "" });
+export async function setSpotlightShortcut(shortcut: string): Promise<ShortcutUpdateResult> {
+  return setNamedShortcut("spotlight", shortcut);
+}
+
+export async function getShortcuts(): Promise<{ main: string; persistent: string; spotlight: string }> {
+  return getNamedShortcuts({ main: "", persistent: "", spotlight: "" });
 }

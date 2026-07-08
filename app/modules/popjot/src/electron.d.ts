@@ -28,7 +28,8 @@ declare global {
       // Named shortcuts
       setMainShortcut: (shortcut: string) => Promise<ShortcutUpdateResult>;
       setPersistentShortcut: (shortcut: string) => Promise<ShortcutUpdateResult>;
-      getShortcuts: () => Promise<{ main: string; persistent: string }>;
+      setSpotlightShortcut: (shortcut: string) => Promise<ShortcutUpdateResult>;
+      getShortcuts: () => Promise<{ main: string; persistent: string; spotlight: string }>;
 
       // PopJot-specific
       onShortcutActivate: (
@@ -39,6 +40,10 @@ declare global {
       ) => () => void;
       overlayActivated: () => void;
       overlayDeactivated: () => void;
+
+      // Spotlight presenter mode
+      onSpotlightSet: (callback: (active: boolean) => void) => () => void;
+      onSpotlightCursor: (callback: (pos: Position) => void) => () => void;
     };
   }
 }

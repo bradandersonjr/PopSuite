@@ -8,7 +8,7 @@
  * from their per-module subdirectories inside the shared Electron binary.
  */
 
-import { desktopCapturer, ipcMain, screen } from "electron";
+import { desktopCapturer, globalShortcut, ipcMain, screen } from "electron";
 import { createPopApp, type PopAppOptions } from "@shared/main/createPopApp";
 import type { settingsSchema as PopJotSchema } from "@/config/settingsSchema";
 import { settingsSchema } from "@/config/settingsSchema";
@@ -77,6 +77,57 @@ export function registerPopJot(
   // Whether shortcuts fire. Starts enabled; tray "Disable PopJot" suspends them.
   let enabled = true;
 
+  // ─── Spotlight cursor tracking ─────────────────────────────────────
+  // While spotlight mode is active the overlay stays click-through (mouse events
+  // pass through to the apps underneath), so the renderer never sees mousemove.
+  // We poll the OS cursor here (~60Hz) and push it to the renderer instead. We
+  // deliberately do NOT enable { forward: true } on the overlay — the shared
+  // shell warns it intercepts synthetic right/middle-click events from tablet
+  // drivers (e.g. Huion stylus). Polling only runs while spotlight is active.
+  let spotlightActive = false;
+  let cursorPollTimer: ReturnType<typeof setInterval> | null = null;
+  // Mirrors renderer annotation state (from overlay-activated/deactivated) so the
+  // spotlight shortcut can be gated in-process without querying the renderer.
+  let annotating = false;
+
+  function startCursorPolling(): void {
+    if (cursorPollTimer) return;
+    cursorPollTimer = setInterval(() => {
+      const win = popApp.getMainWindow();
+      if (!win || win.isDestroyed()) return;
+      const pos = popApp.getCursorDipPosition();
+      win.webContents.send("spotlight-cursor", pos);
+    }, 16);
+  }
+
+  function stopCursorPolling(): void {
+    if (cursorPollTimer) {
+      clearInterval(cursorPollTimer);
+      cursorPollTimer = null;
+    }
+  }
+
+  function setSpotlight(active: boolean): void {
+    if (spotlightActive === active) return;
+    spotlightActive = active;
+    const win = popApp.getMainWindow();
+    if (active) {
+      // Cover whichever display the cursor is on, then start feeding positions.
+      popApp.moveOverlayToCursorDisplay();
+      win?.webContents.send("spotlight-cursor", popApp.getCursorDipPosition());
+      startCursorPolling();
+      // Escape exits spotlight. The overlay stays click-through and unfocused
+      // (so clicks reach the apps underneath), which means its renderer can't see
+      // key events — so we listen globally, only while spotlight is active. This
+      // never touches the renderer's persistent-mode Escape path.
+      globalShortcut.register("Escape", () => setSpotlight(false));
+    } else {
+      stopCursorPolling();
+      globalShortcut.unregister("Escape");
+    }
+    win?.webContents.send("spotlight-set", active);
+  }
+
   const popApp = createPopApp({
     appName: "PopJot",
     aboutDetail: "Screen annotation that stays out of your way.",
@@ -118,7 +169,24 @@ export function registerPopJot(
           win.webContents.send("shortcut-persistent", pos, snapshot);
         },
       },
+      {
+        // Spotlight presenter mode — toggle on/off. Distinct chord from "main"
+        // (Alt+Shift+A), "persistent" (Alt+Shift+S) and PopKey's Alt+Shift+K:
+        // Alt+Shift+D (Cmd+Shift+D on macOS) was free.
+        name: "spotlight",
+        default: isMac ? "Cmd+Shift+D" : "Alt+Shift+D",
+        handler: () => {
+          if (!enabled) return;
+          // Mutually exclusive with annotation: ignore the toggle while
+          // annotating so we never race the RadialMenu activation state machine.
+          if (!spotlightActive && annotating) return;
+          setSpotlight(!spotlightActive);
+        },
+      },
     ],
+    onWillQuit: () => {
+      stopCursorPolling();
+    },
     tray: { settingsLabel: "Open Settings", mode: trayMode },
     trayToggle: {
       getEnabled: () => enabled,
@@ -139,6 +207,9 @@ export function registerPopJot(
       const main = ctx.getMainWindow();
       main?.webContents.on("did-finish-load", () => {
         shortcutFired = false;
+        // The overlay renderer forgets spotlight on reload; drop our side too so
+        // we don't keep polling the cursor for a layer that is no longer shown.
+        if (spotlightActive) setSpotlight(false);
       });
     },
   });
@@ -146,6 +217,11 @@ export function registerPopJot(
   // ─── Overlay activation (PopJot-specific) ────────────────────────────
 
   ipcMain.on("overlay-activated", () => {
+    // Annotation is starting. It is mutually exclusive with spotlight, so an
+    // active spotlight force-exits here (spotlight stays click-through, so this
+    // never fights the drawing overlay's input capture).
+    annotating = true;
+    if (spotlightActive) setSpotlight(false);
     // Suite-only: tell the launcher we're annotating so PopKey auto-hides. No-op
     // outside the suite (no pipe client) and for standalone PopJot.exe.
     popApp.reportSuiteAnnotating(true);
@@ -156,6 +232,7 @@ export function registerPopJot(
   });
 
   ipcMain.on("overlay-deactivated", () => {
+    annotating = false;
     // Suite-only: annotation ended, let the launcher restore PopKey.
     popApp.reportSuiteAnnotating(false);
     const win = popApp.getMainWindow();
