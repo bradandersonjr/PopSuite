@@ -55,19 +55,30 @@ describe("spotlight gradient", () => {
     );
   });
 
-  it("feather percent interpolates the ramp's inner stop between hard and soft", () => {
-    // 0%: hard edge — transparent hole extends to the full radius (200px).
-    expect(spotlightGradient(0, 0, 200, 50, 0)).toContain("rgba(0,0,0,0) 200px");
-    // 100%: softest allowed — ramp starts at 20% of the radius (200 * 0.2 = 40).
-    expect(spotlightGradient(0, 0, 200, 50, 100)).toContain("rgba(0,0,0,0) 40px");
-    // Default (50%): ramp starts at 60% of the radius (200 * 0.6 = 120).
-    expect(spotlightGradient(0, 0, 200, 50, DEFAULT_SPOTLIGHT_FEATHER_PCT)).toContain(
-      "rgba(0,0,0,0) 120px"
+  it("feather percent interpolates the ramp's inner stop by a fixed px width", () => {
+    // 0%: hard edge — transparent hole extends to the full radius (400px, big
+    // enough that the half-radius clamp never engages in this test).
+    expect(spotlightGradient(0, 0, 400, 50, 0)).toContain("rgba(0,0,0,0) 400px");
+    // 100%: softest allowed — ramp is MAX_FEATHER_PX (140) wide: 400 - 140 = 260.
+    expect(spotlightGradient(0, 0, 400, 50, 100)).toContain("rgba(0,0,0,0) 260px");
+    // Default (50%): ramp is 70px wide: 400 - 70 = 330.
+    expect(spotlightGradient(0, 0, 400, 50, DEFAULT_SPOTLIGHT_FEATHER_PCT)).toContain(
+      "rgba(0,0,0,0) 330px"
     );
   });
 
+  it("keeps the ramp width visually consistent as the circle shrinks", () => {
+    // A small radius (60px) at 100% softness would collapse to a near-zero ramp
+    // under the old radius-proportional model; the fixed-width ramp is now
+    // clamped to at most half the radius (30px here) instead of vanishing.
+    expect(spotlightGradient(0, 0, 60, 50, 100)).toContain("rgba(0,0,0,0) 30px");
+    // A mid-size radius (200px) under 2x MAX_FEATHER_PX (140) at 100% softness:
+    // the half-radius clamp (100px) engages before the full 140px ramp would.
+    expect(spotlightGradient(0, 0, 200, 50, 100)).toContain("rgba(0,0,0,0) 100px");
+  });
+
   it("clamps out-of-range feather percent", () => {
-    expect(spotlightGradient(0, 0, 200, 50, 150)).toContain("rgba(0,0,0,0) 40px");
-    expect(spotlightGradient(0, 0, 200, 50, -20)).toContain("rgba(0,0,0,0) 200px");
+    expect(spotlightGradient(0, 0, 400, 50, 150)).toContain("rgba(0,0,0,0) 260px");
+    expect(spotlightGradient(0, 0, 400, 50, -20)).toContain("rgba(0,0,0,0) 400px");
   });
 });
