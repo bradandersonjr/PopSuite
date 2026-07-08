@@ -638,7 +638,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
           title="Spotlight"
           description={
             desktop
-              ? `Dim the screen except a circle that follows your cursor. Toggle with ${spotlightHotkey}. Press Escape to exit.`
+              ? `Dim the screen except a circle that follows your cursor. Toggle with ${spotlightHotkey}, scroll to resize, and press Escape to exit.`
               : "Dim the screen except a circle that follows your cursor (desktop app)."
           }
         >

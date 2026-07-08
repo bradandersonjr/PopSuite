@@ -12,15 +12,13 @@ import { desktopCapturer, globalShortcut, ipcMain, screen } from "electron";
 import { createPopApp, type PopAppOptions } from "@shared/main/createPopApp";
 import type { settingsSchema as PopJotSchema } from "@/config/settingsSchema";
 import { settingsSchema } from "@/config/settingsSchema";
-import { startSpotlightDrag, stopSpotlightDrag } from "./spotlightDrag";
+import { startSpotlightScroll, stopSpotlightScroll } from "./spotlightScroll";
 
 // Spotlight radius slider range (mirrors settingsSchema's SliderRow bounds in
-// SystemTray.tsx: min=80 max=400) and feather percent range (0-100). Kept
-// here so the drag resize clamps to exactly what the sliders allow.
+// SystemTray.tsx: min=80 max=400). Kept here so the scroll-resize clamps to
+// exactly what the slider allows.
 const SPOTLIGHT_RADIUS_MIN = 80;
 const SPOTLIGHT_RADIUS_MAX = 400;
-const SPOTLIGHT_FEATHER_MIN = 0;
-const SPOTLIGHT_FEATHER_MAX = 100;
 
 const isMac = process.platform === "darwin";
 
@@ -135,25 +133,20 @@ export function registerPopJot(
       popApp.moveOverlayToCursorDisplay();
       win?.webContents.send("spotlight-cursor", popApp.getCursorDipPosition());
       startCursorPolling();
-      // Right-mouse-drag resize/soften. Only registered while spotlight is
-      // active (mirrors the cursor-poll lifecycle above) so the native uiohook
-      // listener carries zero cost — and never intercepts a real right-click —
-      // whenever spotlight is off. Values push through ctx.setSetting, the same
-      // path the tray/settings sliders use, so an open Settings window's
-      // sliders and the live paint loop both update in real time from the drag.
-      startSpotlightDrag(
+      // Scroll-wheel resize. Only registered while spotlight is active (mirrors
+      // the cursor-poll lifecycle above) so the native uiohook listener carries
+      // zero cost whenever spotlight is off. Deliberately scroll-only, not a
+      // mouse-button drag — no gesture here can be mistaken for (or swallow) a
+      // click meant for the app under the cursor. Values push through
+      // ctx.setSetting, the same path the tray/settings sliders use, so an open
+      // Settings window's slider and the live paint loop both update in real
+      // time as you scroll.
+      startSpotlightScroll(
         () => popApp.settings.spotlightRadius,
-        () => popApp.settings.spotlightFeather,
+        { radiusMin: SPOTLIGHT_RADIUS_MIN, radiusMax: SPOTLIGHT_RADIUS_MAX },
         {
-          radiusMin: SPOTLIGHT_RADIUS_MIN,
-          radiusMax: SPOTLIGHT_RADIUS_MAX,
-          featherMin: SPOTLIGHT_FEATHER_MIN,
-          featherMax: SPOTLIGHT_FEATHER_MAX,
-        },
-        {
-          onChange: (radius, featherPct) => {
+          onChange: (radius) => {
             popApp.setSetting("spotlightRadius", radius);
-            popApp.setSetting("spotlightFeather", featherPct);
           },
         }
       );
@@ -164,7 +157,7 @@ export function registerPopJot(
       globalShortcut.register("Escape", () => setSpotlight(false));
     } else {
       stopCursorPolling();
-      stopSpotlightDrag();
+      stopSpotlightScroll();
       globalShortcut.unregister("Escape");
     }
     win?.webContents.send("spotlight-set", active);
@@ -228,7 +221,7 @@ export function registerPopJot(
     ],
     onWillQuit: () => {
       stopCursorPolling();
-      stopSpotlightDrag();
+      stopSpotlightScroll();
     },
     tray: { settingsLabel: "Open Settings", mode: trayMode },
     trayToggle: {

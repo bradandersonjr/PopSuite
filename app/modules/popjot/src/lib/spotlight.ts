@@ -33,19 +33,20 @@ export function nextSpotlightActive(current: boolean, annotating: boolean): bool
 
 // Feather-percent -> ramp-width-in-px curve. 0% is a hard edge (no ramp, the
 // transparent hole extends to the full radius and the dim snaps in at the
-// boundary). 100% is the softest ramp we allow, MAX_FEATHER_PX wide. The ramp
-// width is now a FIXED pixel span rather than a fraction of the radius, so
-// shrinking the circle no longer shrinks (or erases) the visible feather —
-// previously the ramp was `radius * fraction`, so a small enough radius made
-// the whole ramp collapse to a few px or less and the edge looked hard even
-// at high softness. Clamped to at most half the radius so the ramp can never
-// invert past the circle's center on very small circles.
-const MAX_FEATHER_PX = 140;
+// boundary). 100% is the softest ramp we allow, FEATHER_SCREEN_FRACTION of the
+// screen's height wide. The ramp width is a fraction of SCREEN size, not of
+// the circle's radius or a fixed px constant — so the edge looks the same
+// softness at every zoom/monitor size, AND resizing the spotlight circle
+// (scroll wheel) never changes how soft the edge looks, only how big the
+// circle is. Still clamped to at most half the current radius so the ramp
+// can never invert past the circle's center on a very small circle.
+const FEATHER_SCREEN_FRACTION = 0.12; // 100% softness = 12% of screen height
 export const DEFAULT_SPOTLIGHT_FEATHER_PCT = 50;
 
-function featherRampPx(featherPct: number, radius: number): number {
+function featherRampPx(featherPct: number, radius: number, screenHeight: number): number {
   const pct = Math.max(0, Math.min(100, featherPct)) / 100;
-  return Math.min(pct * MAX_FEATHER_PX, radius / 2);
+  const maxRampPx = Math.max(0, screenHeight) * FEATHER_SCREEN_FRACTION;
+  return Math.min(pct * maxRampPx, radius / 2);
 }
 
 /**
@@ -54,9 +55,11 @@ function featherRampPx(featherPct: number, radius: number): number {
  *
  *   - `dimOpacity` 0-100 maps to the black overlay alpha outside the circle.
  *   - `radius` is the transparent hole's radius in px.
- *   - `featherPct` 0-100 softens the edge by a fixed-width ramp (see
- *     featherRampPx above) that stays visually consistent regardless of the
- *     circle's size, instead of scaling with the radius.
+ *   - `featherPct` 0-100 softens the edge by a ramp sized as a fraction of
+ *     `screenHeight` (see featherRampPx above), so the softness reads the
+ *     same regardless of the circle's radius or the display's resolution.
+ *   - `screenHeight` is the current display's height in px (DIP), used only
+ *     to size the feather ramp — pass the display the spotlight is on.
  */
 export function spotlightGradient(
   x: number,
@@ -64,12 +67,13 @@ export function spotlightGradient(
   radius: number,
   dimOpacity: number,
   featherPct: number,
+  screenHeight: number,
 ): string {
   const alpha = Math.max(0, Math.min(1, dimOpacity / 100));
   const r = Math.max(0, radius);
   // Round to avoid float noise in the CSS string — sub-pixel precision has no
   // visual effect here anyway.
-  const innerStop = Math.round((r - featherRampPx(featherPct, r)) * 100) / 100;
+  const innerStop = Math.round((r - featherRampPx(featherPct, r, screenHeight)) * 100) / 100;
   return (
     `radial-gradient(circle ${r}px at ${x}px ${y}px, ` +
     `rgba(0,0,0,0) ${innerStop}px, ` +

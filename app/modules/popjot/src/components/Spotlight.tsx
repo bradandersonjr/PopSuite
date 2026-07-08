@@ -35,7 +35,14 @@ const Spotlight = () => {
       if (layer) {
         const { x, y } = cursorRef.current;
         const s = settingsRef.current;
-        layer.style.background = spotlightGradient(x, y, s.radius, s.dimOpacity, s.feather);
+        layer.style.background = spotlightGradient(
+          x,
+          y,
+          s.radius,
+          s.dimOpacity,
+          s.feather,
+          window.innerHeight,
+        );
       }
       raf = requestAnimationFrame(paint);
     };
@@ -63,6 +70,7 @@ const Spotlight = () => {
           radius,
           dimOpacity,
           feather,
+          window.innerHeight,
         ),
       }}
     />
