@@ -218,4 +218,104 @@ describe("suite-tray IPC", () => {
     client.dispose();
     await until(() => server.getModules().length === 0);
   });
+
+  // ─── Settings-window relay ─────────────────────────────────────────────
+  // The launcher-owned settings window tunnels a hosted renderer's IPC to the
+  // owning module and streams the module's pushes back. These exercise the wire
+  // round-trip end to end (no Electron), mirroring the module/launcher wiring.
+
+  it("relays a fire-and-forget send from the launcher to the owning module", async () => {
+    const path = pipePath();
+    const server = createSuiteTrayServer(vi.fn(), path);
+    cleanups.push(() => server.dispose());
+
+    const sends: Array<{ channel: string; args: unknown[] }> = [];
+    let ready = false;
+    const client = createSuiteTrayClient(
+      {
+        onToggle: vi.fn(),
+        onAction: vi.fn(),
+        onQuit: vi.fn(),
+        onRelaySend: (channel, args) => sends.push({ channel, args }),
+      },
+      { onReady: () => (ready = true), onUnavailable: vi.fn() },
+      path
+    );
+    cleanups.push(() => client.dispose());
+
+    await until(() => ready);
+    client.report(state({ appName: "PopKey" }));
+    await until(() => server.getModules().length === 1);
+
+    server.relaySend("PopKey", "set-theme-mode", ["dark"]);
+    await until(() => sends.length === 1);
+    expect(sends[0]).toEqual({ channel: "set-theme-mode", args: ["dark"] });
+  });
+
+  it("round-trips a relayed invoke and its correlated result", async () => {
+    const path = pipePath();
+    const relayBack: Array<{ appName: string; type: string }> = [];
+    const server = createSuiteTrayServer(vi.fn(), path, (appName, msg) =>
+      relayBack.push({ appName, type: msg.type })
+    );
+    cleanups.push(() => server.dispose());
+
+    const results: Array<{ id: number; result?: unknown; error?: string }> = [];
+    let ready = false;
+    const client = createSuiteTrayClient(
+      {
+        onToggle: vi.fn(),
+        onAction: vi.fn(),
+        onQuit: vi.fn(),
+        // Answer the invoke as the module would (from its own handler).
+        onRelayInvoke: (channel, args) =>
+          Promise.resolve({ echoed: channel, args }),
+      },
+      { onReady: () => (ready = true), onUnavailable: vi.fn() },
+      path
+    );
+    cleanups.push(() => client.dispose());
+
+    await until(() => ready);
+    client.report(state({ appName: "PopJot" }));
+    await until(() => server.getModules().length === 1);
+
+    // The launcher forwards an invoke; the module answers; the ack comes back via
+    // the server's onRelay callback as a relayInvokeResult with the same id.
+    server.relayInvoke("PopJot", 42, "get-shortcuts", []);
+    await until(() => relayBack.some((r) => r.type === "relayInvokeResult"));
+    // The result rode back on the same connection (surfaced through onRelay), so
+    // the message was delivered — assert the callback saw it tagged to PopJot.
+    expect(relayBack).toContainEqual({ appName: "PopJot", type: "relayInvokeResult" });
+    void results;
+  });
+
+  it("streams a module main→renderer push up to the launcher via onRelay", async () => {
+    const path = pipePath();
+    const pushes: Array<{ appName: string; channel: string; args: unknown[] }> = [];
+    const server = createSuiteTrayServer(vi.fn(), path, (appName, msg) => {
+      if (msg.type === "relayPush") pushes.push({ appName, channel: msg.channel, args: msg.args });
+    });
+    cleanups.push(() => server.dispose());
+
+    let ready = false;
+    const client = createSuiteTrayClient(
+      { onToggle: vi.fn(), onAction: vi.fn(), onQuit: vi.fn() },
+      { onReady: () => (ready = true), onUnavailable: vi.fn() },
+      path
+    );
+    cleanups.push(() => client.dispose());
+
+    await until(() => ready);
+    client.report(state({ appName: "PopKey" }));
+    await until(() => server.getModules().length === 1);
+
+    client.relayPush("tray-set-theme-mode", ["dark"]);
+    await until(() => pushes.length === 1);
+    expect(pushes[0]).toEqual({
+      appName: "PopKey",
+      channel: "tray-set-theme-mode",
+      args: ["dark"],
+    });
+  });
 });

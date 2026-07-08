@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'" />
+    <title>Not running</title>
+    <style>
+      /* Graceful empty-state shown in a tab whose module process isn't running.
+         Tone matches the app's plain informational dialogs. */
+      :root { color-scheme: dark; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        background: #171717;
+        color: #a3a3a3;
+        font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      .box { max-width: 340px; padding: 24px; }
+      .title { color: #e5e5e5; font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <div class="title" id="title">This app isn't running</div>
+      <div id="detail">Its settings will appear here once it starts.</div>
+    </div>
+    <script>
+      // The module label is passed via the URL hash so this single file serves
+      // both modules without a build step.
+      var name = decodeURIComponent((location.hash || "").replace(/^#/, ""));
+      if (name) {
+        document.getElementById("title").textContent = name + " isn't running";
+        document.getElementById("detail").textContent =
+          name + "'s settings will appear here once it starts.";
+      }
+    </script>
+  </body>
+</html>

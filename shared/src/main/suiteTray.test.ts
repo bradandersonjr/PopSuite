@@ -10,6 +10,7 @@ import {
   type SuiteTrayMenuOptions,
   type SuiteMenuItem,
   type LauncherToModule,
+  type ModuleToLauncher,
 } from "./suiteTray";
 
 function makeModule(overrides: Partial<SuiteModuleState> = {}): SuiteModuleState {
@@ -282,5 +283,29 @@ describe("frame encode/decode", () => {
     const chunk = "not json\n" + encodeFrame({ type: "quit" });
     const { messages } = decodeFrames<LauncherToModule>("", chunk);
     expect(messages).toEqual([{ type: "quit" }]);
+  });
+
+  it("round-trips the settings-relay launcher→module messages", () => {
+    const send = encodeFrame({ type: "relaySend", channel: "set-theme-mode", args: ["dark"] });
+    expect(decodeFrames<LauncherToModule>("", send).messages).toEqual([
+      { type: "relaySend", channel: "set-theme-mode", args: ["dark"] },
+    ]);
+
+    const invoke = encodeFrame({ type: "relayInvoke", id: 7, channel: "get-shortcuts", args: [] });
+    expect(decodeFrames<LauncherToModule>("", invoke).messages).toEqual([
+      { type: "relayInvoke", id: 7, channel: "get-shortcuts", args: [] },
+    ]);
+  });
+
+  it("round-trips the settings-relay module→launcher messages", () => {
+    const result = encodeFrame({ type: "relayInvokeResult", id: 7, result: { a: 1 } });
+    expect(decodeFrames<ModuleToLauncher>("", result).messages).toEqual([
+      { type: "relayInvokeResult", id: 7, result: { a: 1 } },
+    ]);
+
+    const push = encodeFrame({ type: "relayPush", channel: "tray-set-theme-mode", args: ["dark"] });
+    expect(decodeFrames<ModuleToLauncher>("", push).messages).toEqual([
+      { type: "relayPush", channel: "tray-set-theme-mode", args: ["dark"] },
+    ]);
   });
 });

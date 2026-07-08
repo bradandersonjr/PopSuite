@@ -34,8 +34,12 @@ import {
   createSuiteTrayServer,
   type SuiteTrayServer,
 } from "@shared/main/suiteTrayServer";
-import { buildSuiteTrayMenu } from "@shared/main/suiteTray";
+import { buildSuiteTrayMenu, SUITE_ACTION_SETTINGS } from "@shared/main/suiteTray";
 import { createSuiteUpdater, type SuiteUpdater } from "./updater";
+import {
+  createSuiteSettingsWindow,
+  type SuiteSettingsWindow,
+} from "./suiteSettingsWindow";
 
 const MODULES = ["popjot", "popkey"] as const;
 type ModuleId = (typeof MODULES)[number];
@@ -105,6 +109,10 @@ if (requestedModule) {
     let tray: Tray | null = null;
     let trayServer: SuiteTrayServer | null = null;
     let updater: SuiteUpdater | null = null;
+    // The launcher-owned settings window (one window, a tab per module). Created
+    // lazily on first "Edit Settings". Hosts each module's real settings renderer
+    // and relays its IPC to the owning module process over the pipe.
+    let settingsWindow: SuiteSettingsWindow | null = null;
     // Guards a graceful shutdown so module "close" events during Quit All don't
     // re-trigger menu rebuilds against a torn-down tray.
     let quitting = false;
@@ -174,6 +182,27 @@ if (requestedModule) {
       });
     }
 
+    // Map a reported appName (PopJot) to its module id (popjot) for the settings
+    // window's tab selection.
+    function moduleIdForAppName(appName: string): string {
+      return appName.toLowerCase();
+    }
+
+    /**
+     * Open the launcher-owned settings window and select the given module's tab.
+     * Creates the window lazily on first use, wiring the module→launcher relay
+     * (invoke results + main→renderer pushes) into the hosted views. Replaces the
+     * old "relay a Settings action to the module's own window" behavior — the
+     * launcher now owns the one window and never asks a module to open its own.
+     */
+    function openSettingsFor(appName: string): void {
+      if (!trayServer) return;
+      if (!settingsWindow) {
+        settingsWindow = createSuiteSettingsWindow(__dirname, trayServer, launcherTrayIconPath());
+      }
+      settingsWindow.open(moduleIdForAppName(appName));
+    }
+
     function rebuildMenu(): void {
       if (!tray || tray.isDestroyed() || !trayServer) return;
       const readyVersion = updater?.readyVersion ?? null;
@@ -181,7 +210,13 @@ if (requestedModule) {
         trayServer.getModules(),
         {
           onToggle: (appName) => trayServer?.toggle(appName),
-          onAction: (appName, actionId) => trayServer?.action(appName, actionId),
+          onAction: (appName, actionId) => {
+            // Edit Settings picker: open the launcher's single settings window on
+            // this module's tab (the window hosts the module's real settings UI).
+            // Any other action still relays to the module's own handler.
+            if (actionId === SUITE_ACTION_SETTINGS) openSettingsFor(appName);
+            else trayServer?.action(appName, actionId);
+          },
           onOpenAtLoginToggle: () => {
             setLauncherOpenAtLogin(!getLauncherOpenAtLogin());
             // Rebuild so the checkbox reflects the new state immediately.
@@ -246,14 +281,26 @@ if (requestedModule) {
 
       // Start the pipe server first so modules can connect the instant they boot,
       // then rebuild the menu on every connect/disconnect/state change.
-      trayServer = createSuiteTrayServer(() => {
-        if (quitting) return;
-        // Relay PopJot annotating -> PopKey suppress before rebuilding the menu
-        // so the menu reflects PopKey's resulting auto-hidden label in the same
-        // pass once PopKey reports back its autoSuppressed state.
-        relaySuppression();
-        rebuildMenu();
-      });
+      trayServer = createSuiteTrayServer(
+        () => {
+          if (quitting) return;
+          // Relay PopJot annotating -> PopKey suppress before rebuilding the menu
+          // so the menu reflects PopKey's resulting auto-hidden label in the same
+          // pass once PopKey reports back its autoSuppressed state.
+          relaySuppression();
+          rebuildMenu();
+          // Keep the open settings window's tabs in sync with which modules are
+          // connected (swap a placeholder <-> the real view as modules come/go).
+          settingsWindow?.refreshConnState();
+        },
+        undefined,
+        (appName, msg) => {
+          // Settings-window relay coming back from a module: hand it to the
+          // launcher settings window so it reaches the right hosted tab (invoke
+          // results resolve the renderer's promise; pushes drive its subscriptions).
+          settingsWindow?.routeRelay(appName, msg);
+        }
+      );
 
       // Windows/macOS: double-click the icon to re-spawn any missing modules.
       tray.on("double-click", () => spawnModules());
@@ -276,8 +323,9 @@ if (requestedModule) {
       spawnModules();
     });
 
-    // The launcher owns no windows, so window-all-closed must NOT quit it — it
-    // must stay resident as the tray owner. (There are never any windows anyway.)
+    // The launcher must stay resident as the tray owner, so window-all-closed
+    // must NOT quit it. Its only window is the lazily-opened settings window;
+    // closing that must leave the tray (and both module processes) running.
     app.on("window-all-closed", () => {
       // Intentionally empty: keep the launcher alive.
     });
@@ -285,6 +333,8 @@ if (requestedModule) {
     app.on("will-quit", () => {
       updater?.dispose();
       updater = null;
+      settingsWindow?.dispose();
+      settingsWindow = null;
       trayServer?.dispose();
       trayServer = null;
       tray?.destroy();
