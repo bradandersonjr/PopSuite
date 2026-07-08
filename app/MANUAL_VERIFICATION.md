@@ -10,7 +10,7 @@ desktop session after installing `release/PopSuite Setup 1.0.0.exe` (or launchin
 Build the package first:
 
 ```
-npm run package:suite      # from repo root, or: npm run package:win --prefix suite
+npm run package:suite      # from repo root, or: npm run package:win --prefix app
 ```
 
 ## Checklist

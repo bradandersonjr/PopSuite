@@ -6,42 +6,46 @@ distributed as a single desktop install. The repo produces three surfaces from
 one codebase:
 
 1. **PopSuite desktop app** — the only shipped desktop deliverable. One Electron
-   binary (`suite/`) launches PopJot and PopKey as independent module processes
-   under a single unified tray. See [`suite/README.md`](suite/README.md) for the
+   binary (`app/`) launches PopJot and PopKey as independent module processes
+   under a single unified tray. See [`app/README.md`](app/README.md) for the
    architecture.
 2. **Two websites** — [popjot.app](https://popjot.app) and
    [popkey.app](https://popkey.app), static Vite builds of each app's
    `src/roots/WebRoot.tsx`, deployed from this repo via Cloudflare Pages.
-3. **Chromium extensions** — `PopJot/extension/` and `PopKey/extension/`,
-   parked/dormant but buildable (`build:extension` per app).
+3. **Chromium extensions** — `app/modules/popjot/extension/` and
+   `app/modules/popkey/extension/`, parked/dormant but buildable
+   (`build:extension` per module).
 
-- **[PopJot](PopJot/README.md)** — screen-annotation overlay with a radial tool menu and freehand drawing canvas.
-- **[PopKey](PopKey/README.md)** — on-screen keystroke & mouse-action visualizer for screencasts and demos.
+- **[PopJot](app/modules/popjot/README.md)** — screen-annotation overlay with a radial tool menu and freehand drawing canvas.
+- **[PopKey](app/modules/popkey/README.md)** — on-screen keystroke & mouse-action visualizer for screencasts and demos.
 
-Both apps are built with Electron + React + Vite + Tailwind + Zustand and consume shared code from **`pop-shared`**.
+Both apps are built with Electron + React + Vite + Tailwind + Zustand and consume shared code from **`shared/`**.
 
-PopSuite is a single git repository managed as an **npm workspace**. `pop-shared/`, `PopJot/`, `PopKey/`, and `suite/` are all members of one repo; there are no submodules and no separate copies of the shared code.
+PopSuite is a single git repository managed as an **npm workspace**. `shared/`, `app/`, `app/modules/popjot/`, and `app/modules/popkey/` are all members of one repo; there are no submodules and no separate copies of the shared code. The desktop app (`app/`) is the master; PopJot and PopKey are its child modules under `app/modules/`.
 
 ## Layout
 
 ```
-PopSuite/             # single git repo + npm workspace root
-├── pop-shared/       # THE shared foundation (one copy, consumed by both apps + suite)
-│   ├── src/          # runtime code (see "Shared architecture" below)
-│   ├── config/       # vite/electron-vite/vitest/tailwind/eslint/postcss presets
-│   ├── tsconfig/     # base tsconfigs (app / electron / node)
-│   └── scripts/      # extension build scripts (build-content, pack-extension)
-├── PopJot/           # annotation app — unique src/ + thin configs → ../pop-shared
-├── PopKey/           # input-visualizer app — unique src/ + thin configs → ../pop-shared
-├── suite/            # PopSuite desktop shell — launcher + module entrypoints, electron-builder config
-├── node_modules/     # hoisted: shared by pop-shared, both apps, and suite
-└── package.json      # workspace config + orchestration scripts (concurrently)
+PopSuite/                 # single git repo + npm workspace root
+├── app/                  # PopSuite desktop shell — launcher + module entrypoints, electron-builder config
+│   └── modules/
+│       ├── popjot/       # annotation app — unique src/ + thin configs → ../../../shared
+│       └── popkey/       # input-visualizer app — unique src/ + thin configs → ../../../shared
+├── shared/               # THE shared foundation (one copy, consumed by both modules + app)
+│   ├── src/              # runtime code (see "Shared architecture" below)
+│   ├── config/           # vite/electron-vite/vitest/tailwind/eslint/postcss presets
+│   ├── tsconfig/         # base tsconfigs (app / electron / node)
+│   └── scripts/          # extension build scripts (build-content, pack-extension)
+├── node_modules/         # hoisted: shared by shared/, both modules, and app
+└── package.json          # workspace config + orchestration scripts (concurrently)
 ```
+
+> The `shared/` directory keeps the npm package name `pop-shared` (folder renamed, package name unchanged for low churn).
 
 ## Getting started
 
 One install at the repo root hoists all dependencies into a single `node_modules`
-shared by `pop-shared`, both apps, and `suite`:
+shared by `shared/`, both modules, and `app`:
 
 ```sh
 npm install          # one hoisted workspace install for everything
@@ -74,12 +78,12 @@ Run from the repo root; each fans out to the relevant workspace member(s) via
 | --- | --- |
 | `dev` | PopJot + PopKey web dev servers (Vite), in parallel |
 | `dev:popjot` / `dev:popkey` | Single app's web dev server |
-| `build` | Builds both apps' websites (`PopJot/dist`, `PopKey/dist`) |
+| `build` | Builds both apps' websites (`app/modules/popjot/dist`, `app/modules/popkey/dist`) |
 | `build:popjot` / `build:popkey` | Single app's website build |
 | `dev:module:popjot` / `dev:module:popkey` | Run that app's Electron desktop build standalone (dev) |
-| `dev:suite` | Both modules' Electron dev servers under `suite/`'s own configs, in parallel |
+| `dev:suite` | Both modules' Electron dev servers under `app/`'s own configs, in parallel |
 | `build:suite` | Builds the suite (launcher + both module bundles) |
-| `typecheck:suite` | Typechecks the `suite/` package |
+| `typecheck:suite` | Typechecks the `app/` package |
 | `package:suite` | Builds and packages the PopSuite desktop installer (Windows NSIS) |
 | `typecheck` | Typechecks PopJot, PopKey, and suite, in parallel |
 | `lint` | Lints PopJot and PopKey, in parallel |
@@ -88,7 +92,7 @@ Run from the repo root; each fans out to the relevant workspace member(s) via
 
 ## The suite (single desktop install)
 
-`suite/` builds **one Electron binary** (`PopSuite.exe`) that runs in two modes
+`app/` builds **one Electron binary** (`PopSuite.exe`) that runs in two modes
 from the same executable:
 
 - **Launcher** (`PopSuite.exe`, no args) — a resident, lightweight process that
@@ -123,14 +127,15 @@ distribution is exclusively through `package:suite`. Standalone Electron builds
 survive only as a **dev workflow** (`dev:module:*`, or `dev:electron` inside each
 app) and as the pipe-fallback mode described above.
 
-See [`suite/README.md`](suite/README.md) for build/package details and
-[`suite/MANUAL_VERIFICATION.md`](suite/MANUAL_VERIFICATION.md) for the manual
+See [`app/README.md`](app/README.md) for build/package details and
+[`app/MANUAL_VERIFICATION.md`](app/MANUAL_VERIFICATION.md) for the manual
 verification checklist.
 
-## Shared architecture (`pop-shared`)
+## Shared architecture (`shared/`)
 
-Shared code lives in **`pop-shared/`** at the repo root and is consumed by each app
-(and by `suite/`) via the `../pop-shared` relative path and the `@shared/*` import alias. Inside shared
+Shared code lives in **`shared/`** at the repo root (npm package name `pop-shared`)
+and is consumed by each module (and by `app/`) via a relative path (`../../../shared`
+from a module, `../shared` from `app/`) and the `@shared/*` import alias. Inside shared
 code, `@/*` resolves to the **consuming app's** `src/` — this is intentional, so shared
 roots and components can bind to each app's own `store`, `engine`, and `SystemTray`.
 
@@ -157,31 +162,31 @@ The big shared pieces:
   full marketing-page structure (hero/demo/features/how-it-works/settings/
   use-cases/pricing/faq, section scroller, dot nav, FAQ accordion, settings
   modal). Each app's `WebRoot.tsx` supplies only content and theme styling.
-- **Build presets** (`config/`, `tsconfig/`, `scripts/`) — per-app config files
-  are thin re-exports pointing at `../pop-shared`; only the dev port and extension
-  popup global differ. Shared config/script paths resolve the app root from
-  `process.cwd()` and reach `pop-shared` as a sibling.
+- **Build presets** (`config/`, `tsconfig/`, `scripts/`) — per-module config files
+  are thin re-exports pointing at `../../../shared`; only the dev port and extension
+  popup global differ. Shared config/script paths resolve the module root from
+  `process.cwd()` and reach `shared/` three levels up at the repo root.
 
-`pop-shared/` is a normal directory in this repo (an npm workspace member), not a
+`shared/` is a normal directory in this repo (an npm workspace member), not a
 submodule. It is the single source of truth for shared code — one on-disk copy, no
-copy/sync step, no submodule pointers to bump. `suite/` consumes it the same way
-the two apps do.
+copy/sync step, no submodule pointers to bump. `app/` consumes it the same way
+the two modules do.
 
 ### Working on shared code
 
-Just edit files under `pop-shared/src` (or its `config/`, `scripts/`). Because both
-apps (and the suite) import the same directory, every consumer sees the change immediately — no commit
+Just edit files under `shared/src` (or its `config/`, `scripts/`). Because both
+modules (and the app) import the same directory, every consumer sees the change immediately — no commit
 dance, no pointer bump. Re-run the quality gates and commit once in this repo.
 
-> App-specific tests live in each app's own `src/` (e.g. `src/store/useStore.test.ts`); only app-agnostic tests belong in `pop-shared/src/test`.
+> App-specific tests live in each module's own `src/` (e.g. `src/store/useStore.test.ts`); only app-agnostic tests belong in `shared/src/test`.
 
 ## Testing
 
-Shared tests live in `pop-shared/src/test` and run inside each app via Vitest (`npm run test` per app). See the per-app `AUDIT.md` for a point-in-time snapshot of test-wiring status (predates the suite restructure; see its note at the top).
+Shared tests live in `shared/src/test` and run inside each module via Vitest (`npm run test` per module). See the per-module `AUDIT.md` for a point-in-time snapshot of test-wiring status (predates the suite/nest restructure; see its note at the top).
 
 ## Quality gates
 
-Run across both apps from the repo root, or per app with `--prefix PopJot` / `--prefix PopKey` (add `--prefix suite` for the suite's own typecheck):
+Run across both modules from the repo root, or per module with `--prefix app/modules/popjot` / `--prefix app/modules/popkey` (add `--prefix app` for the suite's own typecheck):
 
 ```sh
 npm run typecheck   # tsc --noEmit (PopJot, PopKey, suite; clean)

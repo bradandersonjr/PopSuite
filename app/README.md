@@ -1,6 +1,6 @@
-# suite (PopSuite desktop shell)
+# app (PopSuite desktop shell)
 
-`suite/` builds the **PopSuite desktop app** — the single Electron binary that
+`app/` builds the **PopSuite desktop app** — the single Electron binary that
 ships PopJot and PopKey as one install. It is the only shipped desktop
 deliverable; standalone per-app installers are deprecated. See the
 [root README](../README.md) for how this fits into the repo's three product
@@ -60,21 +60,22 @@ From the repo root:
 
 ```sh
 npm run dev:suite           # both modules' electron-vite dev servers, in parallel
-npm run typecheck:suite     # tsc --noEmit for suite/
+npm run typecheck:suite     # tsc --noEmit for app/
 ```
 
-Or per-module, from the repo root or inside `suite/`:
+Or per-module, from the repo root or inside `app/`:
 
 ```sh
-npm run dev:popjot --prefix suite
-npm run dev:popkey --prefix suite
+npm run dev:popjot --prefix app
+npm run dev:popkey --prefix app
 ```
 
 These run each module through the suite's own `electron.vite.<module>.ts`
 config, without the launcher/tray-owner process. To exercise a module the same
 way the standalone app runs it in dev (with its own tray), use the app's own
 workflow instead: `npm run dev:module:popjot` / `dev:module:popkey` from the
-repo root, or `npm run dev:electron` inside `PopJot/` or `PopKey/`.
+repo root, or `npm run dev:electron` inside `app/modules/popjot/` or
+`app/modules/popkey/`.
 
 ## Build / package
 
@@ -83,14 +84,14 @@ npm run build:suite          # from repo root: builds both modules + the launche
 npm run package:suite        # from repo root: build + electron-builder (Windows NSIS installer)
 ```
 
-Equivalent commands run directly inside `suite/`:
+Equivalent commands run directly inside `app/`:
 
 ```sh
-npm run build --prefix suite          # build:popjot + build:popkey + build:launcher
-npm run package:win --prefix suite    # build + electron-builder --win
+npm run build --prefix app          # build:popjot + build:popkey + build:launcher
+npm run package:win --prefix app    # build + electron-builder --win
 ```
 
-Packaged output lands in `suite/release/` (e.g.
+Packaged output lands in `app/release/` (e.g.
 `release/PopSuite Setup 1.0.0.exe`, `release/win-unpacked/PopSuite.exe`) per
 `electron-builder.yml`'s `directories.output: release`. Per-module tray/app
 icons and the launcher's own unified tray icon are copied in as
