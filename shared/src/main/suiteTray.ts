@@ -262,8 +262,8 @@ export interface SuiteTrayMenuOptions {
  * Layout (top to bottom):
  *   - a disabled "PopSuite" title,
  *   - a flat toggle checkbox per connected module (reflecting `active`, label
- *     carrying the shortcut hint and any "(auto-hidden)" suppression suffix),
- *   - an "Edit Settings" picker submenu with per-module Settings entries,
+ *     carrying any "(auto-hidden)" suppression suffix if applicable),
+ *   - a single "Settings" item that opens the launcher's unified settings window,
  *   - a single "About PopSuite" item (one product, suite version),
  *   - a "Launch Preferences" submenu holding the "Open PopSuite at Login" toggle
  *     and a manual "Check for Updates" item,
@@ -271,7 +271,7 @@ export interface SuiteTrayMenuOptions {
  *   - an optional "Restart to Update (version)" item when an update is staged,
  *   - "Quit PopSuite".
  *
- * The module-dependent section (toggles + Edit Settings) collapses to a disabled
+ * The module-dependent section (toggles + Settings) collapses to a disabled
  * "No modules running" line when nothing has connected yet; the launcher-local
  * items (Launch Preferences, links, Quit) are always shown so the icon is never
  * dead and those capabilities never depend on a module being up.
@@ -293,14 +293,13 @@ export function buildSuiteTrayMenu(
   // Flat toggles: one checkbox per module directly under the title.
   for (const mod of sorted) {
     if (mod.canToggle) {
-      const hint = mod.shortcuts.length ? `  (${mod.shortcuts.join(", ")})` : "";
       // While auto-suppressed by a sibling (PopJot annotating), flag it so the
       // user understands the overlay is hidden by the suite, not by them. The
       // checkbox still reflects their own requested `active` state, and toggling
       // is still relayed (the module defers it until suppression clears).
       const suffix = mod.autoSuppressed ? " (auto-hidden)" : "";
       const label =
-        (mod.toggleLabel ?? `${mod.active ? "Disable" : "Enable"} ${mod.appName}`) + hint + suffix;
+        (mod.toggleLabel ?? `${mod.active ? "Disable" : "Enable"} ${mod.appName}`) + suffix;
       items.push({
         label,
         type: "checkbox",
@@ -313,25 +312,27 @@ export function buildSuiteTrayMenu(
     }
   }
 
-  // Edit Settings picker: one submenu that lists each module's Settings entry
-  // so the user picks which module's window to open. Reuses the existing
-  // per-module action relay (SUITE_ACTION_SETTINGS). About is deliberately
-  // omitted here — the suite presents a single product-level "About PopSuite"
-  // below instead of one About per module (the modules still report their About
-  // action for their own standalone trays; we just don't surface it in the
-  // unified picker). Only shown when at least one module exposes a Settings action.
-  const editSettings: SuiteMenuItem[] = [];
+  // Single Settings item: opens the launcher's settings window which hosts
+  // tabs for each module's real settings UI. About is deliberately omitted here
+  // — the suite presents a single product-level "About PopSuite" below instead
+  // of one About per module (the modules still report their About action for
+  // their own standalone trays; we just don't surface it in the unified menu).
+  // Only shown when at least one module exposes a Settings action.
+  let hasSettings = false;
   for (const mod of sorted) {
     for (const action of mod.actions) {
-      if (action.id === SUITE_ACTION_ABOUT) continue;
-      editSettings.push({
-        label: `${mod.appName} ${action.label}`,
-        click: () => handlers.onAction(mod.appName, action.id),
-      });
+      if (action.id === SUITE_ACTION_SETTINGS) {
+        hasSettings = true;
+        break;
+      }
     }
+    if (hasSettings) break;
   }
-  if (editSettings.length > 0) {
-    items.push({ label: "Edit Settings", submenu: editSettings });
+  if (hasSettings) {
+    items.push({
+      label: "Settings",
+      click: () => handlers.onAction("", SUITE_ACTION_SETTINGS),
+    });
   }
 
   // Single product-level About: one "About PopSuite" for the whole suite,

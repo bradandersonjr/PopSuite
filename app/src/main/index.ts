@@ -194,13 +194,17 @@ if (requestedModule) {
      * (invoke results + main→renderer pushes) into the hosted views. Replaces the
      * old "relay a Settings action to the module's own window" behavior — the
      * launcher now owns the one window and never asks a module to open its own.
+     * If appName is empty, selects the first connected module's tab.
      */
     function openSettingsFor(appName: string): void {
       if (!trayServer) return;
       if (!settingsWindow) {
         settingsWindow = createSuiteSettingsWindow(__dirname, trayServer, launcherTrayIconPath());
       }
-      settingsWindow.open(moduleIdForAppName(appName));
+      // Default to the first module if no specific appName is given (unified Settings item).
+      const modules = trayServer.getModules();
+      const selectedAppName = appName || (modules[0]?.appName ?? "popjot");
+      settingsWindow.open(moduleIdForAppName(selectedAppName));
     }
 
     function rebuildMenu(): void {

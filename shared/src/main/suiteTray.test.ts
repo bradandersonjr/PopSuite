@@ -69,7 +69,7 @@ describe("buildSuiteTrayMenu", () => {
     ]);
   });
 
-  it("builds a flat toggle checkbox per module with shortcut hint and checked state", () => {
+  it("builds a flat toggle checkbox per module with checked state (no shortcut hint)", () => {
     const menu = buildSuiteTrayMenu(
       [makeModule({ appName: "PopJot", active: true, shortcuts: ["Alt+Shift+A"] })],
       noopHandlers(),
@@ -79,7 +79,7 @@ describe("buildSuiteTrayMenu", () => {
     expect(toggle).toBeDefined();
     expect(toggle!.checked).toBe(true);
     expect(toggle!.label).toContain("Disable PopJot");
-    expect(toggle!.label).toContain("Alt+Shift+A");
+    expect(toggle!.label).not.toContain("Alt+Shift+A");
   });
 
   it("labels an inactive module as Enable and leaves the checkbox unchecked", () => {
@@ -104,27 +104,24 @@ describe("buildSuiteTrayMenu", () => {
     expect(menu[3].label).toContain("PopKey");
   });
 
-  it("builds an Edit Settings picker with per-module Settings entries only (no About)", () => {
+  it("shows a single Settings item when any module offers settings", () => {
     const menu = buildSuiteTrayMenu(
       [makeModule({ appName: "PopKey" }), makeModule({ appName: "PopJot" })],
       noopHandlers(),
       opts()
     );
-    const picker = menu.find((i) => i.label === "Edit Settings");
-    expect(picker?.submenu).toBeDefined();
-    // About is omitted from the unified picker — the suite shows one product-level
-    // "About PopSuite" instead of one About per module.
-    expect(labels(picker!.submenu!)).toEqual(["PopJot Settings", "PopKey Settings"]);
+    const settings = menu.find((i) => i.label === "Settings");
+    expect(settings).toBeDefined();
+    expect(settings?.submenu).toBeUndefined();
   });
 
-  it("wires Edit Settings entries to the per-module action relay", () => {
+  it("wires the Settings item to open the launcher's single settings window", () => {
     const handlers = noopHandlers();
     const menu = buildSuiteTrayMenu([makeModule({ appName: "PopKey" })], handlers, opts());
-    const picker = menu.find((i) => i.label === "Edit Settings")!;
-    picker.submenu!.find((i) => i.label === "PopKey Settings")!.click!();
-    expect(handlers.onAction).toHaveBeenCalledWith("PopKey", "settings");
-    // No per-module About in the picker to relay anymore.
-    expect(picker.submenu!.some((i) => i.label === "PopKey About")).toBe(false);
+    const settings = menu.find((i) => i.label === "Settings")!;
+    settings.click!();
+    // Opens the launcher's unified settings window (empty appName = launcher handles default).
+    expect(handlers.onAction).toHaveBeenCalledWith("", "settings");
   });
 
   it("shows a single About PopSuite item wired to onAbout", () => {
