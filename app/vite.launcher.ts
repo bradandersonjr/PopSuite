@@ -6,7 +6,9 @@
  *
  * Built as a plain CJS lib (no renderer/preload) so it stays a tiny standalone
  * entry. Electron built-ins and Node built-ins are externalized; the shared
- * suite-tray server/model (@shared/*) is bundled in.
+ * suite-tray server/model (@shared/*) is bundled in. electron-updater is left
+ * external too — it is a production dependency electron-builder traces into the
+ * app's node_modules, so it is require()d at runtime rather than bundled.
  */
 
 import { defineConfig } from "vite";
@@ -31,6 +33,7 @@ export default defineConfig({
     rollupOptions: {
       external: [
         "electron",
+        "electron-updater",
         ...builtinModules,
         ...builtinModules.map((m) => `node:${m}`),
       ],

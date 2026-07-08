@@ -6,6 +6,7 @@
   "author": "Brad Anderson <brad@bradandersonjr.com>",
   "main": "out/main/index.js",
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "uiohook-napi": "^1.5.4"
   },
   "scripts": {
@@ -16,8 +17,9 @@
     "build:launcher": "vite build --config vite.launcher.ts",
     "build": "npm run build:popjot && npm run build:popkey && npm run build:launcher",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "package": "npm run build && electron-builder --win --config electron-builder.yml",
-    "package:win": "npm run build && electron-builder --win --config electron-builder.yml"
+    "package": "npm run build && electron-builder --win --config electron-builder.yml --publish never",
+    "package:win": "npm run build && electron-builder --win --config electron-builder.yml --publish never",
+    "publish:win": "npm run build && electron-builder --win --config electron-builder.yml --publish always"
   },
   "devDependencies": {
     "electron": "40.10.3",

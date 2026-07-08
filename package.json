@@ -21,6 +21,7 @@
     "build:suite": "npm run build --prefix app",
     "typecheck:suite": "npm run typecheck --prefix app",
     "package:suite": "npm run package:win --prefix app",
+    "publish:suite": "npm run publish:win --prefix app",
 
     "typecheck": "concurrently -n PopJot,PopKey,suite -c cyan,magenta,green \"npm run typecheck --prefix app/modules/popjot\" \"npm run typecheck --prefix app/modules/popkey\" \"npm run typecheck --prefix app\"",
     "lint": "concurrently -n PopJot,PopKey -c cyan,magenta \"npm run lint --prefix app/modules/popjot\" \"npm run lint --prefix app/modules/popkey\"",

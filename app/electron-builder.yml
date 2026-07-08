@@ -5,6 +5,17 @@ copyright: Copyright © 2026 PopSuite
 directories:
   output: release
 
+# GitHub Releases as the update feed. electron-builder writes an app-update.yml
+# into the packaged app (so electron-updater knows where to look) and, in publish
+# mode (CI, GH_TOKEN present), creates/uploads the draft release with the NSIS
+# installer + latest.yml update metadata. Local builds run with `--publish never`
+# so they generate the installer + latest.yml on disk without any upload.
+publish:
+  provider: github
+  owner: bradandersonjr
+  repo: PopSuite
+  releaseType: draft
+
 files:
   - out/**/*
   # Production deps (uiohook-napi, PopKey's native input hook) are auto-included
