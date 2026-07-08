@@ -66,7 +66,7 @@ the repo root:
 npm run package:suite
 ```
 
-See [`../suite/README.md`](../suite/README.md) for the suite's architecture and
+See [`../../README.md`](../../README.md) for the suite's architecture and
 packaging details. `dev:electron` above (and `dev:module:popjot` from the repo
 root) remain the dev workflow for running PopJot standalone.
 
@@ -85,6 +85,9 @@ Press Alt+Shift+A (or Cmd+Shift+A on macOS) and hold. The overlay activates whil
 
 ### Persistent Mode (toggle)
 Press Alt+Shift+S (or Cmd+Shift+S on macOS) once to activate. The canvas stays open until you press Esc. Your annotations persist while the overlay is active. Best for extended annotation sessions, whiteboard-style explanations, or recording tutorials. You can take screenshots with Print Screen or your platform's screenshot tool while in persistent mode.
+
+### Spotlight Mode (presenter)
+Press Alt+Shift+D (or Cmd+Shift+D on macOS) to toggle a presenter overlay that dims the whole screen except a soft circle following the cursor. Scroll the mouse wheel to resize the circle live; soft-edge and dim-strength are adjustable sliders. Press Esc to exit. Mutually exclusive with drawing mode — entering one exits the other. In the PopSuite build, PopKey auto-hides while Spotlight is active, the same as it does while PopJot is drawing.
 
 ## Configuration (tray / settings)
 

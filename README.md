@@ -84,7 +84,7 @@ Run from the repo root; each fans out to the relevant workspace member(s) via
 | `dev:suite` | Both modules' Electron dev servers under `app/`'s own configs, in parallel |
 | `build:suite` | Builds the suite (launcher + both module bundles) |
 | `typecheck:suite` | Typechecks the `app/` package |
-| `package:suite` | Builds and packages the PopSuite desktop installer (Windows NSIS) |
+| `package:suite` | Builds and packages the PopSuite desktop installer for Windows (NSIS) |
 | `typecheck` | Typechecks PopJot, PopKey, and suite, in parallel |
 | `lint` | Lints PopJot and PopKey, in parallel |
 | `test` | Runs PopJot and PopKey's test suites, in parallel |
@@ -123,9 +123,12 @@ suppression so a module can't get stuck hidden.
 
 Per-app standalone installers (`PopJot.exe` / `PopKey.exe` as separate products)
 are **deprecated**; their packaging scripts and workflows were removed. Desktop
-distribution is exclusively through `package:suite`. Standalone Electron builds
-survive only as a **dev workflow** (`dev:module:*`, or `dev:electron` inside each
-app) and as the pipe-fallback mode described above.
+distribution is exclusively through the suite build (`package:suite` locally
+builds the Windows installer; the CI release workflow additionally builds and
+publishes an unsigned macOS dmg and Linux AppImage — see
+[`.github/workflows/release.yml`](.github/workflows/release.yml)). Standalone
+Electron builds survive only as a **dev workflow** (`dev:module:*`, or
+`dev:electron` inside each app) and as the pipe-fallback mode described above.
 
 See [`app/README.md`](app/README.md) for build/package details and
 [`app/MANUAL_VERIFICATION.md`](app/MANUAL_VERIFICATION.md) for the manual

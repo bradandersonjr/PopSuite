@@ -33,13 +33,14 @@ const PrivacyRoot = () => {
       {/* ─── Content ─── */}
       <main className="max-w-3xl mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold text-foreground mb-2">Privacy Policy</h1>
-        <p className="text-sm text-foreground/40 mb-10">Last updated: March 5, 2026</p>
+        <p className="text-sm text-foreground/40 mb-10">Last updated: July 8, 2026</p>
 
         <SectionHeading id="overview" isFirst>Overview</SectionHeading>
         <P>
-          PopJot is a screen annotation tool made by Brad Anderson Jr. This policy explains what
-          data PopJot does and does not collect. The short version: PopJot collects nothing.
-          Everything you draw stays on your device.
+          PopJot is a screen annotation tool made by Brad Anderson Jr, distributed as part of the
+          PopSuite desktop install alongside PopKey. This policy explains what data PopJot does and
+          does not collect. The short version: PopJot collects nothing. Everything you draw stays
+          on your device.
         </P>
 
         <SectionHeading id="data-collected">Data We Collect</SectionHeading>
@@ -49,9 +50,11 @@ const PrivacyRoot = () => {
           time, including during installation, use, or uninstallation.
         </P>
         <P>
-          The desktop application does not make any network requests. The Chrome extension does not
-          make any network requests. Your annotations exist only in memory and are cleared when you
-          deactivate the overlay.
+          The desktop application does not make any network requests, with one exception: on
+          Windows, PopSuite periodically checks GitHub Releases for a newer version so it can
+          offer an update. This check only requests public release metadata — it sends no personal
+          or usage data. The Chrome extension does not make any network requests. Your annotations
+          exist only in memory and are cleared when you deactivate the overlay.
         </P>
 
         <SectionHeading id="permissions">Permissions</SectionHeading>
@@ -83,7 +86,10 @@ const PrivacyRoot = () => {
         <P>
           PopJot saves your preferences (menu style, color palette, theme, animation intensity,
           keyboard shortcuts, and UI scale) locally on your device. On desktop this uses the
-          operating system&apos;s local application storage. In the Chrome extension this uses
+          operating system&apos;s local application storage, plus a small settings file under{" "}
+          <code className="text-sm bg-foreground/10 px-1 rounded mx-0.5">~/.popsuite/</code> used
+          to optionally sync specific settings you opt into sharing with PopKey. In the Chrome
+          extension this uses{" "}
           <code className="text-sm bg-foreground/10 px-1 rounded mx-0.5">chrome.storage.local</code>.
           This data never leaves your device.
         </P>

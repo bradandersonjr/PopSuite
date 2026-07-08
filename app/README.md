@@ -31,9 +31,28 @@ One binary, two run modes, selected by an argv flag:
 Cross-module glue lives in the launcher (`src/main/index.ts`): PopJot reports
 annotating on/off transitions up the pipe, and the launcher relays a `suppress`
 command to PopKey, which force-hides its overlay while PopJot is active and
-restores to the user's last requested state afterward. This behavior is
-suite-only — it never engages for standalone builds or a module run directly
-via `--module=` with no launcher.
+restores to the user's last requested state afterward. PopJot's Spotlight
+presenter mode (dim-screen-except-cursor-circle, toggled via its own global
+shortcut) reuses this same "annotating" signal, so PopKey auto-hides during
+Spotlight too, and Spotlight/annotation are mutually exclusive with each other
+in PopJot's own main process. This behavior is suite-only — it never engages
+for standalone builds or a module run directly via `--module=` with no
+launcher.
+
+### Unified settings window
+
+The launcher owns a single settings window (`src/main/suiteSettingsWindow.ts`)
+instead of each module opening its own. It is one frameless `BaseWindow`
+containing a thin tab-strip `WebContentsView` at the top plus one settings
+`WebContentsView` per module, each loading that module's real settings
+renderer. Only the active tab's view is visible; switching tabs re-lays-out the
+views (attach/detach) rather than reloading, so scroll position and in-progress
+form state survive flipping back and forth. Each hosted renderer's IPC is
+tunneled over the suite pipe to its owning module process via a relay preload
+(`src/main/suiteSettings/hostedPreload.ts`), so the real per-module settings
+handlers keep running in the module process — nothing is duplicated in the
+launcher. If a module isn't connected, its tab shows a placeholder instead of a
+blank view. The tray's single "Settings" item opens this window.
 
 ### Fallback / resilience model
 
@@ -100,9 +119,16 @@ resources dir. `uiohook-napi`'s native binding (PopKey's input hook) is
 unpacked from the asar via `asarUnpack` so it can be loaded at runtime; the
 PopJot module bundle contains no reference to it.
 
-macOS (dmg) and Linux (AppImage) targets are configured in
-`electron-builder.yml` as mirrors of the per-app configs but are not the
-primary target; Windows NSIS is what `package`/`package:win` build.
+macOS (dmg, universal) and Linux (AppImage) targets are also configured in
+`electron-builder.yml`. `package`/`package:win` build the Windows NSIS
+installer; the CI release workflow (`.github/workflows/release.yml`) additionally
+builds and publishes the macOS dmg and Linux AppImage via `publish:mac` /
+`publish:linux`, run on `macos-latest` / `ubuntu-latest` runners. Both are
+currently **unsigned** — no Apple signing identity and no Linux code-signing
+cert — so macOS requires a right-click -> Open on first launch and
+`electron-updater` auto-checks are restricted to Windows (see
+`app/src/main/updater.ts`); manual "Check for Updates" still works on every
+platform.
 
 ## Manual verification
 

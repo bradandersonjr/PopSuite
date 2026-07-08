@@ -151,7 +151,7 @@ const WebRoot = () => {
         { icon: Sparkles, label: "Fully customizable", colorIndex: 2 },
       ],
       hint: "Type or click anywhere to see it in action",
-      footnote: <>Free &amp; open source &middot; Windows, macOS &amp; Linux &middot; Coming Soon</>,
+      footnote: <>Free &amp; open source &middot; part of PopSuite &middot; Windows, macOS &amp; Linux</>,
     },
     demo: {
       heading: <>See it in <span className="text-secondary">action</span></>,
@@ -198,7 +198,7 @@ const WebRoot = () => {
       planMinHeight: 460,
       plans: [
         { name: "PopKey Extension", price: "Free", period: "forever", colorIndex: 2, ctaColorIndex: 3, popular: false, features: ["Keyboard input display", "Mouse click badges", "8 color palettes", "Chrome & Chromium browsers", "No install required"], cta: "Add to Chrome", url: CHROME_STORE_URL },
-        { name: "PopKey Desktop", price: "Free", period: "open source", colorIndex: 4, ctaColorIndex: 1, popular: true, features: ["Transparent overlay over any app", "Global keyboard capture", "Mouse click & scroll visualization", "4 badge styles & 8 palettes", "3 fonts + dark/light themes", "Custom keyboard shortcut", "Windows, macOS & Linux"], cta: "Download", url: GITHUB_RELEASE_URL },
+        { name: "PopKey Desktop", price: "Free", period: "open source", colorIndex: 4, ctaColorIndex: 1, popular: true, features: ["Transparent overlay over any app", "Global keyboard capture", "Mouse click & scroll visualization", "4 badge styles & 8 palettes", "3 fonts + dark/light themes", "Custom keyboard shortcut", "One install includes PopJot too", "Windows (signed), macOS & Linux (unsigned)"], cta: "Download", url: GITHUB_RELEASE_URL },
         { name: "PopSuite Pro", price: "$7", period: "one-time", colorIndex: 0, ctaColorIndex: 5, popular: false, features: ["Everything in Desktop", "Includes PopKey + PopJot", "Custom color palettes", "Any system font", "Badge enter/exit animations", "Branding watermark", "Support open source development"], cta: "Get Pro", url: null, crossLink: { label: "Also includes PopJot", href: POPJOT_URL } },
       ],
     },
@@ -208,7 +208,8 @@ const WebRoot = () => {
       items: [
         { question: "What exactly is PopKey?", answer: "PopKey is an on-screen input visualizer. It displays your keyboard presses, mouse clicks, and scroll wheel activity as styled badges overlaid on your screen — perfect for tutorials, recordings, and live streams." },
         { question: "Does it capture or log my input?", answer: "No. PopKey only displays inputs in real-time on your screen. Nothing is stored, logged, or transmitted. It's purely visual." },
-        { question: "What platforms are supported?", answer: "Windows, macOS, and Linux. PopKey is built with Electron so it runs natively on all three." },
+        { question: "What platforms are supported?", answer: "Windows, macOS, and Linux. The Windows installer is signed and auto-updates in the background. The macOS and Linux builds are early and unsigned — on first launch, right-click the app and choose Open (macOS), or mark the AppImage executable (Linux). Auto-update is Windows-only for now; a manual Check for Updates works everywhere. On macOS, PopKey also needs Accessibility and Input Monitoring permission to capture global input." },
+        { question: "Do I need to install anything besides PopKey?", answer: "No. PopKey installs as part of PopSuite, a single download that also includes PopJot (a screen annotation tool). Both run independently — you can enable or disable either one from the tray." },
         { question: "Can I use this during screen recordings?", answer: "Yes — that's exactly what it's for. PopKey draws on a transparent overlay so your inputs show up in any screen recorder, OBS capture, or screen share." },
         { question: "Can I customize the appearance?", answer: "Absolutely. Badge style (flat, outlined, pop, glow), 8 color palettes, font, text color, position, size, translucency, roundness, duration, and max badges on screen — everything is adjustable. Pro adds any system font, badge animations, custom palettes, and a branding watermark." },
         { question: "How is this different from other keystroke visualizers?", answer: "PopKey is designed to be snappy, beautiful, and stay out of your way. It supports keyboard, mouse clicks, scroll wheel, drag detection, and modifier combos — all with smooth animations and multiple visual styles." },

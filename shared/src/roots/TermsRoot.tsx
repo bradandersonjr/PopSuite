@@ -33,20 +33,22 @@ const TermsRoot = () => {
       {/* ─── Content ─── */}
       <main className="max-w-3xl mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold text-foreground mb-2">Terms of Service</h1>
-        <p className="text-sm text-foreground/40 mb-10">Last updated: March 5, 2026</p>
+        <p className="text-sm text-foreground/40 mb-10">Last updated: July 8, 2026</p>
 
         <SectionHeading id="agreement" isFirst>Agreement</SectionHeading>
         <P>
           By downloading, installing, or using PopJot (&ldquo;the Software&rdquo;), you agree to
-          these Terms of Service. If you do not agree, do not use the Software. These terms are
-          governed by the laws of the State of Georgia, United States.
+          these Terms of Service. PopJot is distributed as part of the PopSuite desktop install
+          alongside PopKey; these terms apply equally to both. If you do not agree, do not use the
+          Software. These terms are governed by the laws of the State of Georgia, United States.
         </P>
 
         <SectionHeading id="license">License</SectionHeading>
         <P>
-          PopJot is sold as a one-time purchase. Upon purchase you receive a personal,
-          non-exclusive, non-transferable license to install and use the Software on your own
-          devices. You may install it on multiple devices that you personally own or control.
+          PopJot is free to use. Optional Pro features are available as a one-time purchase.
+          Whether or not you purchase Pro, you receive a personal, non-exclusive,
+          non-transferable license to install and use the Software on your own devices. You may
+          install it on multiple devices that you personally own or control.
         </P>
         <P>
           The license is granted to you as an individual. It may not be shared, transferred,

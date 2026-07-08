@@ -64,7 +64,7 @@ the repo root:
 npm run package:suite
 ```
 
-See [`../suite/README.md`](../suite/README.md) for the suite's architecture and
+See [`../../README.md`](../../README.md) for the suite's architecture and
 packaging details. `dev:electron` above (and `dev:module:popkey` from the repo
 root) remain the dev workflow for running PopKey standalone.
 

@@ -5,14 +5,18 @@ import { ArrowLeft, Menu, X } from "lucide-react";
 
 const sections = [
   { id: "getting-started", label: "Getting Started" },
+  { id: "the-suite", label: "The PopSuite Tray" },
   { id: "activation-modes", label: "Activation Modes" },
   { id: "drawing-tools", label: "Drawing Tools" },
   { id: "radial-menu", label: "Radial Menu" },
   { id: "canvas-controls", label: "Canvas Controls" },
   { id: "background-modes", label: "Background Modes" },
+  { id: "spotlight", label: "Spotlight Mode" },
   { id: "customization", label: "Customization" },
+  { id: "settings-window", label: "Settings & Sync" },
   { id: "keyboard-shortcuts", label: "Keyboard Shortcuts" },
   { id: "resolution-scaling", label: "Resolution Scaling" },
+  { id: "updates", label: "Updates" },
   { id: "chrome-extension", label: "Chrome Extension" },
 ];
 
@@ -187,12 +191,59 @@ const DocsRoot = () => {
 
             <SubHeading>Installation</SubHeading>
             <P>
-              <strong>Desktop:</strong> Download the installer for your platform. On Windows you get an NSIS installer,
-              on macOS a DMG, and on Linux an AppImage or .deb package. Run the installer and PopJot is ready.
+              <strong>Desktop:</strong> PopJot installs as part of <strong>PopSuite</strong>, a single download
+              that includes both PopJot and PopKey. Get the latest installer for your platform from{" "}
+              <a
+                href="https://github.com/bradandersonjr/PopSuite/releases/latest"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-foreground underline underline-offset-2 hover:no-underline"
+              >
+                GitHub Releases
+              </a>
+              .
             </P>
+            <ul className="list-disc list-inside text-foreground/80 space-y-1 mb-4">
+              <li><strong>Windows</strong> — run the signed <code className="text-sm bg-foreground/10 px-1 rounded mx-0.5">PopSuite Setup</code> installer. Auto-updates in the background.</li>
+              <li>
+                <strong>macOS</strong> — open the <code className="text-sm bg-foreground/10 px-1 rounded mx-0.5">.dmg</code> and drag PopSuite to Applications.
+                The build is currently unsigned, so on first launch macOS will refuse to open it normally.{" "}
+                <strong>Right-click (or Control-click) the app and choose Open</strong>, then confirm in the dialog
+                that appears. You only need to do this once. Auto-update is disabled on macOS by design — check{" "}
+                <em>Check for Updates</em> from the tray to update manually.
+              </li>
+              <li>
+                <strong>Linux</strong> — download the <code className="text-sm bg-foreground/10 px-1 rounded mx-0.5">.AppImage</code>, mark it
+                executable (<code className="text-sm bg-foreground/10 px-1 rounded mx-0.5">chmod +x</code>), and run it. Unsigned, same as macOS;
+                use <em>Check for Updates</em> from the tray to update manually.
+              </li>
+            </ul>
             <P>
               <strong>Chrome Extension:</strong> Install from the Chrome Web Store. It works in all Chromium-based
               browsers (Chrome, Edge, Brave, Arc, etc.). No restart required.
+            </P>
+
+            {/* ─── The PopSuite Tray ─── */}
+            <SectionHeading id="the-suite">The PopSuite Tray</SectionHeading>
+
+            <P>
+              PopSuite runs one system tray icon for both apps. PopJot and PopKey run as
+              independent processes underneath, but you interact with them through a single
+              unified menu:
+            </P>
+            <ul className="list-disc list-inside text-foreground/80 space-y-1 mb-4">
+              <li>A checkbox toggle for each app (enable/disable PopJot, enable/disable PopKey)</li>
+              <li>A single <strong>Settings</strong> item that opens one settings window with a tab for each app</li>
+              <li><strong>About PopSuite</strong></li>
+              <li><strong>Launch Preferences</strong> — open PopSuite at login, and a manual Check for Updates</li>
+              <li><strong>Changelog</strong> and <strong>Documentation</strong> links</li>
+              <li><strong>Quit PopSuite</strong>, which exits both apps</li>
+            </ul>
+            <P>
+              While PopJot is annotating (or in Spotlight mode), PopKey automatically hides its
+              overlay so the two never visually collide — its tray toggle shows &quot;(auto-hidden)&quot;
+              during that time. PopKey&apos;s branding overlay, if enabled, stays visible. PopKey
+              restores to whatever state you last asked for as soon as PopJot stops.
             </P>
 
             {/* ─── Activation Modes ─── */}
@@ -365,12 +416,33 @@ const DocsRoot = () => {
               Annotate over a static image of your screen.
             </P>
 
+            {/* ─── Spotlight Mode ─── */}
+            <SectionHeading id="spotlight">Spotlight Mode</SectionHeading>
+
+            <P>
+              Spotlight is a presenter aid, separate from drawing: it dims the entire screen except
+              a soft circle that follows your cursor, so you can call attention to one spot without
+              annotating anything. Press <Kbd>Alt</Kbd>+<Kbd>Shift</Kbd>+<Kbd>D</Kbd> (or{" "}
+              <Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>D</Kbd> on macOS) to toggle it on and off.
+            </P>
+            <ul className="list-disc list-inside text-foreground/80 space-y-1 mb-4">
+              <li><strong>Scroll the mouse wheel</strong> to resize the spotlight circle live, the same way brush size works while drawing.</li>
+              <li><strong>Soft edge</strong> — a 0-100% slider controlling how gradual the fade is from the transparent circle to the dimmed background. 0% is a hard edge; 100% is the softest ramp.</li>
+              <li><strong>Dim strength</strong> — a 0-100% slider controlling how dark the dimmed area outside the circle is.</li>
+              <li>Press <Kbd>Esc</Kbd> to exit Spotlight at any time.</li>
+            </ul>
+            <P>
+              Spotlight and drawing mode are mutually exclusive — activating one exits the other.
+              While Spotlight is active, PopKey automatically hides its overlay, just as it does
+              while PopJot is drawing.
+            </P>
+
             {/* ─── Customization ─── */}
             <SectionHeading id="customization">Customization</SectionHeading>
 
             <P>
-              All customization options are in the Settings panel (accessible from the system tray on desktop,
-              or the extension popup in Chrome).
+              All customization options live in PopJot&apos;s tab of the PopSuite settings window
+              (opened from the tray&apos;s single Settings item), or the extension popup in Chrome.
             </P>
 
             <SubHeading>Menu styles</SubHeading>
@@ -470,6 +542,25 @@ const DocsRoot = () => {
               <li><strong>High</strong> — Playful. Exaggerated hover effects and bouncy animations.</li>
             </ul>
 
+            {/* ─── Settings & Sync ─── */}
+            <SectionHeading id="settings-window">Settings & Sync</SectionHeading>
+
+            <P>
+              PopSuite hosts one settings window for both apps. It opens from the tray&apos;s
+              single <strong>Settings</strong> item and shows a PopJot tab and a PopKey tab;
+              switching between them is instant — no reload, and your place in each tab is
+              preserved when you switch back.
+            </P>
+            <SubHeading>Cross-app sync</SubHeading>
+            <P>
+              Some settings — like color palette — can be shared between PopJot and PopKey so
+              you only have to set them once. Each syncable setting has its own opt-in toggle in
+              a <strong>Sync</strong> tab; nothing syncs unless you turn it on for that specific
+              setting. Synced values are stored in a shared file alongside each app&apos;s own
+              settings, all under <code className="text-sm bg-foreground/10 px-1 rounded mx-0.5">~/.popsuite/</code> on
+              your machine — never uploaded anywhere. Settings persist across restarts either way.
+            </P>
+
             {/* ─── Keyboard Shortcuts ─── */}
             <SectionHeading id="keyboard-shortcuts">Keyboard Shortcuts</SectionHeading>
 
@@ -499,6 +590,21 @@ const DocsRoot = () => {
                     <td className="py-2 pr-4">Exit persistent mode</td>
                     <td className="py-2 pr-4"><Kbd>Esc</Kbd></td>
                     <td className="py-2"><Kbd>Esc</Kbd></td>
+                  </tr>
+                  <tr className="border-b border-foreground/10">
+                    <td className="py-2 pr-4">Toggle Spotlight mode</td>
+                    <td className="py-2 pr-4"><Kbd>Alt</Kbd>+<Kbd>Shift</Kbd>+<Kbd>D</Kbd></td>
+                    <td className="py-2"><Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>D</Kbd></td>
+                  </tr>
+                  <tr className="border-b border-foreground/10">
+                    <td className="py-2 pr-4">Exit Spotlight mode</td>
+                    <td className="py-2 pr-4"><Kbd>Esc</Kbd></td>
+                    <td className="py-2"><Kbd>Esc</Kbd></td>
+                  </tr>
+                  <tr className="border-b border-foreground/10">
+                    <td className="py-2 pr-4">Resize Spotlight circle</td>
+                    <td className="py-2 pr-4">Scroll wheel</td>
+                    <td className="py-2">Scroll wheel</td>
                   </tr>
                   <tr className="border-b border-foreground/10">
                     <td className="py-2 pr-4">Open radial menu</td>
@@ -553,6 +659,23 @@ const DocsRoot = () => {
               <li><strong>150%</strong> — Good for 1440p displays</li>
               <li><strong>200%</strong> — Good for 4K displays</li>
             </ul>
+
+            {/* ─── Updates ─── */}
+            <SectionHeading id="updates">Updates</SectionHeading>
+            <P>
+              <strong>Windows</strong> — PopSuite checks for updates in the background and downloads
+              them silently. When one is ready, the tray menu shows a &quot;Restart to Update&quot;
+              item; click it to install and relaunch.
+            </P>
+            <P>
+              <strong>macOS and Linux</strong> — automatic background updates are disabled on these
+              unsigned builds. Use <strong>Launch Preferences &gt; Check for Updates</strong> from
+              the tray to check manually, then download the latest release yourself.
+            </P>
+            <P>
+              On every platform, <strong>Check for Updates</strong> in Launch Preferences triggers an
+              immediate manual check and reports back if you&apos;re already on the latest version.
+            </P>
 
             {/* ─── Chrome Extension ─── */}
             <SectionHeading id="chrome-extension">Chrome Extension</SectionHeading>

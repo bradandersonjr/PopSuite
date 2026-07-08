@@ -57,8 +57,27 @@ const ChangelogRoot = () => {
         <h1 className="text-3xl font-bold text-foreground mb-2">Changelog</h1>
         <P>All notable changes, bug fixes, and improvements to PopJot are documented here.</P>
 
-        {/* ── v1.0.0 ── */}
-        <SectionHeading id="v1-0-0" isFirst>v1.0.0 &mdash; March 2026</SectionHeading>
+        {/* ── PopSuite 1.0.0 ── */}
+        <SectionHeading id="popsuite-1-0-0" isFirst>PopSuite 1.0.0 &mdash; July 8, 2026</SectionHeading>
+        <P>
+          PopJot now ships as part of <strong>PopSuite</strong>, a single desktop install
+          that bundles PopJot and PopKey together. One installer, one tray icon, one
+          settings window &mdash; each app still runs as its own process underneath.
+        </P>
+        <ul className="space-y-1 mb-6">
+          <Entry tag="new">Single installer for PopJot and PopKey &mdash; one download, one tray icon, both apps included</Entry>
+          <Entry tag="new">Unified system tray with a toggle for each app, one Settings item, About PopSuite, Launch Preferences, Changelog, and Documentation</Entry>
+          <Entry tag="new">One settings window with a PopJot tab and a PopKey tab that switch instantly, no reload</Entry>
+          <Entry tag="new">Cross-app settings sync &mdash; opt in per setting to keep shared values (like color palette) in sync between PopJot and PopKey</Entry>
+          <Entry tag="new">PopKey automatically hides its overlay while PopJot is annotating or in Spotlight mode, and restores itself afterward</Entry>
+          <Entry tag="new">Spotlight presenter mode (Alt+Shift+D, Cmd+Shift+D on macOS) &mdash; dims the screen except a circle that follows your cursor, for calling out one spot on screen without drawing</Entry>
+          <Entry tag="new">Spotlight circle resizes live with the scroll wheel, with adjustable soft-edge and dim-strength sliders; press Escape to exit</Entry>
+          <Entry tag="new">Automatic background updates on Windows, with a manual &quot;Check for Updates&quot; option on every platform</Entry>
+          <Entry tag="improved">macOS and Linux builds are now available (unsigned) alongside the signed Windows installer</Entry>
+        </ul>
+
+        {/* ── PopJot v1.0.0 ── */}
+        <SectionHeading id="v1-0-0">PopJot v1.0.0 &mdash; March 2026</SectionHeading>
         <P>Initial public release of PopJot.</P>
         <ul className="space-y-1 mb-6">
           <Entry tag="new">Transparent fullscreen drawing overlay for desktop (Windows, macOS, Linux)</Entry>
