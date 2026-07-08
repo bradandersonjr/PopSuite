@@ -169,6 +169,15 @@ export function createSuiteSettingsWindow(
       webPreferences: {
         preload: hostedPreloadJs,
         contextIsolation: true,
+        // Electron 20+ defaults preloads to sandbox: true, which restricts
+        // require() to a small built-in allowlist. hostedPreload.ts must
+        // require() the module's own compiled preload bundle by absolute path
+        // at runtime (see hostedPreload.ts) — that require silently fails under
+        // the sandbox, leaving window.electronAPI undefined in every hosted tab.
+        // The module's standalone settings window preload is a self-contained
+        // bundle with no runtime require of external files, so it works sandboxed;
+        // this view genuinely needs the escape hatch.
+        sandbox: false,
         // Pass the module id and its real preload path to the hosted preload so
         // it can tunnel IPC for the right module and boot the module's own bridge.
         additionalArguments: [

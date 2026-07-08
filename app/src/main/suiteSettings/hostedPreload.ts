@@ -87,8 +87,20 @@ ipcRenderer.removeListener = ((channel: string, listener: (...args: unknown[]) =
 // module's exact preload, which calls contextBridge.exposeInMainWorld with its
 // real electronAPI — now transparently talking to the owning module process.
 if (modulePreloadPath) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require(modulePreloadPath);
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require(modulePreloadPath);
+  } catch (err) {
+    // Surface load failures instead of silently leaving window.electronAPI
+    // undefined (which makes every isDesktop() check in the hosted renderer
+    // fall back to its web-page copy, e.g. the Sync tab's "desktop app only"
+    // message even though this genuinely IS the desktop app).
+    // eslint-disable-next-line no-console
+    console.error("[hostedPreload] failed to load module preload:", modulePreloadPath, err);
+  }
+} else {
+  // eslint-disable-next-line no-console
+  console.error("[hostedPreload] no --suite-preload argument received; argv:", process.argv);
 }
 
 // Tell the owning module (through the relay) that our renderer is up so it seeds
