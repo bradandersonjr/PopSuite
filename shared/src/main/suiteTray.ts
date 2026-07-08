@@ -178,6 +178,13 @@ export interface SuiteTrayHandlers {
   onOpenLink(url: string): void;
   /** Show the single suite-level About dialog (launcher-local, suite version). */
   onAbout(): void;
+  /** Trigger an immediate manual update check (launcher-local, no pipe). */
+  onCheckForUpdates(): void;
+  /**
+   * Install a downloaded update: quit the modules, then quitAndInstall. Only
+   * wired when an update is staged (options.updateReady is set).
+   */
+  onInstallUpdate(): void;
   onQuitAll(): void;
 }
 
@@ -185,6 +192,12 @@ export interface SuiteTrayHandlers {
 export interface SuiteTrayMenuOptions {
   /** Current launcher open-at-login state; drives the checkbox in the submenu. */
   launcherOpenAtLogin: boolean;
+  /**
+   * Set when an update has downloaded and is ready to install; renders a
+   * "Restart to Update (version)" item near Quit. Absent when no update is
+   * staged (dev, offline, already current, or still downloading).
+   */
+  updateReady?: { version: string };
 }
 
 /**
@@ -196,8 +209,10 @@ export interface SuiteTrayMenuOptions {
  *     carrying the shortcut hint and any "(auto-hidden)" suppression suffix),
  *   - an "Edit Settings" picker submenu with per-module Settings entries,
  *   - a single "About PopSuite" item (one product, suite version),
- *   - a "Launch Preferences" submenu holding the "Open PopSuite at Login" toggle,
+ *   - a "Launch Preferences" submenu holding the "Open PopSuite at Login" toggle
+ *     and a manual "Check for Updates" item,
  *   - suite-wide "Changelog" / "Documentation" links,
+ *   - an optional "Restart to Update (version)" item when an update is staged,
  *   - "Quit PopSuite".
  *
  * The module-dependent section (toggles + Edit Settings) collapses to a disabled
@@ -279,6 +294,10 @@ export function buildSuiteTrayMenu(
         checked: options.launcherOpenAtLogin,
         click: () => handlers.onOpenAtLoginToggle(),
       },
+      { type: "separator" },
+      // Manual update check. The silent auto-check runs on its own cadence; this
+      // lets the user force one and get a "you're on the latest version" reply.
+      { label: "Check for Updates", click: () => handlers.onCheckForUpdates() },
     ],
   });
 
@@ -287,6 +306,14 @@ export function buildSuiteTrayMenu(
   items.push({ label: "Documentation", click: () => handlers.onOpenLink(SUITE_DOCS_URL) });
 
   items.push({ type: "separator" });
+  // A staged update surfaces as a restart item directly above Quit, so the two
+  // "app lifecycle" actions sit together. Only present once the download is ready.
+  if (options.updateReady) {
+    items.push({
+      label: `Restart to Update (${options.updateReady.version})`,
+      click: () => handlers.onInstallUpdate(),
+    });
+  }
   items.push({ label: "Quit PopSuite", click: () => handlers.onQuitAll() });
 
   return items;

@@ -35,6 +35,7 @@ import {
   type SuiteTrayServer,
 } from "@shared/main/suiteTrayServer";
 import { buildSuiteTrayMenu } from "@shared/main/suiteTray";
+import { createSuiteUpdater, type SuiteUpdater } from "./updater";
 
 const MODULES = ["popjot", "popkey"] as const;
 type ModuleId = (typeof MODULES)[number];
@@ -103,6 +104,7 @@ if (requestedModule) {
   } else {
     let tray: Tray | null = null;
     let trayServer: SuiteTrayServer | null = null;
+    let updater: SuiteUpdater | null = null;
     // Guards a graceful shutdown so module "close" events during Quit All don't
     // re-trigger menu rebuilds against a torn-down tray.
     let quitting = false;
@@ -174,6 +176,7 @@ if (requestedModule) {
 
     function rebuildMenu(): void {
       if (!tray || tray.isDestroyed() || !trayServer) return;
+      const readyVersion = updater?.readyVersion ?? null;
       const template = buildSuiteTrayMenu(
         trayServer.getModules(),
         {
@@ -186,11 +189,42 @@ if (requestedModule) {
           },
           onOpenLink: (url) => openSuiteLink(url),
           onAbout: () => showSuiteAboutDialog(),
+          onCheckForUpdates: () => checkForUpdates(),
+          onInstallUpdate: () => installUpdate(),
           onQuitAll: () => quitAll(),
         },
-        { launcherOpenAtLogin: getLauncherOpenAtLogin() }
+        {
+          launcherOpenAtLogin: getLauncherOpenAtLogin(),
+          updateReady: readyVersion ? { version: readyVersion } : undefined,
+        }
       );
       tray.setContextMenu(Menu.buildFromTemplate(template as Electron.MenuItemConstructorOptions[]));
+    }
+
+    // Manual "Check for Updates": trigger an immediate check and, when nothing
+    // newer is found, reassure the user. A found update follows the same silent
+    // download -> tray restart-item flow as the automatic checks, so we only need
+    // a dialog for the up-to-date / unavailable cases.
+    function checkForUpdates(): void {
+      void updater?.checkNow().then((result) => {
+        if (result.status === "up-to-date" || result.status === "unavailable") {
+          dialog.showMessageBox({
+            type: "info",
+            title: "PopSuite",
+            message: "You're on the latest version.",
+            buttons: ["OK"],
+          });
+        }
+        // "downloading"/"ready" surface via the tray item; no dialog needed.
+      });
+    }
+
+    // Install a staged update: hand the updater our module-quit routine so the
+    // modules tear down (PopKey's uiohook, overlays) before quitAndInstall.
+    function installUpdate(): void {
+      if (!updater?.readyVersion) return;
+      quitting = true;
+      updater.installUpdate(() => trayServer?.quitAll());
     }
 
     function quitAll(): void {
@@ -224,6 +258,14 @@ if (requestedModule) {
       // Windows/macOS: double-click the icon to re-spawn any missing modules.
       tray.on("double-click", () => spawnModules());
 
+      // Launcher-only auto-update: start the delayed initial check + 4h interval.
+      // No-ops cleanly in dev (!app.isPackaged). When an update finishes
+      // downloading it rebuilds the menu so the restart item appears.
+      updater = createSuiteUpdater(() => {
+        if (!quitting) rebuildMenu();
+      });
+      updater.start();
+
       rebuildMenu();
       spawnModules();
     });
@@ -241,6 +283,8 @@ if (requestedModule) {
     });
 
     app.on("will-quit", () => {
+      updater?.dispose();
+      updater = null;
       trayServer?.dispose();
       trayServer = null;
       tray?.destroy();

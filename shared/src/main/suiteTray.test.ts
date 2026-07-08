@@ -33,6 +33,8 @@ function noopHandlers(): SuiteTrayHandlers {
     onOpenAtLoginToggle: vi.fn(),
     onOpenLink: vi.fn(),
     onAbout: vi.fn(),
+    onCheckForUpdates: vi.fn(),
+    onInstallUpdate: vi.fn(),
     onQuitAll: vi.fn(),
   };
 }
@@ -151,6 +153,32 @@ describe("buildSuiteTrayMenu", () => {
       .find((i) => i.label === "Launch Preferences")!
       .submenu!.find((i) => i.label === "Open PopSuite at Login")!;
     expect(onItem.checked).toBe(true);
+  });
+
+  it("puts a Check for Updates item in the Launch Preferences submenu wired to onCheckForUpdates", () => {
+    const handlers = noopHandlers();
+    const menu = buildSuiteTrayMenu([], handlers, opts());
+    const prefs = menu.find((i) => i.label === "Launch Preferences")!;
+    const check = prefs.submenu!.find((i) => i.label === "Check for Updates")!;
+    expect(check).toBeDefined();
+    check.click!();
+    expect(handlers.onCheckForUpdates).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits the Restart to Update item when no update is staged", () => {
+    const menu = buildSuiteTrayMenu([], noopHandlers(), opts());
+    expect(menu.some((i) => i.label?.startsWith("Restart to Update"))).toBe(false);
+  });
+
+  it("shows a Restart to Update item with the version just above Quit when an update is ready", () => {
+    const handlers = noopHandlers();
+    const menu = buildSuiteTrayMenu([], handlers, opts({ updateReady: { version: "1.1.0" } }));
+    const idx = menu.findIndex((i) => i.label === "Restart to Update (1.1.0)");
+    expect(idx).toBeGreaterThanOrEqual(0);
+    // Sits directly above Quit PopSuite.
+    expect(menu[idx + 1].label).toBe("Quit PopSuite");
+    menu[idx].click!();
+    expect(handlers.onInstallUpdate).toHaveBeenCalledTimes(1);
   });
 
   it("wires the login toggle to onOpenAtLoginToggle", () => {
