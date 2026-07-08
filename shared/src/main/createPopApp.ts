@@ -494,6 +494,15 @@ export function createPopApp<S extends SettingsSchema>(
 
     loadRendererWindow(win);
 
+    // Push the loaded settings (persisted from disk, or synced from the sibling
+    // app) into the overlay once its content is ready. Without this the overlay
+    // renders with schema defaults every launch and only picks up the real
+    // values if the user happens to open the Settings window, which has its own
+    // did-finish-load sync below.
+    win.webContents.on("did-finish-load", () => {
+      syncTraySettingsToWindow(win);
+    });
+
     win.once("ready-to-show", () => {
       // Force full-display bounds after show to override OS working-area constraints
       win.setBounds({ x, y, width, height });

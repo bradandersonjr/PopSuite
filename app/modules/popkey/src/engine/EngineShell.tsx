@@ -14,7 +14,9 @@ const EngineShell = () => {
       {appEnabled && <InputHUD badges={badges} />}
       {appEnabled && showMouseClicks && <MouseRipple clicks={clicks} />}
       {appEnabled && showScrollWheel && <ScrollIndicator scrolls={scrolls} />}
-      {appEnabled && <BrandingOverlay />}
+      {/* Branding stays visible even while PopKey is hidden (manually or
+          auto-suppressed by PopJot annotating) so the watermark never disappears. */}
+      <BrandingOverlay />
     </>
   );
 };
