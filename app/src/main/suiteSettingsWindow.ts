@@ -255,6 +255,13 @@ export function createSuiteSettingsWindow(
   // Every hosted renderer's send/invoke arrives here tagged with its module id;
   // forward to the owning module process over the pipe.
   ipcMain.on("suite:relay-send", (_e, moduleId: string, channel: string, args: unknown[]) => {
+    // The hosted "Done" button sends close-window; in the launcher-owned window
+    // that must hide THIS window, not ask the (windowless) module to hide its own.
+    // Everything else tunnels to the owning module.
+    if (channel === "close-window") {
+      if (win && !win.isDestroyed()) win.hide();
+      return;
+    }
     trayServer.relaySend(appNameForModule(moduleId), channel, args);
   });
   // Correlate invoke replies by id. The module answers via routeRelay below.
