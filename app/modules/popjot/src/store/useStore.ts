@@ -34,10 +34,16 @@ interface AppState extends SettingsState<typeof settingsSchema> {
     setHotkey: (hotkey: string) => void;
     persistentHotkey: string;
     setPersistentHotkey: (hotkey: string) => void;
+    spotlightHotkey: string;
+    setSpotlightHotkey: (hotkey: string) => void;
     isPersistentMode: boolean;
     setIsPersistentMode: (isPersistentMode: boolean) => void;
     isDrawing: boolean;
     setIsDrawing: (isDrawing: boolean) => void;
+    /** Spotlight presenter mode — dim the screen except a circle at the cursor.
+     *  Runtime-only (not persisted); toggled by the spotlight shortcut/Escape. */
+    spotlightActive: boolean;
+    setSpotlightActive: (spotlightActive: boolean) => void;
     pageZoomFactor: number;
     setPageZoomFactor: (zoomFactor: number) => void;
     snapshotDataUrl: string | null;
@@ -71,10 +77,14 @@ export const useStore = create<AppState>((set) => ({
     setHotkey: (hotkey) => set({ hotkey }),
     persistentHotkey: isMac() ? "Cmd + Shift + S" : "Alt + Shift + S",
     setPersistentHotkey: (persistentHotkey) => set({ persistentHotkey }),
+    spotlightHotkey: isMac() ? "Cmd + Shift + D" : "Alt + Shift + D",
+    setSpotlightHotkey: (spotlightHotkey) => set({ spotlightHotkey }),
     isPersistentMode: false,
     setIsPersistentMode: (isPersistentMode) => set({ isPersistentMode }),
     isDrawing: false,
     setIsDrawing: (isDrawing) => set({ isDrawing }),
+    spotlightActive: false,
+    setSpotlightActive: (spotlightActive) => set({ spotlightActive }),
     pageZoomFactor: 1,
     setPageZoomFactor: (pageZoomFactor) => set({ pageZoomFactor }),
     snapshotDataUrl: null,

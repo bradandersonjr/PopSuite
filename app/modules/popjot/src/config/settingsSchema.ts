@@ -39,6 +39,12 @@ export const settingsSchema = {
   gridMode: setting.enum(["none", "grid", "dots"], "none"),
   gridSize: setting.enum(["small", "large"], "small"),
   overlayMode: setting.enum(["live", "snapshot"], "live"),
+  // Spotlight mode: dim the whole screen except a soft circle that follows the
+  // cursor (presenter effect). These tune the visual only — the mode itself is
+  // toggled by the "spotlight" global shortcut, not a stored on/off flag.
+  spotlightDimOpacity: setting.number(65), // 0 = no dim, 100 = fully black
+  spotlightRadius: setting.number(180, { positive: true }), // circle radius in px
+  spotlightFeather: setting.boolean(true), // soft (feathered) vs hard circle edge
   scaleMultiplier: setting.number(1, { positive: true }),
   // Per-monitor UI scale — derived by each window, broadcast but never stored.
   scaleFactor: setting.number(1, { positive: true, volatile: true }),
