@@ -20,6 +20,7 @@ import {
   encodeFrame,
   decodeFrames,
   type SuiteModuleState,
+  type SuiteBounds,
   type LauncherToModule,
 } from "./suiteTray";
 
@@ -37,11 +38,31 @@ export interface SuiteTrayClientHandlers {
    * can omit it. Defaults to a no-op.
    */
   onSuppress?(suppressed: boolean): void;
+  /**
+   * Suite-only: the launcher relayed a settings tab-swap — open (or focus) this
+   * module's settings window at the given bounds so it lands exactly where the
+   * sibling's window was. Optional; defaults to a no-op.
+   */
+  onOpenSettings?(bounds: SuiteBounds): void;
+  /**
+   * Suite-only: the result of THIS module's own tab-swap request. `delivered` is
+   * true when the sibling got the openSettings command (safe to hide our own
+   * window), false when the sibling wasn't running (keep our window — never zero
+   * settings windows). Optional; defaults to a no-op.
+   */
+  onSiblingSettingsResult?(target: string, delivered: boolean): void;
 }
 
 export interface SuiteTrayClient {
   /** Push a fresh state snapshot to the launcher (no-op if not connected). */
   report(state: SuiteModuleState): void;
+  /**
+   * Ask the launcher to relay a settings tab-swap to the sibling module: open
+   * ITS settings window at `bounds`. No-op if not connected. The launcher only
+   * relays to a running sibling; a dead sibling is silently dropped so this
+   * module keeps its own settings window.
+   */
+  requestSiblingSettings(target: string, bounds: SuiteBounds): void;
   /** Tear down the socket. */
   dispose(): void;
 }
@@ -100,6 +121,12 @@ export function createSuiteTrayClient(
         case "suppress":
           handlers.onSuppress?.(msg.suppressed);
           break;
+        case "openSettings":
+          handlers.onOpenSettings?.(msg.bounds);
+          break;
+        case "siblingSettingsResult":
+          handlers.onSiblingSettingsResult?.(msg.target, msg.delivered);
+          break;
       }
     }
   });
@@ -119,6 +146,14 @@ export function createSuiteTrayClient(
       if (!socket || socket.destroyed) return;
       try {
         socket.write(encodeFrame({ type: "state", state }));
+      } catch {
+        // Write after close: the close/error handler already handles fallback.
+      }
+    },
+    requestSiblingSettings(target: string, bounds: SuiteBounds): void {
+      if (!socket || socket.destroyed) return;
+      try {
+        socket.write(encodeFrame({ type: "requestSiblingSettings", target, bounds }));
       } catch {
         // Write after close: the close/error handler already handles fallback.
       }

@@ -100,6 +100,42 @@ export function onSyncPrefsChanged(cb: (prefs: Record<string, boolean>) => void)
   return (bridge() as SyncBridge | undefined)?.onSyncPrefsChanged?.(cb) ?? (() => {});
 }
 
+// ─── Suite settings app-switcher (tab strip) ───────────────────────────
+
+/** Identity for the settings app-switcher tab strip. `sibling` is null when the
+ *  app has no suite sibling (standalone-only build) so the strip never renders. */
+export interface SuiteInfo {
+  appName: string;
+  sibling: string | null;
+  connected: boolean;
+}
+
+type SuiteBridge = {
+  suiteGetInfo?: () => Promise<SuiteInfo>;
+  suiteSwitchToSibling?: () => void;
+  onSuiteConnectedChanged?: (cb: (connected: boolean) => void) => () => void;
+};
+
+/**
+ * Read the suite app-switcher info (identity + current connected state). On web
+ * (or any non-suite build) returns a standalone-shaped value with no sibling and
+ * connected=false, so the tab strip stays hidden and behavior matches today.
+ */
+export async function getSuiteInfo(): Promise<SuiteInfo> {
+  const info = await (bridge() as SuiteBridge | undefined)?.suiteGetInfo?.();
+  return info ?? { appName: "", sibling: null, connected: false };
+}
+
+/** Ask the shell to swap to the sibling module's settings window (no-op on web). */
+export function suiteSwitchToSibling(): void {
+  (bridge() as SuiteBridge | undefined)?.suiteSwitchToSibling?.();
+}
+
+/** Subscribe to live suite-connected changes (fires on connect / pipe drop). */
+export function onSuiteConnectedChanged(cb: (connected: boolean) => void): () => void {
+  return (bridge() as SuiteBridge | undefined)?.onSuiteConnectedChanged?.(cb) ?? (() => {});
+}
+
 export interface SettingsPlatform<S extends SettingsSchema> {
   /** Send a setting change to the main process (no-op on web). */
   sendSetting<K extends keyof S & string>(key: K, value: SettingValue<S[K]>): void;

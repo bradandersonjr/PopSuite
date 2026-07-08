@@ -19,6 +19,7 @@ import {
   encodeFrame,
   decodeFrames,
   type SuiteModuleState,
+  type SuiteBounds,
   type ModuleToLauncher,
   type LauncherToModule,
 } from "./suiteTray";
@@ -42,6 +43,13 @@ export interface SuiteTrayServer {
    * connected). Used to hide/restore PopKey while PopJot annotates.
    */
   suppress(appName: string, suppressed: boolean): void;
+  /**
+   * Tell the named module to open (or focus) its settings window at `bounds`
+   * (the tab-swap relay). Returns true if the module was connected and the
+   * command was sent; false if it isn't running, so the requesting side can keep
+   * its own settings window open rather than leaving the user with none.
+   */
+  openSettingsAt(appName: string, bounds: SuiteBounds): boolean;
   /** Ask every connected module to quit itself. */
   quitAll(): void;
   /** Stop listening and drop all connections. */
@@ -50,11 +58,16 @@ export interface SuiteTrayServer {
 
 /**
  * Start the tray server. `onChange` fires whenever the live module set or any
- * module's state changes, so the launcher can rebuild its menu.
+ * module's state changes, so the launcher can rebuild its menu. `onRequest`
+ * fires (after the relay) when a module asks the launcher to relay a command to
+ * a sibling — today only the settings tab-swap. The server performs the relay +
+ * ack itself so the requester never strands the user with zero windows; the
+ * callback is a launcher-side observation hook (logging) with the delivered flag.
  */
 export function createSuiteTrayServer(
   onChange: () => void,
-  pipePath: string = SUITE_TRAY_PIPE
+  pipePath: string = SUITE_TRAY_PIPE,
+  onRequest?: (msg: ModuleToLauncher, delivered: boolean) => void
 ): SuiteTrayServer {
   // Best-effort cleanup of a stale Unix socket file from a crashed prior run.
   // On Windows named pipes there is no filesystem node to remove.
@@ -96,6 +109,17 @@ export function createSuiteTrayServer(
         if (msg.type === "state") {
           conn.state = msg.state;
           changed = true;
+        } else if (msg.type === "requestSiblingSettings") {
+          // Settings tab-swap: relay openSettings to the sibling (if connected),
+          // then ack the requester with whether it was delivered. The requester
+          // only hides its own window on delivered=true, so a dead sibling never
+          // leaves the user with zero settings windows. Not a state change (no
+          // menu rebuild). onRequest lets the launcher log/observe the relay.
+          const target = findByApp(msg.target);
+          const delivered = Boolean(target);
+          if (target) send(target, { type: "openSettings", bounds: msg.bounds });
+          send(conn, { type: "siblingSettingsResult", target: msg.target, delivered });
+          onRequest?.(msg, delivered);
         }
       }
       if (changed) onChange();
@@ -135,6 +159,12 @@ export function createSuiteTrayServer(
     suppress(appName: string, suppressed: boolean): void {
       const conn = findByApp(appName);
       if (conn) send(conn, { type: "suppress", suppressed });
+    },
+    openSettingsAt(appName: string, bounds: SuiteBounds): boolean {
+      const conn = findByApp(appName);
+      if (!conn) return false;
+      send(conn, { type: "openSettings", bounds });
+      return true;
     },
     quitAll(): void {
       for (const conn of connections) send(conn, { type: "quit" });

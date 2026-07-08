@@ -145,6 +145,145 @@ describe("suite-tray IPC", () => {
     expect(server.getModules()[0].annotating).toBe(true);
   });
 
+  it("relays an openSettings command with bounds to the named module", async () => {
+    const path = pipePath();
+    const server = createSuiteTrayServer(vi.fn(), path);
+    cleanups.push(() => server.dispose());
+
+    const openCalls: Array<{ x: number; y: number; width: number; height: number }> = [];
+    let ready = false;
+    const client = createSuiteTrayClient(
+      {
+        onToggle: vi.fn(),
+        onAction: vi.fn(),
+        onQuit: vi.fn(),
+        onOpenSettings: (bounds) => openCalls.push(bounds),
+      },
+      { onReady: () => (ready = true), onUnavailable: vi.fn() },
+      path
+    );
+    cleanups.push(() => client.dispose());
+
+    await until(() => ready);
+    client.report(state({ appName: "PopKey" }));
+    await until(() => server.getModules().length === 1);
+
+    const bounds = { x: 100, y: 120, width: 1160, height: 860 };
+    const sent = server.openSettingsAt("PopKey", bounds);
+    expect(sent).toBe(true);
+    await until(() => openCalls.length === 1);
+    expect(openCalls[0]).toEqual(bounds);
+  });
+
+  it("openSettingsAt returns false when the target module is not connected", () => {
+    const path = pipePath();
+    const server = createSuiteTrayServer(vi.fn(), path);
+    cleanups.push(() => server.dispose());
+    // Nobody connected: a swap request for a dead sibling is a no-op the caller
+    // can detect, so the requesting side keeps its own settings window.
+    expect(server.openSettingsAt("PopKey", { x: 0, y: 0, width: 900, height: 680 })).toBe(false);
+  });
+
+  it("fires the launcher onRequest hook with the delivered flag for a swap request", async () => {
+    const path = pipePath();
+    const requests: Array<{ msg: unknown; delivered: boolean }> = [];
+    const server = createSuiteTrayServer(vi.fn(), path, (msg, delivered) =>
+      requests.push({ msg, delivered })
+    );
+    cleanups.push(() => server.dispose());
+
+    let ready = false;
+    const client = createSuiteTrayClient(
+      { onToggle: vi.fn(), onAction: vi.fn(), onQuit: vi.fn() },
+      { onReady: () => (ready = true), onUnavailable: vi.fn() },
+      path
+    );
+    cleanups.push(() => client.dispose());
+
+    await until(() => ready);
+    // No sibling connected: the launcher hook sees delivered=false.
+    const bounds = { x: 50, y: 60, width: 1160, height: 860 };
+    client.requestSiblingSettings("PopKey", bounds);
+    await until(() => requests.length === 1);
+    expect(requests[0].msg).toEqual({ type: "requestSiblingSettings", target: "PopKey", bounds });
+    expect(requests[0].delivered).toBe(false);
+  });
+
+  it("end-to-end: a swap request opens the sibling's settings and acks the requester delivered", async () => {
+    const path = pipePath();
+    // The server relays + acks internally now; no launcher policy needed.
+    const server = createSuiteTrayServer(vi.fn(), path);
+    cleanups.push(() => server.dispose());
+
+    // PopJot: the requester (receives the ack). PopKey: the sibling (opens settings).
+    const openOnPopKey: Array<{ width: number }> = [];
+    const acksOnPopJot: Array<{ target: string; delivered: boolean }> = [];
+    let popjotReady = false;
+    let popkeyReady = false;
+    const popjot = createSuiteTrayClient(
+      {
+        onToggle: vi.fn(),
+        onAction: vi.fn(),
+        onQuit: vi.fn(),
+        onSiblingSettingsResult: (target, delivered) => acksOnPopJot.push({ target, delivered }),
+      },
+      { onReady: () => (popjotReady = true), onUnavailable: vi.fn() },
+      path
+    );
+    cleanups.push(() => popjot.dispose());
+    const popkey = createSuiteTrayClient(
+      {
+        onToggle: vi.fn(),
+        onAction: vi.fn(),
+        onQuit: vi.fn(),
+        onOpenSettings: (b) => openOnPopKey.push(b),
+      },
+      { onReady: () => (popkeyReady = true), onUnavailable: vi.fn() },
+      path
+    );
+    cleanups.push(() => popkey.dispose());
+
+    await until(() => popjotReady && popkeyReady);
+    popjot.report(state({ appName: "PopJot" }));
+    popkey.report(state({ appName: "PopKey" }));
+    await until(() => server.getModules().length === 2);
+
+    popjot.requestSiblingSettings("PopKey", { x: 0, y: 0, width: 1160, height: 860 });
+    await until(() => openOnPopKey.length === 1 && acksOnPopJot.length === 1);
+    expect(openOnPopKey[0].width).toBe(1160);
+    expect(acksOnPopJot[0]).toEqual({ target: "PopKey", delivered: true });
+  });
+
+  it("acks the requester delivered=false when the sibling isn't running (never zero windows)", async () => {
+    const path = pipePath();
+    const server = createSuiteTrayServer(vi.fn(), path);
+    cleanups.push(() => server.dispose());
+
+    const acks: Array<{ target: string; delivered: boolean }> = [];
+    let ready = false;
+    const client = createSuiteTrayClient(
+      {
+        onToggle: vi.fn(),
+        onAction: vi.fn(),
+        onQuit: vi.fn(),
+        onSiblingSettingsResult: (target, delivered) => acks.push({ target, delivered }),
+      },
+      { onReady: () => (ready = true), onUnavailable: vi.fn() },
+      path
+    );
+    cleanups.push(() => client.dispose());
+
+    await until(() => ready);
+    client.report(state({ appName: "PopJot" }));
+    await until(() => server.getModules().length === 1);
+
+    // Sibling "PopKey" never connected: the requester is told delivered=false so
+    // it keeps its own settings window.
+    client.requestSiblingSettings("PopKey", { x: 0, y: 0, width: 900, height: 680 });
+    await until(() => acks.length === 1);
+    expect(acks[0]).toEqual({ target: "PopKey", delivered: false });
+  });
+
   it("quitAll asks every connected module to quit", async () => {
     const path = pipePath();
     const server = createSuiteTrayServer(vi.fn(), path);

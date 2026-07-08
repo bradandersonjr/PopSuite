@@ -13,6 +13,7 @@ export {
   SettingsColumns,
 } from "./primitives";
 export { SettingsWindowFrame, EmbeddedSettingsPanel } from "./SettingsWindowFrame";
+export { SuiteTabStrip } from "./SuiteTabStrip";
 export { LicenseField } from "./LicenseField";
 export { SettingsImportExport } from "./SettingsImportExport";
 export { SyncSettings } from "./SyncSettings";

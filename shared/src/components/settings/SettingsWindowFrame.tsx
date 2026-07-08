@@ -8,6 +8,7 @@ import React from "react";
 import { Settings } from "lucide-react";
 import { closeWindow, isDesktop } from "../../settings/renderer";
 import { useSettingsUI } from "./primitives";
+import { SuiteTabStrip } from "./SuiteTabStrip";
 
 const FRAME_STYLES = {
   comfortable: {
@@ -63,6 +64,10 @@ export const SettingsWindowFrame = ({
           borderRadius: f.radius,
         }}
       >
+        {/* Suite app-switcher: renders only when both modules run under the
+            launcher; absent standalone so the window looks identical to today. */}
+        <SuiteTabStrip />
+
         <header className={f.header} style={{ borderBottom: `1px solid ${palette.divider}` }}>
           <div className={f.headerRow}>
             <div className={f.iconBox} style={{ backgroundColor: palette.card }}>

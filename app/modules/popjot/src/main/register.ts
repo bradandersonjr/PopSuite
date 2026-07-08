@@ -188,6 +188,8 @@ export function registerPopJot(
       stopCursorPolling();
     },
     tray: { settingsLabel: "Open Settings", mode: trayMode },
+    // Suite settings app-switcher: PopJot's sibling tab is PopKey.
+    suiteSibling: "PopKey",
     trayToggle: {
       getEnabled: () => enabled,
       onToggle: () => {

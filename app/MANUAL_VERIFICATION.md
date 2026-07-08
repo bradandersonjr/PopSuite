@@ -249,6 +249,63 @@ is active — the overlay stays click-through, so it never enables `{ forward: t
    so it must NOT report `annotating=true` up the suite pipe and must NOT trigger
    PopKey auto-hide (contrast with real annotation in test #9, which does hide it).
 
+### One settings window (suite settings app-switcher / tab-swap)
+
+In the suite, each module's settings window gains a "PopJot | PopKey" tab strip
+at the very top of the window chrome. The current app's tab is highlighted; the
+sibling's tab is clickable. Clicking it captures this window's bounds, asks the
+launcher (over the existing pipe) to open the sibling's settings window at those
+exact bounds, then hides this one once the sibling's window is up — so it reads
+as one tabbed window swapping content, while staying two windows in two
+processes. Standalone (no launcher / pipe) shows NO tab strip and behaves exactly
+as today.
+
+S1. **Tab strip visible in suite mode on BOTH apps' settings.**
+   With both modules running under the launcher, open PopJot's settings (Edit
+   Settings > PopJot Settings). A tab strip appears at the top: "PopJot" (active,
+   highlighted) and "PopKey" (clickable). Open PopKey's settings the same way and
+   confirm the mirror: "PopKey" active, "PopJot" clickable. The rest of each
+   settings window's content is unchanged.
+
+S2. **Clicking the sibling tab swaps seamlessly at the same position/size.**
+   Open PopJot settings, move/resize the window somewhere distinctive, then click
+   the "PopKey" tab. PopKey's settings window opens at the SAME position and size,
+   and PopJot's settings window hides. There is no visible flash of "no window"
+   (the sibling opens first, then this one hides on the launcher's ack). Click the
+   "PopJot" tab in the now-shown PopKey window to swap back — same position/size.
+
+S3. **No zero-windows when the sibling module is dead.**
+   Quit ONE module (e.g. end the PopKey child `PopSuite.exe` in Task Manager, or
+   use its own tray Quit) while keeping the launcher and the other module alive.
+   Open the surviving module's settings — the tab strip may still show the sibling
+   tab briefly (the launcher only drops the module on pipe disconnect). Click the
+   dead sibling's tab: nothing opens AND the current window STAYS open (it is never
+   hidden without the sibling taking over). You are never left with no settings
+   window. A console line notes the dropped swap.
+
+S4. **Tab strip absent when a module runs standalone.**
+   Launch standalone `PopJot.exe` (or `PopSuite.exe --module=popjot` with no
+   launcher). Open its settings — NO tab strip renders; the window is
+   pixel-identical to before this feature. Same for PopKey standalone.
+
+S5. **Window dragging still works.**
+   The frameless settings window can still be moved/resized exactly as before; the
+   tab strip does not introduce a drag region that would swallow the swap click or
+   break window movement. (The settings window has no custom drag chrome; the tab
+   strip is a normal, non-draggable button row.)
+
+S6. **Rapid tab clicking is harmless (idempotent).**
+   Double- or triple-click the sibling tab quickly. Exactly one swap happens (the
+   in-flight guard ignores extra clicks until the launcher acks); you never end up
+   with two windows fighting or a flicker of both.
+
+S7. **Pipe drop hides/disables the strip live.**
+   With a settings window open and its tab strip showing, end the LAUNCHER
+   `PopSuite.exe` process. The tab strip DISAPPEARS from the open settings window
+   within a moment (the live suite-connected flag flips false on the pipe drop),
+   and the module falls back to its own tray (per check 6). The settings window
+   itself stays open and fully usable — only the app-switcher strip is removed.
+
 ## Notes
 
 - **Unified tray architecture.** The launcher (`PopSuite.exe` with no `--module`
@@ -272,6 +329,18 @@ is active — the overlay stays click-through, so it never enables `{ forward: t
   lock lives at `%APPDATA%/PopSuite` (no `modules/` segment).
 - Licensing is untouched: both modules use the `suite` Pro product and the same
   offline license layer as the standalone apps.
+- **Settings app-switcher (suite-only "one settings window").** Each module's
+  settings window renders a shared `SuiteTabStrip` (in `SettingsWindowFrame`) that
+  self-gates: it only appears when the module reports LIVE suite-connected state
+  and has a configured `suiteSibling`. Clicking the sibling tab sends a
+  `requestSiblingSettings` (with this window's bounds) up the pipe; the launcher's
+  tray server relays an `openSettings` to the sibling (if running) and acks the
+  requester with `siblingSettingsResult { delivered }`. The requester hides its
+  own window ONLY on `delivered=true`, so a dead sibling never leaves zero
+  windows. The arriving window clamps the incoming bounds onto a visible display
+  (`clampBoundsToDisplays`) so an unplugged-monitor rect can't strand it
+  off-screen, and Electron enforces each window's own min size. Gated entirely
+  behind the pipe: standalone/web renders no strip and the switch is a no-op.
 - **PopJot annotation auto-hide (suite-only).** PopJot's main process reports its
   annotating on/off transitions (surfaced from the existing renderer
   `overlay-activated` / `overlay-deactivated` IPC — RadialMenu's activation logic

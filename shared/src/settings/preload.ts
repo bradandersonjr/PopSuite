@@ -48,6 +48,12 @@ export function createSettingsBridge<S extends SettingsSchema>(schema: S): Recor
     setSyncAll: sender("set-sync-all"),
     onSyncPrefsChanged: (callback: (prefs: Record<string, boolean>) => void) =>
       subscribe("sync-prefs-changed")(callback as (...args: never[]) => void),
+    // Suite settings app-switcher: identity + live connected state drive the
+    // tab strip; the switch requests the launcher swap to the sibling window.
+    suiteGetInfo: invoker("suite-get-info"),
+    suiteSwitchToSibling: sender("suite-switch-to-sibling"),
+    onSuiteConnectedChanged: (callback: (connected: boolean) => void) =>
+      subscribe("suite-connected")(callback as (...args: never[]) => void),
   };
 
   for (const key of Object.keys(schema)) {

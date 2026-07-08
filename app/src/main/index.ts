@@ -246,14 +246,29 @@ if (requestedModule) {
 
       // Start the pipe server first so modules can connect the instant they boot,
       // then rebuild the menu on every connect/disconnect/state change.
-      trayServer = createSuiteTrayServer(() => {
-        if (quitting) return;
-        // Relay PopJot annotating -> PopKey suppress before rebuilding the menu
-        // so the menu reflects PopKey's resulting auto-hidden label in the same
-        // pass once PopKey reports back its autoSuppressed state.
-        relaySuppression();
-        rebuildMenu();
-      });
+      trayServer = createSuiteTrayServer(
+        () => {
+          if (quitting) return;
+          // Relay PopJot annotating -> PopKey suppress before rebuilding the menu
+          // so the menu reflects PopKey's resulting auto-hidden label in the same
+          // pass once PopKey reports back its autoSuppressed state.
+          relaySuppression();
+          rebuildMenu();
+        },
+        undefined,
+        (msg, delivered) => {
+          if (quitting) return;
+          // Settings tab-swap: the server already relayed openSettings to the
+          // sibling (or dropped it if the sibling isn't running) and acked the
+          // requester. This is just an observation hook — log a dropped swap so a
+          // dead-sibling case is visible; the requester keeps its own window.
+          if (msg.type === "requestSiblingSettings" && !delivered) {
+            console.error(
+              `Settings swap requested for "${msg.target}" but it isn't connected; ignoring.`
+            );
+          }
+        }
+      );
 
       // Windows/macOS: double-click the icon to re-spawn any missing modules.
       tray.on("double-click", () => spawnModules());
