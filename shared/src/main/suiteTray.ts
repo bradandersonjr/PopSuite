@@ -89,52 +89,6 @@ export interface ActionMessage {
   id: string;
 }
 
-/** A settings-window rectangle carried across the pipe during a tab swap. */
-export interface SuiteBounds {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-/**
- * Launcher → module: open (or focus) your settings window at exactly these
- * bounds. Sent when the user clicks the sibling's tab in the shared settings
- * app-switcher: the requesting module hands its current window rect up to the
- * launcher, which relays it here so the arriving window lands in the same spot
- * and size, producing the "one window that swaps content" illusion.
- */
-export interface OpenSettingsMessage {
-  type: "openSettings";
-  bounds: SuiteBounds;
-}
-
-/**
- * Module → launcher: please tell the sibling module to open ITS settings window
- * at these bounds (the tab-swap request). `target` is the sibling's appName. If
- * the target isn't connected the launcher no-ops and the requester keeps its own
- * window open, so the user is never left with zero settings windows.
- */
-export interface RequestSiblingSettingsMessage {
-  type: "requestSiblingSettings";
-  target: string;
-  bounds: SuiteBounds;
-}
-
-/**
- * Launcher → module: the result of this module's tab-swap request. `delivered`
- * is true when the sibling was connected and got the openSettings command (the
- * requester may now hide its own window), false when the sibling wasn't running
- * so the launcher dropped it (the requester MUST keep its window — never zero
- * settings windows). `target` echoes the requested sibling so a stale ack can't
- * be misapplied.
- */
-export interface SiblingSettingsResultMessage {
-  type: "siblingSettingsResult";
-  target: string;
-  delivered: boolean;
-}
-
 /** Launcher → module: quit yourself (used by "Quit All"). */
 export interface QuitMessage {
   type: "quit";
@@ -152,15 +106,9 @@ export interface SuppressMessage {
 }
 
 /** Everything a module may send up the pipe. */
-export type ModuleToLauncher = StateMessage | RequestSiblingSettingsMessage;
+export type ModuleToLauncher = StateMessage;
 /** Everything the launcher may send down the pipe. */
-export type LauncherToModule =
-  | ToggleMessage
-  | ActionMessage
-  | QuitMessage
-  | SuppressMessage
-  | OpenSettingsMessage
-  | SiblingSettingsResultMessage;
+export type LauncherToModule = ToggleMessage | ActionMessage | QuitMessage | SuppressMessage;
 
 // ─── Newline-delimited JSON framing ─────────────────────────────────────
 // A single socket carries many messages; frame each as one JSON object on its
@@ -193,66 +141,6 @@ export function decodeFrames<T>(buffer: string, chunk: string): { messages: T[];
     }
   }
   return { messages, rest };
-}
-
-// ─── Settings-swap bounds clamp (pure) ──────────────────────────────────
-// A swapped-in settings window inherits the requesting window's rect. A rect
-// coming off a display that no longer exists (monitor unplugged between the two
-// modules opening) could strand the arriving window off every screen. Clamp it
-// so its top-left always lands inside some display's work area, keeping the
-// window title bar reachable. Kept Electron-free (plain rects) for unit testing;
-// createPopApp feeds it screen.getAllDisplays().workArea.
-
-/** Minimal rectangle mirror of an Electron display's workArea. */
-export interface DisplayArea {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-/**
- * Clamp `bounds` so its origin sits within a visible display's work area. If the
- * origin already falls inside any display it is returned unchanged; otherwise it
- * is nudged onto the nearest display (by clamping to the display whose center is
- * closest), preserving width/height. With no displays supplied the bounds pass
- * through untouched (Electron will place the window on the primary display).
- */
-export function clampBoundsToDisplays(bounds: SuiteBounds, displays: DisplayArea[]): SuiteBounds {
-  if (displays.length === 0) return bounds;
-
-  const originInside = displays.some(
-    (d) =>
-      bounds.x >= d.x &&
-      bounds.x < d.x + d.width &&
-      bounds.y >= d.y &&
-      bounds.y < d.y + d.height
-  );
-  if (originInside) return bounds;
-
-  // Pick the display whose center is nearest the window's origin, then clamp the
-  // origin into that display's work area so the title bar is always on-screen.
-  let best = displays[0];
-  let bestDist = Infinity;
-  for (const d of displays) {
-    const cx = d.x + d.width / 2;
-    const cy = d.y + d.height / 2;
-    const dist = (cx - bounds.x) ** 2 + (cy - bounds.y) ** 2;
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = d;
-    }
-  }
-
-  const clampAxis = (value: number, min: number, size: number): number =>
-    Math.max(min, Math.min(value, min + Math.max(size - 1, 0)));
-
-  return {
-    x: clampAxis(bounds.x, best.x, best.width),
-    y: clampAxis(bounds.y, best.y, best.height),
-    width: bounds.width,
-    height: bounds.height,
-  };
 }
 
 // ─── Menu model (pure) ──────────────────────────────────────────────────

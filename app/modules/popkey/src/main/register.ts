@@ -58,8 +58,6 @@ export function registerPopKey(
       },
     ],
     tray: { settingsLabel: "Settings", doubleClickOpensSettings: true, mode: trayMode },
-    // Suite settings app-switcher: PopKey's sibling tab is PopJot.
-    suiteSibling: "PopJot",
     trayToggle: {
       // The user's requested state (mirrors the reducer's userRequested); drives
       // the local fallback tray's Enable/Disable label. In the suite the launcher

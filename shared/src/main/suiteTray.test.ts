@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildSuiteTrayMenu,
-  clampBoundsToDisplays,
   encodeFrame,
   decodeFrames,
   SUITE_CHANGELOG_URL,
@@ -11,7 +10,6 @@ import {
   type SuiteTrayMenuOptions,
   type SuiteMenuItem,
   type LauncherToModule,
-  type ModuleToLauncher,
 } from "./suiteTray";
 
 function makeModule(overrides: Partial<SuiteModuleState> = {}): SuiteModuleState {
@@ -284,67 +282,5 @@ describe("frame encode/decode", () => {
     const chunk = "not json\n" + encodeFrame({ type: "quit" });
     const { messages } = decodeFrames<LauncherToModule>("", chunk);
     expect(messages).toEqual([{ type: "quit" }]);
-  });
-
-  it("round-trips a launcher openSettings message with bounds", () => {
-    const bounds = { x: 100, y: 120, width: 1160, height: 860 };
-    const frame = encodeFrame({ type: "openSettings", bounds });
-    const { messages } = decodeFrames<LauncherToModule>("", frame);
-    expect(messages).toEqual([{ type: "openSettings", bounds }]);
-  });
-
-  it("round-trips a module requestSiblingSettings message", () => {
-    const bounds = { x: 10, y: 20, width: 900, height: 680 };
-    const frame = encodeFrame({ type: "requestSiblingSettings", target: "PopKey", bounds });
-    const { messages } = decodeFrames<ModuleToLauncher>("", frame);
-    expect(messages).toEqual([{ type: "requestSiblingSettings", target: "PopKey", bounds }]);
-  });
-
-  it("round-trips a launcher siblingSettingsResult ack", () => {
-    const frame = encodeFrame({ type: "siblingSettingsResult", target: "PopKey", delivered: true });
-    const { messages } = decodeFrames<LauncherToModule>("", frame);
-    expect(messages).toEqual([{ type: "siblingSettingsResult", target: "PopKey", delivered: true }]);
-  });
-});
-
-describe("clampBoundsToDisplays", () => {
-  const primary = { x: 0, y: 0, width: 1920, height: 1080 };
-  const secondary = { x: 1920, y: 0, width: 1920, height: 1080 };
-
-  it("returns bounds unchanged when no displays are supplied", () => {
-    const b = { x: -5000, y: -5000, width: 800, height: 600 };
-    expect(clampBoundsToDisplays(b, [])).toEqual(b);
-  });
-
-  it("leaves bounds untouched when the origin is inside a display", () => {
-    const b = { x: 200, y: 150, width: 1160, height: 860 };
-    expect(clampBoundsToDisplays(b, [primary, secondary])).toEqual(b);
-  });
-
-  it("keeps bounds whose origin sits on a secondary display", () => {
-    const b = { x: 2100, y: 300, width: 900, height: 680 };
-    expect(clampBoundsToDisplays(b, [primary, secondary])).toEqual(b);
-  });
-
-  it("nudges an off-screen origin back onto the nearest display, preserving size", () => {
-    // Origin far below/right of every display (e.g. monitor unplugged).
-    const b = { x: 5000, y: 5000, width: 1000, height: 700 };
-    const clamped = clampBoundsToDisplays(b, [primary, secondary]);
-    // Size is preserved...
-    expect(clamped.width).toBe(1000);
-    expect(clamped.height).toBe(700);
-    // ...and the origin now sits within the nearest display (the secondary).
-    expect(clamped.x).toBeGreaterThanOrEqual(secondary.x);
-    expect(clamped.x).toBeLessThan(secondary.x + secondary.width);
-    expect(clamped.y).toBeGreaterThanOrEqual(secondary.y);
-    expect(clamped.y).toBeLessThan(secondary.y + secondary.height);
-  });
-
-  it("pulls a negative origin back onto the primary display", () => {
-    const b = { x: -400, y: -400, width: 900, height: 680 };
-    const clamped = clampBoundsToDisplays(b, [primary]);
-    expect(clamped.x).toBe(0);
-    expect(clamped.y).toBe(0);
-    expect(clamped.width).toBe(900);
   });
 });

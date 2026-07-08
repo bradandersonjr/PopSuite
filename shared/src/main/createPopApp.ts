@@ -40,7 +40,7 @@ import {
 } from "./license";
 import type { SettingsSchema, SettingsValues, SettingValue } from "../settings/schema";
 import { createSuiteTrayClient, type SuiteTrayClient } from "./suiteTrayClient";
-import { clampBoundsToDisplays, type SuiteModuleState, type SuiteTrayAction } from "./suiteTray";
+import type { SuiteModuleState, SuiteTrayAction } from "./suiteTray";
 import {
   initialSuppressionState,
   applyManualToggle,
@@ -189,15 +189,6 @@ export interface PopAppOptions<S extends SettingsSchema> {
     /** Drive the overlay to the given effective visibility. */
     applyActive: (active: boolean) => void;
   };
-  /**
-   * Suite-only: the sibling module's appName (e.g. PopJot's sibling is "PopKey").
-   * Drives the settings-window app-switcher tab strip: the shared shell exposes
-   * this identity to the settings renderer so it can render the sibling's tab and,
-   * on click, request the launcher swap to the sibling's settings window at the
-   * same bounds. Omit for apps with no suite sibling — the tab strip then never
-   * renders (standalone stays pixel-identical to today).
-   */
-  suiteSibling?: string;
   /** What launching a second instance should do. Defaults to "focus-main". */
   secondInstance?: "focus-main" | "open-settings";
   onReady?: (ctx: PopAppContext<S>) => void;
@@ -290,11 +281,6 @@ export function createPopApp<S extends SettingsSchema>(
   // Suite unified-tray client. Only created when tray.mode === "reported". Null
   // in standalone/owned mode and after a fallback to a local tray.
   let suiteTrayClient: SuiteTrayClient | null = null;
-  // Live suite-connected state for the settings app-switcher tab strip. True only
-  // between the client's onReady and onUnavailable — NOT merely "client exists".
-  // Drives the tab strip's visibility in the settings renderer, pushed on every
-  // change so a mid-session pipe drop hides/disables the strip live.
-  let suiteConnected = false;
   // Suite-only annotating flag (PopJot): reported up so the launcher can relay
   // it to PopKey as a suppress command. Always false for non-annotating apps.
   let suiteAnnotating = false;
@@ -591,9 +577,6 @@ export function createPopApp<S extends SettingsSchema>(
     });
     win.webContents.on("did-finish-load", () => {
       syncTraySettingsToWindow(win);
-      // Seed the app-switcher tab strip with the current live connected state so
-      // a settings window opened after connect reflects it immediately.
-      win.webContents.send("suite-connected", suiteConnected);
     });
 
     win.on("closed", () => {
@@ -614,82 +597,6 @@ export function createPopApp<S extends SettingsSchema>(
     if (settingsWindow.isMinimized()) settingsWindow.restore();
     settingsWindow.show();
     settingsWindow.focus();
-  }
-
-  // ─── Suite settings app-switcher (tab-swap) ──────────────────────────
-  // In the suite, each module's settings window shows a "PopJot | PopKey" tab
-  // strip. Clicking the sibling's tab hands this window's bounds to the launcher,
-  // which asks the sibling to open ITS settings window at exactly those bounds;
-  // this window then hides. Two windows in two processes read as one that swaps
-  // content. Everything here no-ops outside the suite (no client / no sibling).
-
-  /** Push the current live suite-connected flag to the settings renderer so the
-   *  tab strip appears only while connected and disappears on a pipe drop. */
-  function sendSuiteConnected(): void {
-    settingsWindow?.webContents.send("suite-connected", suiteConnected);
-  }
-
-  function setSuiteConnected(connected: boolean): void {
-    if (suiteConnected === connected) return;
-    suiteConnected = connected;
-    sendSuiteConnected();
-  }
-
-  /**
-   * Launcher relayed a tab-swap: open (or focus) our settings window and move it
-   * to the sibling's bounds. Clamp the origin onto a visible display so a rect
-   * from an unplugged monitor can't strand the window off-screen; Electron
-   * enforces our own minWidth/minHeight if the incoming rect is smaller.
-   */
-  function openSettingsAtBounds(bounds: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }): void {
-    openSettingsWindow();
-    const win = settingsWindow;
-    if (!win || win.isDestroyed()) return;
-    const displays = screen.getAllDisplays().map((d) => d.workArea);
-    const clamped = clampBoundsToDisplays(bounds, displays);
-    win.setBounds(clamped);
-    if (win.isMinimized()) win.restore();
-    win.show();
-    win.focus();
-  }
-
-  // True between sending a swap request and receiving its ack, so a rapid double
-  // tab-click can't fire a second request (idempotent) while one is in flight.
-  let swapInFlight = false;
-
-  /**
-   * Renderer clicked the sibling's tab. Grab THIS window's live bounds in the
-   * main process (authoritative) and ask the launcher to bring the sibling's
-   * settings up there. We do NOT hide yet — we wait for the launcher's ack
-   * (onSiblingSettingsResult). On delivered=true the sibling's window is already
-   * up (open-then-hide → no flash of no window), so we hide ourselves. On
-   * delivered=false the sibling wasn't running and the launcher opened nothing,
-   * so we keep our window (never zero settings windows).
-   */
-  function switchToSibling(): void {
-    if (!suiteConnected || !suiteTrayClient || !options.suiteSibling) return;
-    if (swapInFlight) return; // in-flight request pending: ignore double-clicks.
-    const win = settingsWindow;
-    if (!win || win.isDestroyed()) return;
-    swapInFlight = true;
-    const bounds = win.getBounds();
-    suiteTrayClient.requestSiblingSettings(options.suiteSibling, bounds);
-  }
-
-  /** Launcher acked our swap request: hide only if the sibling actually took
-   *  over, so a dead sibling never leaves the user with no settings window. */
-  function onSiblingSettingsResult(target: string, delivered: boolean): void {
-    swapInFlight = false;
-    if (target !== options.suiteSibling) return; // stale/foreign ack; ignore.
-    if (!delivered) return; // sibling not running: keep our own window.
-    const win = settingsWindow;
-    if (!win || win.isDestroyed()) return;
-    win.hide();
   }
 
   // ─── Suite auto-suppression (PopKey) ─────────────────────────────────
@@ -775,21 +682,6 @@ export function createPopApp<S extends SettingsSchema>(
     if (settingsWindow && !settingsWindow.isDestroyed()) {
       settingsWindow.hide();
     }
-  });
-
-  // ─── Suite settings app-switcher IPC ─────────────────────────────────
-  // The settings renderer's tab strip queries suite state, subscribes to live
-  // changes, and requests a swap. All harmless outside the suite: identity is
-  // static, connected is always false (no client), and the switch is a no-op.
-
-  ipcMain.handle("suite-get-info", () => ({
-    appName,
-    sibling: options.suiteSibling ?? null,
-    connected: suiteConnected,
-  }));
-
-  ipcMain.on("suite-switch-to-sibling", () => {
-    switchToSibling();
   });
 
   ipcMain.handle("get-open-at-login", () => {
@@ -1038,30 +930,14 @@ export function createPopApp<S extends SettingsSchema>(
           // Launcher relayed PopJot's annotating state: force-hide / restore.
           applySuiteSuppression(suppressed);
         },
-        onOpenSettings: (bounds) => {
-          // Launcher relayed a tab-swap from the sibling: bring our settings
-          // window up at the sibling's bounds so it reads as one window swapping.
-          openSettingsAtBounds(bounds);
-        },
-        onSiblingSettingsResult: (target, delivered) => {
-          // Ack for our own tab-swap: hide our window only if the sibling took over.
-          onSiblingSettingsResult(target, delivered);
-        },
       },
       {
-        onReady: () => {
-          setSuiteConnected(true);
-          reportSuiteState();
-        },
+        onReady: () => reportSuiteState(),
         onUnavailable: () => {
           // Launcher absent or gone: drop the client and stand up a local tray so
           // this module is never left without one. Also clear any auto-suppression
           // so a PopKey that was hidden by PopJot isn't stuck hidden forever once
-          // the suite glue is gone — the user regains normal manual control. The
-          // live connected flag flips false so the settings tab strip disappears.
-          setSuiteConnected(false);
-          // Drop any in-flight swap guard so a later reconnect can swap again.
-          swapInFlight = false;
+          // the suite glue is gone — the user regains normal manual control.
           suiteTrayClient?.dispose();
           suiteTrayClient = null;
           clearSuiteSuppression();
