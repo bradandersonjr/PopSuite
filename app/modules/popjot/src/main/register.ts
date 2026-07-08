@@ -124,7 +124,15 @@ export function registerPopJot(
     }
   }
 
-  function setSpotlight(active: boolean): void {
+  /**
+   * `skipSuiteReport` is set by the drawing-mode force-exit below: entering
+   * annotation immediately re-asserts reportSuiteAnnotating(true) right after
+   * this would send `false`, and the two suite reports are separate
+   * synchronous pipe sends the launcher processes in order — so without this,
+   * PopKey would see a real (if momentary) false-then-true and could flicker
+   * back into view for a frame before drawing mode re-suppresses it.
+   */
+  function setSpotlight(active: boolean, skipSuiteReport = false): void {
     if (spotlightActive === active) return;
     spotlightActive = active;
     const win = popApp.getMainWindow();
@@ -160,6 +168,12 @@ export function registerPopJot(
       stopSpotlightScroll();
       globalShortcut.unregister("Escape");
     }
+    // Suite-only: reuse the same "annotating" suppress signal drawing mode
+    // already sends, so PopKey auto-hides (down to just its branding overlay)
+    // while spotlight is active too — one full-screen presenter surface at a
+    // time reads the same way to the suite regardless of which PopJot mode
+    // triggered it. No-op outside the suite (no pipe client) and standalone.
+    if (!skipSuiteReport) popApp.reportSuiteAnnotating(active);
     win?.webContents.send("spotlight-set", active);
   }
 
@@ -257,7 +271,9 @@ export function registerPopJot(
     // active spotlight force-exits here (spotlight stays click-through, so this
     // never fights the drawing overlay's input capture).
     annotating = true;
-    if (spotlightActive) setSpotlight(false);
+    // skipSuiteReport: the very next line reports annotating=true anyway, so
+    // don't send a same-tick false first (see setSpotlight's doc comment).
+    if (spotlightActive) setSpotlight(false, true);
     // Suite-only: tell the launcher we're annotating so PopKey auto-hides. No-op
     // outside the suite (no pipe client) and for standalone PopJot.exe.
     popApp.reportSuiteAnnotating(true);
