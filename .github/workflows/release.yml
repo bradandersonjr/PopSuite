@@ -99,13 +99,14 @@ jobs:
         run: npm ci
 
       # uiohook-napi has no Electron-ABI prebuild, so electron-builder rebuilds
-      # it from source via node-gyp on this runner — which needs the X11/XKB
-      # development headers that ubuntu-latest doesn't ship by default
-      # (first failure mode: fatal error: X11/keysym.h: No such file or directory).
+      # it from source via node-gyp on this runner — which needs the full X11/XKB
+      # development header set that ubuntu-latest doesn't ship by default
+      # (observed failures: X11/keysym.h, then X11/extensions/Xrandr.h). This is
+      # the complete list libuiohook's own Linux CI installs.
       - name: Install libuiohook build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxtst-dev libxt-dev libxinerama-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-dev
+          sudo apt-get install -y libx11-dev libxtst-dev libxt-dev libxinerama-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-dev libxkbfile-dev libxrandr-dev
 
       # Build the suite and publish the Linux AppImage + latest-linux.yml to a
       # draft release.
