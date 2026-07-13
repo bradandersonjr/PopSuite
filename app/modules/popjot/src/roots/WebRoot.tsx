@@ -183,7 +183,7 @@ const renderShapes = (shapes: readonly Shape[]) => {
 /* ─── Component ─── */
 
 const WebRoot = () => {
-  const { themeMode, colorPalette, menuStyle, buttonRoundness, hotkey, persistentHotkey, setScaleFactor } = useStore();
+  const { themeMode, colorPalette, menuStyle, buttonRoundness, hotkey, persistentHotkey, lastToolHotkey, setScaleFactor } = useStore();
   useScaleSync(setScaleFactor);
 
   // Roundness slider (0–100) drives the landing cards' corner radius.
@@ -257,12 +257,13 @@ const WebRoot = () => {
           {[
             {
               icon: Keyboard,
-              title: "Two activation modes",
+              title: "Three activation modes",
               colorIndex: 3,
               content: (
                 <>
                   Hold <HotkeyBadge shortcut={hotkey} /> for quick annotations that
-                  disappear when you release. Press{" "}
+                  disappear when you release, or <HotkeyBadge shortcut={lastToolHotkey} />{" "}
+                  to skip the menu and draw with your last-used tool. Press{" "}
                   <HotkeyBadge shortcut={persistentHotkey} /> to stay in drawing mode
                   until you press <Kbd>Esc</Kbd>.
                 </>

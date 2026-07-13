@@ -62,7 +62,7 @@ extraResources:
 asar: true
 
 # uiohook-napi ships a native .node binding that cannot run from inside the asar
-# archive — unpack it so the PopKey and PopJot module processes can dlopen it
+# archive — unpack it so the PopKey and PopJot module runtimes can load it
 # at runtime.
 asarUnpack:
   - "**/node_modules/uiohook-napi/**"

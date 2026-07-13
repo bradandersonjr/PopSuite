@@ -1,16 +1,9 @@
 /**
- * Per-module electron-vite config for the PopSuite build.
+ * Per-module renderer/preload build for unified PopSuite.
  *
- * Runs once per module (popjot / popkey). It builds THAT module's:
- *   - main    → suite/out/main/<module>/index.js     (the suite module entry,
- *               which sets per-module userData then calls the app's register())
- *   - preload → suite/out/preload/<module>/index.js  (the app's own preload)
- *   - renderer→ suite/out/renderer/<module>/index.html (the app's own UI)
- *
- * The module entry lives in suite/src/modules/<module>.ts and pulls the app's
- * register() via the @popjot / @popkey alias. The renderer/preload roots point
- * at the app directory so the app's existing index.html, main.tsx, and `@`
- * alias resolve exactly as in the standalone build.
+ * Each run emits the module preload and renderer used by its independent native
+ * window. A legacy module-main bundle is also retained for isolated development;
+ * packaged PopSuite uses the unified app/src/main/index.ts bundle instead.
  */
 
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
@@ -55,8 +48,7 @@ export function createModuleConfig({ module, appDir }: ModuleBuildOptions) {
           formats: ["cjs"],
         },
         rollupOptions: {
-          // Force the module bundle to out/main/<module>/index.js so the
-          // launcher's runtime require("./<module>/index.js") resolves.
+          // Retain a standalone module main bundle for isolated development.
           output: { format: "cjs", entryFileNames: "index.js" },
         },
       },

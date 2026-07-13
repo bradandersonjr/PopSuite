@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { isValidElement, useCallback, useEffect, useMemo } from "react";
 import { activateLicense, deactivateLicense } from "@shared/license/renderer";
 import CustomPaletteSettings from "@/components/pro/CustomPaletteSettings";
 import CenterCircleSettings from "@/components/pro/CenterCircleSettings";
@@ -29,6 +29,7 @@ import {
   setMainShortcut,
   setPersistentShortcut,
   setSpotlightShortcut,
+  setLastToolShortcut,
 } from "@/lib/platform";
 import {
   DropdownMenu,
@@ -44,6 +45,7 @@ import {
   OptionGrid,
   SettingGroup,
   SettingsColumns,
+  SettingsSection,
   SettingsUIProvider,
   SettingsWindowFrame,
   EmbeddedSettingsPanel,
@@ -182,12 +184,28 @@ const MenuStylePicker = ({
   );
 };
 
+/**
+ * Suite-composed rendering: the suite settings window owns the section
+ * navigation and asks this component for one section's content at a time.
+ * `undefined` = not in suite mode; `null` = suite mode with this module's
+ * content hidden (hooks stay mounted so state/IPC stay live); an object
+ * selects a section by title, optionally omitting items by their JSX key.
+ */
+export type SuiteSectionRequest = { title: string; omitKeys?: string[] } | null;
+
 type SystemTrayProps = {
   settingsWindowMode?: boolean;
   embedded?: boolean;
+  unifiedSettingsMode?: boolean;
+  suiteSection?: SuiteSectionRequest;
 };
 
-const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTrayProps) => {
+const SystemTray = ({
+  settingsWindowMode = false,
+  embedded = false,
+  unifiedSettingsMode = false,
+  suiteSection,
+}: SystemTrayProps) => {
 
   const {
     hotkey,
@@ -196,6 +214,8 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     setPersistentHotkey,
     spotlightHotkey,
     setSpotlightHotkey,
+    lastToolHotkey,
+    setLastToolHotkey,
     spotlightDimOpacity,
     setSpotlightDimOpacity: setSpotlightDimOpacityLocal,
     spotlightRadius,
@@ -268,19 +288,21 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
           ? await setMainShortcut(formatted)
           : kind === "persistent"
             ? await setPersistentShortcut(formatted)
-            : await setSpotlightShortcut(formatted);
+            : kind === "lastTool"
+              ? await setLastToolShortcut(formatted)
+              : await setSpotlightShortcut(formatted);
       if (result.ok) {
         const apply =
-          kind === "main" ? setHotkey : kind === "persistent" ? setPersistentHotkey : setSpotlightHotkey;
+          kind === "main" ? setHotkey : kind === "persistent" ? setPersistentHotkey : kind === "lastTool" ? setLastToolHotkey : setSpotlightHotkey;
         apply(formatted);
       }
       return result;
     },
-    [setHotkey, setPersistentHotkey, setSpotlightHotkey]
+    [setHotkey, setPersistentHotkey, setSpotlightHotkey, setLastToolHotkey]
   );
 
   const { recordingKind, activeKeys, shortcutError, startRecording } = useShortcutRecorder({
-    enabled: settingsWindowMode || embedded,
+    enabled: settingsWindowMode || embedded || unifiedSettingsMode || suiteSection !== undefined,
     commit: commitShortcut,
   });
 
@@ -288,18 +310,19 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     if (!desktop) return;
 
     let mounted = true;
-    void getShortcuts().then(({ main, persistent, spotlight }) => {
+    void getShortcuts().then(({ main, persistent, spotlight, lastTool }) => {
       if (mounted) {
         setHotkey(main);
         setPersistentHotkey(persistent);
         setSpotlightHotkey(spotlight);
+        setLastToolHotkey(lastTool);
       }
     });
 
     return () => {
       mounted = false;
     };
-  }, [desktop, setHotkey, setPersistentHotkey, setSpotlightHotkey]);
+  }, [desktop, setHotkey, setPersistentHotkey, setSpotlightHotkey, setLastToolHotkey]);
 
   const applyThemeMode = (mode: ThemeMode) => {
     setThemeModeLocal(mode);
@@ -604,23 +627,8 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
         <SettingGroup key="translucency" title="Translucency" description="Menu button background opacity">
           <SliderRow value={menuTranslucency} min={0} max={95} step={5} onChange={applyMenuTranslucency} valueSuffix="%" defaultValue={0} />
         </SettingGroup>,
-      ],
-    },
-    {
-      title: "Branding",
-      items: [
-        <SettingGroup key="branding" title="Branding" description="Replace the menu's center shape with your logo, plus a custom palette" pro locked={!effectiveIsPro} buyUrl={POPJOT_PRO_URL}>
-          <div className="space-y-5">
-            <div>
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Logo</div>
-              <CenterCircleSettings />
-            </div>
-            <div className="h-px" style={{ backgroundColor: surfacePalette.divider }} />
-            <div>
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Custom Palette</div>
-              <CustomPaletteSettings />
-            </div>
-          </div>
+        <SettingGroup key="scale" title="Size" description="Scale interface size">
+          <SliderRow value={Math.round(scaleMultiplier * 100)} min={50} max={200} step={5} onChange={(v) => applyScaleMultiplier(v / 100)} valueSuffix="%" defaultValue={100} />
         </SettingGroup>,
       ],
     },
@@ -643,14 +651,6 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
           }
         >
           <div className="space-y-4">
-            {desktop && (
-              <ShortcutButton
-                currentShortcut={spotlightHotkey}
-                isRecording={recordingKind === "spotlight"}
-                activeKeys={activeKeys}
-                onStartRecording={() => startRecording("spotlight")}
-              />
-            )}
             <div>
               <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Dim</div>
               <SliderRow value={spotlightDimOpacity} min={0} max={100} step={5} onChange={applySpotlightDimOpacity} valueSuffix="%" defaultValue={65} />
@@ -666,40 +666,21 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
           </div>
         </SettingGroup>,
         <SettingGroup key="grid" title="Canvas Grid" description="Display reference grid or dots on canvas">
-          <OptionGrid options={gridModeOptions} columns="grid-cols-3" compact />
-        </SettingGroup>,
-        <SettingGroup key="grid-size" title="Grid Size" description="Adjust grid density if visible">
-          <OptionGrid options={gridSizeOptions} columns="grid-cols-2" />
-        </SettingGroup>,
-        <SettingGroup key="scale" title="Size" description="Scale interface size">
-          <SliderRow value={Math.round(scaleMultiplier * 100)} min={50} max={200} step={5} onChange={(v) => applyScaleMultiplier(v / 100)} valueSuffix="%" defaultValue={100} />
-        </SettingGroup>,
-      ],
-    },
-    {
-      title: "Sync",
-      items: [
-        <SettingGroup
-          key="sync"
-          title="Sync with PopKey"
-          description="Keep these settings identical across PopJot and PopKey. Toggles are shared, so changes here appear in PopKey instantly."
-        >
-          <SyncSettings schema={settingsSchema} />
+          <div className="space-y-3">
+            <OptionGrid options={gridModeOptions} columns="grid-cols-3" compact />
+            {gridMode !== "none" && (
+              <div>
+                <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Grid Size</div>
+                <OptionGrid options={gridSizeOptions} columns="grid-cols-2" />
+              </div>
+            )}
+          </div>
         </SettingGroup>,
       ],
     },
     {
-      title: "System",
+      title: "Shortcuts",
       items: desktop ? [
-        <ProSection
-          key="pro"
-          palette={surfacePalette}
-          isPro={effectiveIsPro}
-          buyUrl={POPJOT_PRO_URL}
-          tagline="Custom palette, center icon, circle size & stroke effects — in the Appearance tab."
-          onActivate={(key) => activateLicense(key)}
-          onDeactivate={() => void deactivateLicense()}
-        />,
         <SettingGroup
           key="main-shortcut"
           title="Main Shortcut"
@@ -724,6 +705,82 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
             onStartRecording={() => startRecording("persistent")}
           />
         </SettingGroup>,
+        <SettingGroup
+          key="last-tool-shortcut"
+          title="Last Tool Shortcut"
+          description="Hold to draw with your last-used tool, skipping the menu"
+        >
+          <ShortcutButton
+            currentShortcut={lastToolHotkey}
+            isRecording={recordingKind === "lastTool"}
+            activeKeys={activeKeys}
+            onStartRecording={() => startRecording("lastTool")}
+          />
+        </SettingGroup>,
+        <SettingGroup
+          key="spotlight-shortcut"
+          title="Spotlight Shortcut"
+          description="Toggle spotlight mode on and off"
+        >
+          <ShortcutButton
+            currentShortcut={spotlightHotkey}
+            isRecording={recordingKind === "spotlight"}
+            activeKeys={activeKeys}
+            onStartRecording={() => startRecording("spotlight")}
+          />
+        </SettingGroup>,
+      ] : [
+        <p key="desktop-only" className="text-xs" style={{ color: surfacePalette.muted }}>
+          Shortcuts are available in the desktop app.
+        </p>,
+      ],
+    },
+    {
+      title: "Pro",
+      items: [
+        // License activation talks to the desktop preload bridge; web builds
+        // only show the feature cards (matches the old System-tab gating).
+        desktop && (
+          <ProSection
+            key="pro"
+            palette={surfacePalette}
+            isPro={effectiveIsPro}
+            buyUrl={POPJOT_PRO_URL}
+            tagline="Custom palette and a center logo for your radial menu."
+            onActivate={(key) => activateLicense(key)}
+            onDeactivate={() => void deactivateLicense()}
+          />
+        ),
+        <SettingGroup key="branding" title="Branding" description="Replace the menu's center shape with your logo, plus a custom palette" pro locked={!effectiveIsPro} buyUrl={POPJOT_PRO_URL}>
+          <div className="space-y-5">
+            <div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Logo</div>
+              <CenterCircleSettings />
+            </div>
+            <div className="h-px" style={{ backgroundColor: surfacePalette.divider }} />
+            <div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Custom Palette</div>
+              <CustomPaletteSettings />
+            </div>
+          </div>
+        </SettingGroup>,
+      ],
+    },
+    {
+      title: "Sync",
+      items: [
+        <SettingGroup
+          key="sync"
+          title="Sync with PopKey"
+          description="Keep these settings identical across PopJot and PopKey. Toggles are shared, so changes here appear in PopKey instantly."
+        >
+          <SyncSettings schema={settingsSchema} />
+        </SettingGroup>,
+      ],
+    },
+    {
+      title: "System",
+      items: desktop ? [
         <SettingGroup key="startup" title="Startup" description="Configure application startup behavior">
           <ToggleRow label="Open at login" checked={openAtLogin} onChange={toggleOpenAtLogin} />
         </SettingGroup>,
@@ -845,6 +902,31 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
       </DropdownMenuItem>
     </DropdownMenuContent>
   );
+
+  if (suiteSection !== undefined) {
+    if (suiteSection === null) return null;
+    const column = settingsColumns.find((c) => c.title === suiteSection.title);
+    if (!column) return null;
+    const omit = suiteSection.omitKeys ?? [];
+    const items = column.items.filter(
+      (item) =>
+        !(isValidElement(item) && item.key !== null && omit.includes(String(item.key))),
+    );
+    return (
+      <SettingsUIProvider density="compact" palette={surfacePalette}>
+        <ShortcutErrorBanner error={shortcutError} isDark={isDark} />
+        <SettingsSection items={items} />
+      </SettingsUIProvider>
+    );
+  }
+
+  if (unifiedSettingsMode) {
+    return (
+      <SettingsUIProvider density="compact" palette={surfacePalette}>
+        <div className="flex h-full flex-col overflow-hidden px-6 py-4">{sectionsContent}</div>
+      </SettingsUIProvider>
+    );
+  }
 
   if (embedded) {
     return (

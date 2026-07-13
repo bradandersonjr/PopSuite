@@ -36,6 +36,8 @@ interface AppState extends SettingsState<typeof settingsSchema> {
     setPersistentHotkey: (hotkey: string) => void;
     spotlightHotkey: string;
     setSpotlightHotkey: (hotkey: string) => void;
+    lastToolHotkey: string;
+    setLastToolHotkey: (hotkey: string) => void;
     isPersistentMode: boolean;
     setIsPersistentMode: (isPersistentMode: boolean) => void;
     isDrawing: boolean;
@@ -79,6 +81,8 @@ export const useStore = create<AppState>((set) => ({
     setPersistentHotkey: (persistentHotkey) => set({ persistentHotkey }),
     spotlightHotkey: isMac() ? "Cmd + Shift + D" : "Alt + Shift + D",
     setSpotlightHotkey: (spotlightHotkey) => set({ spotlightHotkey }),
+    lastToolHotkey: isMac() ? "Cmd + Shift + W" : "Alt + Shift + W",
+    setLastToolHotkey: (lastToolHotkey) => set({ lastToolHotkey }),
     isPersistentMode: false,
     setIsPersistentMode: (isPersistentMode) => set({ isPersistentMode }),
     isDrawing: false,

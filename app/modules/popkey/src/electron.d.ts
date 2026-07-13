@@ -6,7 +6,16 @@ type ShortcutUpdateResult =
   | { ok: true; shortcut: string }
   | { ok: false; shortcut: string; error: string };
 
-type RawKeyEvent = { key: string; keycode: number; modifier: boolean; time: number };
+type RawKeyEvent = {
+  key: string;
+  keycode: number;
+  modifier: boolean;
+  time: number;
+  altKey?: boolean;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  shiftKey?: boolean;
+};
 type RawClickEvent = {
   button: number;
   x: number;

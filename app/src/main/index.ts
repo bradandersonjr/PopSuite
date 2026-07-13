@@ -1,33 +1,13 @@
 /**
- * PopSuite main entry — launcher/tray-owner + module router.
+ * PopSuite desktop main entry.
  *
- * ONE Electron binary, invoked in two modes:
- *
- *   PopSuite.exe                 → LAUNCHER / TRAY OWNER: a resident, lightweight
- *                                  hub process. It creates the SINGLE unified
- *                                  system tray icon for the whole suite, spawns a
- *                                  detached child process per module
- *                                  (--module=popjot, --module=popkey), and stays
- *                                  alive listening on a local pipe. Each module
- *                                  reports its state over that pipe; the launcher
- *                                  builds one dynamic menu from whichever modules
- *                                  are connected and relays clicks back. The
- *                                  launcher owns NO overlay/settings windows and
- *                                  never touches a module's window/focus/overlay
- *                                  behavior.
- *
- *   PopSuite.exe --module=<id>   → MODULE: boot that module's main process in
- *                                  this process (own userData, own lock, own
- *                                  overlay window — identical to the standalone
- *                                  app). Delegated to modules/<id>.ts, which runs
- *                                  in "reported" tray mode so it reports to the
- *                                  launcher instead of drawing its own tray. If
- *                                  the launcher pipe is unreachable, the module
- *                                  falls back to its own local tray automatically.
+ * One Electron main process owns two independent native overlay windows:
+ * PopJot and PopKey. Each keeps its own renderer, preload, Chromium session,
+ * settings, shortcuts, focus behavior, and input policy. The shared process owns
+ * the unified tray, settings host, updater, and cross-tool coordination.
  */
 
 import { app, Tray, Menu, nativeImage, dialog, shell } from "electron";
-import { spawn } from "child_process";
 import { join } from "path";
 import { existsSync } from "fs";
 import {
@@ -35,49 +15,14 @@ import {
   type SuiteTrayServer,
 } from "@shared/main/suiteTrayServer";
 import { buildSuiteTrayMenu, SUITE_ACTION_SETTINGS } from "@shared/main/suiteTray";
+import { registerPopJot } from "@popjot/main/register";
+import { registerPopKey } from "@popkey/main/register";
+import { popjotLayout, popkeyLayout } from "./moduleRuntime";
 import { createSuiteUpdater, type SuiteUpdater } from "./updater";
 import {
   createSuiteSettingsWindow,
   type SuiteSettingsWindow,
 } from "./suiteSettingsWindow";
-
-const MODULES = ["popjot", "popkey"] as const;
-type ModuleId = (typeof MODULES)[number];
-
-function parseModuleArg(argv: string[]): ModuleId | null {
-  for (const arg of argv) {
-    const m = /^--module=(.+)$/.exec(arg);
-    if (m && (MODULES as readonly string[]).includes(m[1])) {
-      return m[1] as ModuleId;
-    }
-  }
-  return null;
-}
-
-/**
- * Spawn one detached child per module from this same executable. Packaged,
- * process.execPath IS PopSuite.exe, so `execPath --module=x` re-launches the
- * suite in module mode. In dev, process.execPath is electron.exe and the app
- * directory must be forwarded as the first arg; app.getAppPath() gives that in
- * both modes.
- *
- * Spawning is unconditional: a module whose single-instance lock is already held
- * loses the lock in createPopApp and quits cleanly (focusing the running
- * instance via the primary's second-instance handler). "Already running"
- * resolves to a focus, never a duplicate.
- */
-function spawnModules(): void {
-  const isPackaged = app.isPackaged;
-  const appPath = app.getAppPath();
-  for (const module of MODULES) {
-    const args = isPackaged ? [`--module=${module}`] : [appPath, `--module=${module}`];
-    const child = spawn(process.execPath, args, { detached: true, stdio: "ignore" });
-    // Detach so children outlive a launcher restart; the launcher tracks them via
-    // the pipe, not the child handle.
-    child.unref();
-  }
-}
-
 /** Resolve the launcher's own tray icon. Reuses PopJot's brand icon (also the
  *  suite app icon). Packaged: extraResources at resourcesPath/suite/. Dev: read
  *  straight from the popjot module's assets dir (app/modules/popjot/assets). */
@@ -86,22 +31,8 @@ function launcherTrayIconPath(): string {
   return join(app.getAppPath(), "modules", "popjot", "assets", "tray-icon.png");
 }
 
-const requestedModule = parseModuleArg(process.argv);
-
-if (requestedModule) {
-  // ─── Module process ────────────────────────────────────────────────
-  // Delegate to the module entry, which sets its per-module userData BEFORE
-  // createPopApp requests the single-instance lock. A computed require keeps the
-  // bundler from resolving the per-module bundles at build time — they are loaded
-  // at runtime from out/main/<module>/index.js, siblings of this launcher.
-  const modulePath = `./${requestedModule}/index.js`;
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require(modulePath);
-} else {
   // ─── Launcher / tray-owner process ─────────────────────────────────
-  // Single-instance lock so re-launching PopSuite doesn't stack multiple tray
-  // owners; the second instance just re-spawns modules (which focus via their
-  // own locks) and exits.
+  // One lock owns the entire desktop suite; a second launch focuses Settings.
   const gotLock = app.requestSingleInstanceLock();
   if (!gotLock) {
     app.quit();
@@ -109,9 +40,7 @@ if (requestedModule) {
     let tray: Tray | null = null;
     let trayServer: SuiteTrayServer | null = null;
     let updater: SuiteUpdater | null = null;
-    // The launcher-owned settings window (one window, a tab per module). Created
-    // lazily on first "Edit Settings". Hosts each module's real settings renderer
-    // and relays its IPC to the owning module process over the pipe.
+    // One settings shell swaps two tool panels inside a single renderer.
     let settingsWindow: SuiteSettingsWindow | null = null;
     // Guards a graceful shutdown so module "close" events during Quit All don't
     // re-trigger menu rebuilds against a torn-down tray.
@@ -190,17 +119,12 @@ if (requestedModule) {
 
     /**
      * Open the launcher-owned settings window and select the given module's tab.
-     * Creates the window lazily on first use, wiring the module→launcher relay
-     * (invoke results + main→renderer pushes) into the hosted views. Replaces the
-     * old "relay a Settings action to the module's own window" behavior — the
-     * launcher now owns the one window and never asks a module to open its own.
-     * If appName is empty, selects the first connected module's tab.
+     * Creates the window lazily on first use. The selected panel talks to its
+     * module through namespaced IPC, while module-to-renderer state pushes use
+     * the suite relay. If appName is empty, the first connected module is used.
      */
     function openSettingsFor(appName: string): void {
-      if (!trayServer) return;
-      if (!settingsWindow) {
-        settingsWindow = createSuiteSettingsWindow(__dirname, trayServer, launcherTrayIconPath());
-      }
+      if (!trayServer || !settingsWindow) return;
       // Default to the first module if no specific appName is given (unified Settings item).
       const modules = trayServer.getModules();
       const selectedAppName = appName || (modules[0]?.appName ?? "popjot");
@@ -216,7 +140,7 @@ if (requestedModule) {
           onToggle: (appName) => trayServer?.toggle(appName),
           onAction: (appName, actionId) => {
             // Edit Settings picker: open the launcher's single settings window on
-            // this module's tab (the window hosts the module's real settings UI).
+            // this module's panel inside the shared Settings renderer.
             // Any other action still relays to the module's own handler.
             if (actionId === SUITE_ACTION_SETTINGS) openSettingsFor(appName);
             else trayServer?.action(appName, actionId);
@@ -231,10 +155,17 @@ if (requestedModule) {
           onCheckForUpdates: () => checkForUpdates(),
           onInstallUpdate: () => installUpdate(),
           onQuitAll: () => quitAll(),
+          onApplyPreset: (id) => settingsWindow?.applyPreset(id),
         },
         {
           launcherOpenAtLogin: getLauncherOpenAtLogin(),
           updateReady: readyVersion ? { version: readyVersion } : undefined,
+          presets: settingsWindow
+            ? {
+                isPro: settingsWindow.getPresets().isPro,
+                saved: settingsWindow.getPresets().presets,
+              }
+            : undefined,
         }
       );
       tray.setContextMenu(Menu.buildFromTemplate(template as Electron.MenuItemConstructorOptions[]));
@@ -263,16 +194,14 @@ if (requestedModule) {
     function installUpdate(): void {
       if (!updater?.readyVersion) return;
       quitting = true;
-      updater.installUpdate(() => trayServer?.quitAll());
+      updater.installUpdate(() => app.quit());
     }
 
     function quitAll(): void {
       quitting = true;
-      // Ask every connected module to quit itself, then quit the launcher. The
-      // modules tear down their own windows/hooks via their will-quit handlers.
-      trayServer?.quitAll();
-      // Give the quit messages a moment to flush over the pipe before we go.
-      setTimeout(() => app.quit(), 200);
+      // Both tools share this main process, so one app quit tears down every
+      // overlay, native hook, tray resource, and settings relay together.
+      app.quit();
     }
 
     app.whenReady().then(() => {
@@ -293,21 +222,37 @@ if (requestedModule) {
           // pass once PopKey reports back its autoSuppressed state.
           relaySuppression();
           rebuildMenu();
-          // Keep the open settings window's tabs in sync with which modules are
-          // connected (swap a placeholder <-> the real view as modules come/go).
+          // Keep the open Settings tabs in sync with module connection state.
           settingsWindow?.refreshConnState();
         },
         undefined,
         (appName, msg) => {
-          // Settings-window relay coming back from a module: hand it to the
-          // launcher settings window so it reaches the right hosted tab (invoke
-          // results resolve the renderer's promise; pushes drive its subscriptions).
+          // Forward module state pushes into the unified Settings renderer.
           settingsWindow?.routeRelay(appName, msg);
         }
       );
 
-      // Windows/macOS: double-click the icon to re-spawn any missing modules.
-      tray.on("double-click", () => spawnModules());
+      // Create the settings-window controller eagerly (no window is shown until
+      // open()/applyPreset()). This registers its IPC — including the presets
+      // sync channel — and loads the persisted preset index so the tray can list
+      // presets before the user ever opens Settings. Rebuild the menu whenever
+      // the renderer syncs a change.
+      settingsWindow = createSuiteSettingsWindow(
+        __dirname,
+        trayServer,
+        launcherTrayIconPath(),
+        () => {
+          if (!quitting) rebuildMenu();
+        },
+      );
+
+      // Register both tools in this Electron process. They still create separate
+      // BrowserWindows and connect independently to the unified tray/settings host.
+      registerPopJot(popjotLayout(), "reported", true);
+      registerPopKey(popkeyLayout(), "reported", true);
+
+      // Double-click opens the unified settings shell.
+      tray.on("double-click", () => openSettingsFor(""));
 
       // Launcher-only auto-update: start the delayed initial check + 4h interval.
       // No-ops cleanly in dev (!app.isPackaged). When an update finishes
@@ -318,18 +263,16 @@ if (requestedModule) {
       updater.start();
 
       rebuildMenu();
-      spawnModules();
     });
 
-    // Re-launch of PopSuite while the launcher owns the tray: re-spawn modules so
-    // any that were quit come back; running ones focus via their own locks.
+    // A second desktop launch opens the existing suite settings window.
     app.on("second-instance", () => {
-      spawnModules();
+      openSettingsFor("");
     });
 
     // The launcher must stay resident as the tray owner, so window-all-closed
     // must NOT quit it. Its only window is the lazily-opened settings window;
-    // closing that must leave the tray (and both module processes) running.
+    // closing that must leave the tray and both overlay windows running.
     app.on("window-all-closed", () => {
       // Intentionally empty: keep the launcher alive.
     });
@@ -351,4 +294,3 @@ if (requestedModule) {
       if (app.isReady()) dialog.showErrorBox("PopSuite", `Launcher error: ${String(err)}`);
     });
   }
-}

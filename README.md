@@ -5,10 +5,10 @@ PopSuite ships two utilities — **PopJot** (screen annotation) and **PopKey**
 distributed as a single desktop install. The repo produces three surfaces from
 one codebase:
 
-1. **PopSuite desktop app** — the only shipped desktop deliverable. One Electron
-   binary (`app/`) launches PopJot and PopKey as independent module processes
-   under a single unified tray. See [`app/README.md`](app/README.md) for the
-   architecture.
+1. **PopSuite desktop app** � the only shipped desktop deliverable. One Electron
+   runtime (app/) owns two independent PopJot and PopKey overlay windows under a
+   single unified tray. The tools share a process, not a window or renderer.
+   See app/README.md for the architecture.
 2. **Two websites** — [popjot.app](https://popjot.app) and
    [popkey.app](https://popkey.app), static Vite builds of each app's
    `src/roots/WebRoot.tsx`, deployed from this repo via Cloudflare Pages.
@@ -27,7 +27,7 @@ PopSuite is a single git repository managed as an **npm workspace**. `shared/`, 
 
 ```
 PopSuite/                 # single git repo + npm workspace root
-├── app/                  # PopSuite desktop shell — launcher + module entrypoints, electron-builder config
+|-- app/                  # PopSuite desktop runtime, module windows, and electron-builder config
 │   └── modules/
 │       ├── popjot/       # annotation app — unique src/ + thin configs → ../../../shared
 │       └── popkey/       # input-visualizer app — unique src/ + thin configs → ../../../shared
@@ -92,34 +92,21 @@ Run from the repo root; each fans out to the relevant workspace member(s) via
 
 ## The suite (single desktop install)
 
-`app/` builds **one Electron binary** (`PopSuite.exe`) that runs in two modes
-from the same executable:
+The app/ package builds one Electron desktop runtime. It creates two independent
+native BrowserWindows: one for PopJot and one for PopKey. Each window has its own
+preload, renderer, persistent Chromium session partition, namespaced IPC channels,
+focus policy, and mouse-input policy. Sharing the Electron main process does not
+flatten the tools into one overlay.
 
-- **Launcher** (`PopSuite.exe`, no args) — a resident, lightweight process that
-  owns the single unified system tray icon for the whole product, spawns one
-  detached child process per module (`--module=popjot`, `--module=popkey`), and
-  stays alive listening on a local named pipe. Each module reports its state
-  (active/inactive, shortcut hints, annotating, etc.) over that pipe; the
-  launcher builds one dynamic tray menu from whichever modules are currently
-  connected and relays clicks back. The launcher owns no overlay/settings
-  windows and never touches a module's window/focus/overlay behavior.
-- **Module** (`PopSuite.exe --module=<id>`) — boots that module's normal main
-  process in this process, with its own userData, its own single-instance lock,
-  and its own overlay window — identical to the standalone app. It runs in
-  `tray.mode: "reported"`, so it reports to the launcher instead of drawing its
-  own OS tray icon.
+The same runtime also owns the unified tray, updater, and tabbed Settings shell.
+PopJot and PopKey report state independently to the suite coordinator, so their
+enable toggles, shortcuts, settings, and overlay lifecycles remain separate.
+PopJot annotation state still suppresses PopKey temporarily and restores the
+previous PopKey state afterward.
 
-Cross-module glue lives in the launcher too: PopJot reports when it starts/stops
-annotating, and the launcher relays that as an auto-suppress command to PopKey
-(so the keystroke overlay hides itself while you're actively drawing, then
-restores to whatever state you'd last asked for).
-
-**Resilience:** if the launcher's pipe is unreachable when a module starts (run
-directly via `--module=`, or the launcher isn't running) or the connection drops
-later (launcher killed/crashed), the module automatically falls back to creating
-its own local tray icon — the same code path the standalone apps use. A module
-is never left without a tray, and a dropped pipe also clears any active
-suppression so a module can't get stuck hidden.
+The two public websites remain independent static Vite builds from their existing
+WebRoot entry points. Standalone per-module Electron development commands also
+remain available for isolating and debugging one tool at a time.
 
 Per-app standalone installers (`PopJot.exe` / `PopKey.exe` as separate products)
 are **deprecated**; their packaging scripts and workflows were removed. Desktop

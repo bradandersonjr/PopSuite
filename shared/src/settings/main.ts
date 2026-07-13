@@ -43,6 +43,7 @@ export interface SettingsController<S extends SettingsSchema> {
 export function registerSettingsIpc<S extends SettingsSchema>(
   schema: S,
   opts: {
+    ipcNamespace?: string;
     sendToRenderers: (channel: string, value: unknown) => void;
     onChange?: { [K in keyof S]?: (value: SettingValue<S[K]>) => void };
     /** Optional initial values to merge with defaults (e.g. from disk). */
@@ -51,6 +52,8 @@ export function registerSettingsIpc<S extends SettingsSchema>(
     onKeyChange?: (key: keyof S & string, value: unknown) => void;
   }
 ): SettingsController<S> {
+  const channel = (name: string) =>
+    opts.ipcNamespace ? opts.ipcNamespace + ":" + name : name;
   const values = { ...settingsDefaults(schema), ...opts.initialValues };
 
   function applyChange(key: keyof S & string, value: unknown): void {
@@ -71,13 +74,13 @@ export function registerSettingsIpc<S extends SettingsSchema>(
     syncToWindow(win) {
       for (const key of Object.keys(schema) as Array<keyof S & string>) {
         if (schema[key].volatile) continue;
-        win.webContents.send(trayChannel(key), values[key]);
+        win.webContents.send(channel(trayChannel(key)), values[key]);
       }
     },
   };
 
   for (const key of Object.keys(schema) as Array<keyof S & string>) {
-    ipcMain.on(setChannel(key), (_event, value: unknown) => {
+    ipcMain.on(channel(setChannel(key)), (_event, value: unknown) => {
       applyChange(key, value);
     });
   }

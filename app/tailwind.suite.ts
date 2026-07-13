@@ -18,6 +18,7 @@ const g = (p: string) => resolve(REPO_ROOT, p).replace(/\\/g, "/");
 const config: Config = {
   ...preset,
   content: [
+    g("app/src/settings/**/*.{html,ts,tsx}"),
     g("app/modules/popjot/index.html"),
     g("app/modules/popjot/src/**/*.{ts,tsx}"),
     g("app/modules/popkey/index.html"),

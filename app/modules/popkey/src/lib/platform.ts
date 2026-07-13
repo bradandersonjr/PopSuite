@@ -35,7 +35,16 @@ export {
 export type { ShortcutUpdateResult };
 
 // Raw uiohook event shapes forwarded by the main process (see main/inputCapture.ts).
-export type KeyEvent = { key: string; keycode: number; modifier: boolean; time: number };
+export type KeyEvent = {
+  key: string;
+  keycode: number;
+  modifier: boolean;
+  time: number;
+  altKey?: boolean;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  shiftKey?: boolean;
+};
 export type ClickEvent = {
   button: number;
   x: number;

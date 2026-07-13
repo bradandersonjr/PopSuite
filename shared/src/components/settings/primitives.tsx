@@ -469,3 +469,31 @@ export const SettingsColumns = ({
     </div>
   );
 };
+
+/**
+ * Content-only renderer for a single settings section: the items of one
+ * SettingsColumns column without the sidebar, scroll container, or section
+ * heading. The suite settings window composes these under its own suite-level
+ * navigation (one sidebar spanning both apps).
+ */
+export const SettingsSection = ({
+  items,
+}: {
+  items: Array<React.ReactNode>;
+}) => {
+  const { palette } = useSettingsUI();
+  const visible = items.filter(Boolean);
+  if (visible.length === 0) return null;
+  return (
+    <div className="space-y-4">
+      {visible.map((item, index) => (
+        <div key={index} className="rounded-xl transition-all duration-200">
+          {index > 0 && (
+            <div className="my-3 h-px" style={{ backgroundColor: palette.divider }} />
+          )}
+          {item}
+        </div>
+      ))}
+    </div>
+  );
+};

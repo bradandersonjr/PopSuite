@@ -10,8 +10,8 @@
 
 import { desktopCapturer, globalShortcut, ipcMain, screen } from "electron";
 import { createPopApp, type PopAppOptions } from "@shared/main/createPopApp";
-import type { settingsSchema as PopJotSchema } from "@/config/settingsSchema";
-import { settingsSchema } from "@/config/settingsSchema";
+import type { settingsSchema as PopJotSchema } from "../config/settingsSchema";
+import { settingsSchema } from "../config/settingsSchema";
 import { startSpotlightScroll, stopSpotlightScroll } from "./spotlightScroll";
 
 // Spotlight radius slider range (mirrors settingsSchema's SliderRow bounds in
@@ -79,7 +79,8 @@ function warmupScreenshotCapture(): Promise<void> {
  */
 export function registerPopJot(
   layout?: PopAppOptions<typeof PopJotSchema>["layout"],
-  trayMode?: "owned" | "reported"
+  trayMode?: "owned" | "reported",
+  embedded = false
 ): void {
   // Whether shortcuts fire. Starts enabled; tray "Disable PopJot" suspends them.
   let enabled = true;
@@ -113,7 +114,7 @@ export function registerPopJot(
       const win = popApp.getMainWindow();
       if (!win || win.isDestroyed()) return;
       const pos = popApp.getCursorDipPosition();
-      win.webContents.send("spotlight-cursor", pos);
+      popApp.sendToMainWindow("spotlight-cursor", pos);
     }, 16);
   }
 
@@ -135,11 +136,10 @@ export function registerPopJot(
   function setSpotlight(active: boolean, skipSuiteReport = false): void {
     if (spotlightActive === active) return;
     spotlightActive = active;
-    const win = popApp.getMainWindow();
     if (active) {
       // Cover whichever display the cursor is on, then start feeding positions.
       popApp.moveOverlayToCursorDisplay();
-      win?.webContents.send("spotlight-cursor", popApp.getCursorDipPosition());
+      popApp.sendToMainWindow("spotlight-cursor", popApp.getCursorDipPosition());
       startCursorPolling();
       // Scroll-wheel resize. Only registered while spotlight is active (mirrors
       // the cursor-poll lifecycle above) so the native uiohook listener carries
@@ -174,13 +174,14 @@ export function registerPopJot(
     // time reads the same way to the suite regardless of which PopJot mode
     // triggered it. No-op outside the suite (no pipe client) and standalone.
     if (!skipSuiteReport) popApp.reportSuiteAnnotating(active);
-    win?.webContents.send("spotlight-set", active);
+    popApp.sendToMainWindow("spotlight-set", active);
   }
 
   const popApp = createPopApp({
     appName: "PopJot",
     aboutDetail: "Screen annotation that stays out of your way.",
     settingsSchema,
+    embedded,
     proProduct: "suite",
     layout,
     onSettingChange: {
@@ -202,7 +203,37 @@ export function registerPopJot(
           const pos = ctx.getCursorDipPosition();
           const needsSnapshot = ctx.settings.overlayMode === "snapshot";
           const snapshot = needsSnapshot ? await captureScreenshot() : null;
-          win.webContents.send("shortcut-activate", pos, snapshot);
+          if (!enabled) {
+            shortcutFired = false;
+            return;
+          }
+          ctx.sendToMainWindow("shortcut-activate", pos, snapshot);
+        },
+      },
+      {
+        // Use last tool: activate the overlay straight into drawing with the
+        // last-used tool, skipping the radial menu — the keyboard twin of the
+        // top (History) slot. Alt+Shift+W (Cmd+Shift+W on macOS) was free.
+        name: "lastTool",
+        default: isMac ? "Cmd+Shift+W" : "Alt+Shift+W",
+        handler: async (ctx) => {
+          const win = ctx.getMainWindow();
+          if (!win || !enabled) return;
+          if (shortcutFired) {
+            // Overlay already up (menu open): the renderer just dismisses the
+            // menu and keeps the current tool — no re-capture needed.
+            ctx.sendToMainWindow("shortcut-last-tool", null);
+            return;
+          }
+          shortcutFired = true;
+          ctx.moveOverlayToCursorDisplay();
+          const needsSnapshot = ctx.settings.overlayMode === "snapshot";
+          const snapshot = needsSnapshot ? await captureScreenshot() : null;
+          if (!enabled) {
+            shortcutFired = false;
+            return;
+          }
+          ctx.sendToMainWindow("shortcut-last-tool", snapshot);
         },
       },
       {
@@ -215,7 +246,8 @@ export function registerPopJot(
           const pos = ctx.getCursorDipPosition();
           const needsSnapshot = ctx.settings.overlayMode === "snapshot";
           const snapshot = needsSnapshot ? await captureScreenshot() : null;
-          win.webContents.send("shortcut-persistent", pos, snapshot);
+          if (!enabled) return;
+          ctx.sendToMainWindow("shortcut-persistent", pos, snapshot);
         },
       },
       {
@@ -243,9 +275,26 @@ export function registerPopJot(
       onToggle: () => {
         enabled = !enabled;
         popApp.setTrayActive(enabled);
+        const win = popApp.getMainWindow();
+        if (enabled) {
+          // PopJot's transparent overlay remains resident while the app is
+          // enabled so activation never has to recreate/show its native surface.
+          win?.showInactive();
+          return;
+        }
+
+        if (spotlightActive) setSpotlight(false);
+        if (annotating) {
+          // Let the renderer clear persistent/momentary state, then its normal
+          // overlay-deactivated event completes the hide and suite restoration.
+          popApp.sendToMainWindow("overlay-deactivate-requested");
+        } else {
+          shortcutFired = false;
+          win?.hide();
+        }
       },
     },
-    secondInstance: "focus-main",
+    secondInstance: "open-settings",
     onReady: (ctx) => {
       ctx.setTrayActive(enabled);
       void warmupScreenshotCapture();
@@ -257,16 +306,21 @@ export function registerPopJot(
       const main = ctx.getMainWindow();
       main?.webContents.on("did-finish-load", () => {
         shortcutFired = false;
-        // The overlay renderer forgets spotlight on reload; drop our side too so
-        // we don't keep polling the cursor for a layer that is no longer shown.
+        // Renderer reloads forget transient drawing/spotlight state. Reconcile
+        // main and suite state while keeping the enabled overlay resident.
         if (spotlightActive) setSpotlight(false);
+        if (annotating) {
+          annotating = false;
+          ctx.reportSuiteAnnotating(false);
+        }
+        if (!enabled) main.hide();
       });
     },
   });
 
   // ─── Overlay activation (PopJot-specific) ────────────────────────────
 
-  ipcMain.on("overlay-activated", () => {
+  ipcMain.on(popApp.ipcChannel("overlay-activated"), () => {
     // Annotation is starting. It is mutually exclusive with spotlight, so an
     // active spotlight force-exits here (spotlight stays click-through, so this
     // never fights the drawing overlay's input capture).
@@ -283,7 +337,7 @@ export function registerPopJot(
     win.focus();
   });
 
-  ipcMain.on("overlay-deactivated", () => {
+  ipcMain.on(popApp.ipcChannel("overlay-deactivated"), () => {
     annotating = false;
     // Suite-only: annotation ended, let the launcher restore PopKey.
     popApp.reportSuiteAnnotating(false);
@@ -293,6 +347,9 @@ export function registerPopJot(
     // input pipeline which can intercept synthetic right/middle-click events from
     // tablet drivers (e.g. Huion stylus buttons).
     win.setIgnoreMouseEvents(true);
+    // The transparent native surface stays present between activations while
+    // PopJot is enabled. Disabling PopJot still removes it entirely.
+    if (!enabled) win.hide();
     shortcutFired = false;
   });
 }

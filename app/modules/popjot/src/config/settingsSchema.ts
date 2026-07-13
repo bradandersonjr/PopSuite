@@ -1,5 +1,5 @@
 import { setting } from "@shared/settings/schema";
-import { DEFAULT_SPOTLIGHT_FEATHER_PCT } from "@/lib/spotlight";
+import { DEFAULT_SPOTLIGHT_FEATHER_PCT } from "../lib/spotlight";
 
 /**
  * PopJot's tray-adjustable settings — the single source of truth for

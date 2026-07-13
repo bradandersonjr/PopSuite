@@ -5,6 +5,7 @@ import {
   decodeFrames,
   SUITE_CHANGELOG_URL,
   SUITE_DOCS_URL,
+  SUITE_PRESET_DEFAULT_ID,
   type SuiteModuleState,
   type SuiteTrayHandlers,
   type SuiteTrayMenuOptions,
@@ -37,6 +38,7 @@ function noopHandlers(): SuiteTrayHandlers {
     onCheckForUpdates: vi.fn(),
     onInstallUpdate: vi.fn(),
     onQuitAll: vi.fn(),
+    onApplyPreset: vi.fn(),
   };
 }
 
@@ -245,6 +247,88 @@ describe("buildSuiteTrayMenu", () => {
     expect(menu.some((i) => i.type === "checkbox")).toBe(false);
     const heading = menu.find((i) => i.label === "PopJot");
     expect(heading?.enabled).toBe(false);
+  });
+
+  describe("Situational Presets (Pro)", () => {
+    it("omits the Presets submenu entirely for non-Pro users", () => {
+      const menu = buildSuiteTrayMenu(
+        [makeModule()],
+        noopHandlers(),
+        opts({ presets: { isPro: false, saved: [{ id: "a", name: "Fusion" }] } })
+      );
+      expect(menu.some((i) => i.label === "Presets")).toBe(false);
+    });
+
+    it("shows a Presets submenu with only Default when no presets are saved", () => {
+      const menu = buildSuiteTrayMenu(
+        [makeModule()],
+        noopHandlers(),
+        opts({ presets: { isPro: true, saved: [] } })
+      );
+      const presets = menu.find((i) => i.label === "Presets");
+      expect(presets?.submenu?.map((i) => i.label ?? `<${i.type}>`)).toEqual([
+        "Default",
+      ]);
+    });
+
+    it("lists Default then a separator then each saved preset", () => {
+      const menu = buildSuiteTrayMenu(
+        [makeModule()],
+        noopHandlers(),
+        opts({
+          presets: {
+            isPro: true,
+            saved: [
+              { id: "a", name: "Fusion" },
+              { id: "b", name: "Recording" },
+            ],
+          },
+        })
+      );
+      const presets = menu.find((i) => i.label === "Presets");
+      expect(presets?.submenu?.map((i) => i.label ?? `<${i.type}>`)).toEqual([
+        "Default",
+        "<separator>",
+        "Fusion",
+        "Recording",
+      ]);
+    });
+
+    it("appears directly after About PopSuite", () => {
+      const menu = buildSuiteTrayMenu(
+        [makeModule()],
+        noopHandlers(),
+        opts({ presets: { isPro: true, saved: [] } })
+      );
+      const aboutIdx = menu.findIndex((i) => i.label === "About PopSuite");
+      // About, then a separator, then the Presets submenu.
+      expect(menu[aboutIdx + 1]?.type).toBe("separator");
+      expect(menu[aboutIdx + 2]?.label).toBe("Presets");
+    });
+
+    it("wires Default to onApplyPreset with the default sentinel", () => {
+      const handlers = noopHandlers();
+      const menu = buildSuiteTrayMenu(
+        [makeModule()],
+        handlers,
+        opts({ presets: { isPro: true, saved: [] } })
+      );
+      const presets = menu.find((i) => i.label === "Presets");
+      presets?.submenu?.find((i) => i.label === "Default")?.click?.();
+      expect(handlers.onApplyPreset).toHaveBeenCalledWith(SUITE_PRESET_DEFAULT_ID);
+    });
+
+    it("wires a saved preset to onApplyPreset with its id", () => {
+      const handlers = noopHandlers();
+      const menu = buildSuiteTrayMenu(
+        [makeModule()],
+        handlers,
+        opts({ presets: { isPro: true, saved: [{ id: "xyz", name: "Fusion" }] } })
+      );
+      const presets = menu.find((i) => i.label === "Presets");
+      presets?.submenu?.find((i) => i.label === "Fusion")?.click?.();
+      expect(handlers.onApplyPreset).toHaveBeenCalledWith("xyz");
+    });
   });
 });
 

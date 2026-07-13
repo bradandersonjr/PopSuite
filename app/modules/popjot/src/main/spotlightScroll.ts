@@ -16,7 +16,11 @@
  * lifecycle in register.ts, to keep the "only cost while active" property.
  */
 
-import { uIOhook } from "uiohook-napi";
+import {
+  acquireGlobalInputHook,
+  releaseGlobalInputHook,
+  uIOhook,
+} from "@shared/main/globalInputHook";
 
 // Sensitivity: radius change (px) per wheel "tick". uiohook reports rotation
 // magnitude per tick (typically 1-3 for a standard mouse wheel notch); scale
@@ -68,10 +72,10 @@ export function startSpotlightScroll(
   callbacks = cb;
   if (hookStarted) return;
   uIOhook.on("wheel", handleWheel);
-  try {
-    uIOhook.start();
+  if (acquireGlobalInputHook()) {
     hookStarted = true;
-  } catch (err) {
+  } else {
+    uIOhook.removeListener("wheel", handleWheel);
     // A native hook failure (missing macOS permission, Wayland session on
     // Linux, etc.) must not crash the main process — spotlight still works,
     // it just won't support the scroll-to-resize gesture.
@@ -82,7 +86,7 @@ export function startSpotlightScroll(
     // macOS install the scroll-to-resize gesture will quietly do nothing with
     // no explanation to the user. Consider prompting for Accessibility the
     // first time spotlight mode is entered on mac, mirroring PopKey's flow.
-    console.error(`Failed to start spotlight scroll input capture (uIOhook): ${String(err)}`);
+    console.error("Failed to start spotlight scroll input capture (uIOhook).");
   }
 }
 
@@ -93,6 +97,6 @@ export function stopSpotlightScroll(): void {
   callbacks = null;
   if (!hookStarted) return;
   uIOhook.removeListener("wheel", handleWheel);
-  uIOhook.stop();
+  releaseGlobalInputHook();
   hookStarted = false;
 }

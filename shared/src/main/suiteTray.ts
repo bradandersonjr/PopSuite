@@ -242,7 +242,19 @@ export interface SuiteTrayHandlers {
    */
   onInstallUpdate(): void;
   onQuitAll(): void;
+  /** Apply a preset by id from the tray (Pro). Includes the Default sentinel. */
+  onApplyPreset?(id: string): void;
 }
+
+/** A situational preset as surfaced in the tray (Pro feature). */
+export interface SuiteTrayPreset {
+  id: string;
+  name: string;
+}
+
+/** Sentinel id for the built-in factory-defaults preset (mirror of the
+ *  renderer's DEFAULT_PRESET_ID in app/src/settings/SuitePresets.tsx). */
+export const SUITE_PRESET_DEFAULT_ID = "__default__";
 
 /** Extra inputs to the menu builder beyond the connected-module list. */
 export interface SuiteTrayMenuOptions {
@@ -254,6 +266,13 @@ export interface SuiteTrayMenuOptions {
    * staged (dev, offline, already current, or still downloading).
    */
   updateReady?: { version: string };
+  /**
+   * Situational Presets (Pro). When `isPro` is true, a "Presets" submenu is
+   * rendered under "About PopSuite" with a built-in Default entry plus each
+   * saved preset. Omitted entirely for non-Pro users. The saved list may be
+   * empty (only Default shows).
+   */
+  presets?: { isPro: boolean; saved: SuiteTrayPreset[] };
 }
 
 /**
@@ -339,6 +358,29 @@ export function buildSuiteTrayMenu(
   // launcher-local (shows the suite's own version), never per module. Always
   // shown — it's about the product, not a connected module.
   items.push({ label: "About PopSuite", click: () => handlers.onAbout() });
+
+  // Situational Presets (Pro): a submenu of the built-in Default plus each saved
+  // preset, applied via the launcher (which opens the settings window so its
+  // relay can push settings to the module processes). Only for Pro users.
+  if (options.presets?.isPro) {
+    const presetItems: SuiteMenuItem[] = [
+      {
+        label: "Default",
+        click: () => handlers.onApplyPreset?.(SUITE_PRESET_DEFAULT_ID),
+      },
+    ];
+    if (options.presets.saved.length > 0) {
+      presetItems.push({ type: "separator" });
+      for (const preset of options.presets.saved) {
+        presetItems.push({
+          label: preset.name,
+          click: () => handlers.onApplyPreset?.(preset.id),
+        });
+      }
+    }
+    items.push({ type: "separator" });
+    items.push({ label: "Presets", submenu: presetItems });
+  }
 
   // ─── Launcher-local items (never depend on a connected module) ─────────
   items.push({ type: "separator" });

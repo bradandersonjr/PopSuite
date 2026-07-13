@@ -18,6 +18,7 @@
     "dev:module:popjot": "npm run dev:electron --prefix app/modules/popjot",
     "dev:module:popkey": "npm run dev:electron --prefix app/modules/popkey",
     "dev:suite": "concurrently -n suite:popjot,suite:popkey -c cyan,magenta \"npm run dev:popjot --prefix app\" \"npm run dev:popkey --prefix app\"",
+    "dev:launcher": "npm run dev:launcher --prefix app",
     "build:suite": "npm run build --prefix app",
     "typecheck:suite": "npm run typecheck --prefix app",
     "package:suite": "npm run package:win --prefix app",

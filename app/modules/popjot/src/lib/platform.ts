@@ -80,6 +80,11 @@ export function overlayDeactivated(): void {
   window.electronAPI?.overlayDeactivated();
 }
 
+export function onOverlayDeactivateRequested(callback: () => void): () => void {
+  if (!window.electronAPI) return () => {};
+  return window.electronAPI.onOverlayDeactivateRequested(callback);
+}
+
 // ─── Spotlight presenter mode ──────────────────────────────────────
 
 export function onSpotlightSet(callback: (active: boolean) => void): () => void {
@@ -97,6 +102,11 @@ export function onShortcutActivate(
 ): () => void {
   if (!window.electronAPI) return () => {};
   return window.electronAPI.onShortcutActivate(callback);
+}
+
+export function onShortcutLastTool(callback: (snapshotDataUrl: string | null) => void): () => void {
+  if (!window.electronAPI) return () => {};
+  return window.electronAPI.onShortcutLastTool(callback);
 }
 
 export function onShortcutPersistent(
@@ -118,6 +128,10 @@ export async function setSpotlightShortcut(shortcut: string): Promise<ShortcutUp
   return setNamedShortcut("spotlight", shortcut);
 }
 
-export async function getShortcuts(): Promise<{ main: string; persistent: string; spotlight: string }> {
-  return getNamedShortcuts({ main: "", persistent: "", spotlight: "" });
+export async function setLastToolShortcut(shortcut: string): Promise<ShortcutUpdateResult> {
+  return setNamedShortcut("lastTool", shortcut);
+}
+
+export async function getShortcuts(): Promise<{ main: string; persistent: string; spotlight: string; lastTool: string }> {
+  return getNamedShortcuts({ main: "", persistent: "", spotlight: "", lastTool: "" });
 }

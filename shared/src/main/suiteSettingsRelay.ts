@@ -1,31 +1,15 @@
 /**
- * Module-side settings-IPC relay for the launcher-owned settings window.
+ * Suite-only settings state-push relay.
  *
- * In the suite build the launcher owns ONE settings window that hosts each
- * module's REAL settings renderer in a WebContentsView. Because that renderer
- * runs in the LAUNCHER's process, its `ipcRenderer` traffic reaches the
- * launcher's main — not this module's, where the settings handlers and canonical
- * state actually live. This relay closes that gap: the launcher tunnels the
- * hosted renderer's IPC to the owning module over the suite pipe, this module
- * answers it against its OWN handlers, and pushes flowing the other way (main →
- * renderer) are streamed back so subscriptions keep firing.
+ * In the unified desktop build, the one Settings renderer sends requests
+ * directly to each module's namespaced IPC handlers because both modules share
+ * the same Electron main process. While a module panel is mounted, createPopApp
+ * mirrors its main-to-renderer state pushes through the suite coordinator so
+ * subscriptions in that shared renderer receive current values.
  *
- * Nothing here runs in a standalone module (no launcher / no pipe) or on the
- * web: the relay is engaged only while the launcher is hosting this module's
- * settings, and the module's own local settings window path is untouched.
- *
- * How each direction is served without duplicating per-module settings logic:
- *   - `relaySend`   → replayed with `ipcMain.emit(channel, event, ...args)`,
- *                     which triggers the module's registered `.on(channel)`
- *                     listeners exactly as a real renderer send would.
- *   - `relayInvoke` → dispatched to the matching `ipcMain.handle` handler. Electron
- *                     keeps those handlers private, so we capture them via a thin
- *                     recording shim installed around `ipcMain.handle` (the real
- *                     registration still runs, so behavior is unchanged).
- *   - pushes        → the module feeds its settings-window sends into `pushToHost`
- *                     while hosted, and the relay forwards them up the pipe.
+ * The send/invoke replay helpers remain as compatibility paths for a separated
+ * module host, but the current desktop Settings preload does not need them.
  */
-
 import { ipcMain, type IpcMainInvokeEvent } from "electron";
 
 /** Handler shape Electron stores for `ipcMain.handle`. */

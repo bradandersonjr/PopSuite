@@ -13,6 +13,7 @@ import {
   onSetAppEnabled,
 } from "@/lib/platform";
 import type { KeyEvent, ClickEvent, WheelEventData } from "@/lib/platform";
+import { isMac } from "@shared/lib/hotkeys";
 
 export type BadgeType = "key" | "combo" | "click" | "scroll" | "drag";
 
@@ -56,7 +57,7 @@ const DOM_MODIFIER_MAP: Record<string, string> = {
 
 // Display names that uiohook uses for modifier keys (from inputCapture.ts DISPLAY_NAMES).
 // Used as a reliable fallback since the `data.modifier` boolean can be stale across IPC.
-const MODIFIER_NAMES = new Set(["Ctrl", "Shift", "Alt", "Win"]);
+const MODIFIER_NAMES = new Set(["Ctrl", "Shift", "Alt", "Win", "Cmd"]);
 
 let badgeCounter = 0;
 function nextId(): string { return `b${++badgeCounter}`; }
@@ -349,8 +350,29 @@ export function useInputCapture() {
 
     if (!appEnabled) return () => cleanups.forEach((fn) => fn());
 
+    const syncModifiers = (data: KeyEvent) => {
+      if (data.altKey !== undefined) {
+        if (data.altKey) heldModifiersRef.current.add("Alt");
+        else heldModifiersRef.current.delete("Alt");
+      }
+      if (data.ctrlKey !== undefined) {
+        if (data.ctrlKey) heldModifiersRef.current.add("Ctrl");
+        else heldModifiersRef.current.delete("Ctrl");
+      }
+      if (data.shiftKey !== undefined) {
+        if (data.shiftKey) heldModifiersRef.current.add("Shift");
+        else heldModifiersRef.current.delete("Shift");
+      }
+      if (data.metaKey !== undefined) {
+        const metaLabel = isMac() ? "Cmd" : "Win";
+        if (data.metaKey) heldModifiersRef.current.add(metaLabel);
+        else heldModifiersRef.current.delete(metaLabel);
+      }
+    };
+
     if (keyboardEnabled) {
       cleanups.push(onInputKeyDown((data: KeyEvent) => {
+        syncModifiers(data);
         const isMod = data.modifier || MODIFIER_NAMES.has(data.key);
         // Already held → this is an OS auto-repeat; optionally show a ×N counter.
         if (heldKeysRef.current.has(data.keycode)) {
@@ -368,6 +390,7 @@ export function useInputCapture() {
       }));
 
       cleanups.push(onInputKeyUp((data: KeyEvent) => {
+        syncModifiers(data);
         heldKeysRef.current.delete(data.keycode);
         heldKeyBadgeRef.current.delete(data.keycode);
         // Word mode integration point: if (wordCapture.handleDesktopKeyUp(...)) return;

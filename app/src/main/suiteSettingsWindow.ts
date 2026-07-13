@@ -1,211 +1,192 @@
 /**
- * Launcher-owned settings window (the "one window, instant tabs" surface).
+ * One desktop-only settings BrowserWindow and one renderer.
  *
- * The launcher creates ONE frameless BrowserWindow containing:
- *   - a thin tab-strip WebContentsView at the top (its own tabStrip.html, no
- *     dependency on either module's settings bundle), and
- *   - one settings WebContentsView PER MODULE, each loading that module's REAL
- *     settings renderer (out/renderer/<id>/index.html?settings=1) via the hosted
- *     preload, which tunnels the renderer's IPC over the suite pipe to the owning
- *     module process. Only the active tab's view is visible; switching tabs just
- *     re-lays-out the views (attach/detach) — never reload — so scroll and
- *     in-progress form state survive flipping back and forth.
- *
- * If a module process isn't connected, its tab shows a graceful placeholder
- * instead of a blank/broken view; the other tab keeps working independently.
- *
- * Standalone modules are unaffected: this window only exists in the launcher
- * process, and the launcher only ever opens it (it never relays a settings
- * action to a module), so a module with no launcher still creates its own local
- * settings window exactly as before.
+ * The renderer mounts either PopJot or PopKey settings and switches its preload
+ * API between the existing namespaced IPC bridges. Overlay windows remain
+ * separate and never participate in this window.
  */
 
-import { BaseWindow, WebContentsView, ipcMain, nativeImage } from "electron";
-import { existsSync } from "fs";
+import { app, BrowserWindow, ipcMain, nativeImage } from "electron";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import type { SuiteTrayServer } from "@shared/main/suiteTrayServer";
 import type { ModuleToLauncher } from "@shared/main/suiteTray";
 
-/** A hosted module: its id, display label, and settings WebContentsView. */
-interface ModuleTab {
-  id: string;
-  label: string;
-  view: WebContentsView;
-  /** True once the module's renderer has loaded at least once (view is live). */
-  loaded: boolean;
-}
+type ModuleId = "popjot" | "popkey";
+
+type SettingsState = {
+  activeId: ModuleId;
+  tabs: Array<{ id: ModuleId; label: string; connected: boolean }>;
+};
 
 const WINDOW_WIDTH = 1160;
 const WINDOW_HEIGHT = 860;
 const WINDOW_MIN_WIDTH = 900;
 const WINDOW_MIN_HEIGHT = 640;
-const TAB_STRIP_HEIGHT = 40;
 
-/** Modules the suite ships, in tab order, with their display labels. */
-const MODULE_TABS: ReadonlyArray<{ id: string; label: string }> = [
+const MODULE_TABS: ReadonlyArray<{ id: ModuleId; label: string }> = [
   { id: "popjot", label: "PopJot" },
   { id: "popkey", label: "PopKey" },
 ];
 
+const HOST_START = "__suite_host_start";
+const HOST_STOP = "__suite_host_stop";
+
+const STATE_CHANNEL = "suite:settings-state";
+const STATE_CHANGED_CHANNEL = "suite:settings-state-changed";
+const SELECT_CHANNEL = "suite:settings-select";
+const SEED_CHANNEL = "suite:settings-seed";
+const CLOSE_CHANNEL = "suite:settings-close";
+const PRESETS_SYNC_CHANNEL = "suite:presets-sync";
+const PRESETS_APPLY_CHANNEL = "suite:presets-apply";
+// Renderer -> main ack sent once a tray-triggered preset apply has dispatched
+// all its settings IPC, so a window created solely to run the apply (never
+// shown) can be torn down instead of lingering invisibly.
+const PRESETS_APPLY_DONE_CHANNEL = "suite:presets-apply-done";
+// Renderer -> main: the presets panel has mounted and attached its apply
+// listener. This is the ONLY trigger that flushes a queued tray apply into a
+// loading window. Flushing any earlier (e.g. on did-finish-load) races React's
+// effect subscription: the apply would be sent into a renderer with no
+// listener and dropped, while pendingApplyId is cleared — a silent no-op.
+const PRESETS_READY_CHANNEL = "suite:presets-ready";
+
+// Grace period after the renderer acks a tray apply before a hidden apply-only
+// window is destroyed, so the fire-and-forget setting IPCs it dispatched reach
+// the module processes first. Also the hard fallback if no ack ever arrives
+// (renderer error / old renderer): the window is torn down regardless so it
+// never lingers invisibly holding the settings relay.
+const HIDDEN_APPLY_TEARDOWN_MS = 1500;
+
+/** Tray-visible index of the renderer's presets. Names only — the full data
+ *  stays in the renderer's localStorage; the tray just needs to list + apply. */
+export interface SuitePresetsIndex {
+  presets: Array<{ id: string; name: string }>;
+  isPro: boolean;
+}
+
 export interface SuiteSettingsWindow {
-  /** Open (creating if needed) and focus the window, selecting `moduleId`'s tab. */
   open(moduleId: string): void;
-  /**
-   * Route a module→launcher relay message (invoke result / main→renderer push)
-   * into the matching hosted settings view. Wired to the tray server's onRelay.
-   */
   routeRelay(appName: string, msg: ModuleToLauncher): void;
-  /** Rebuild tab-strip state after a module connect/disconnect (refresh dimming). */
   refreshConnState(): void;
-  /** Destroy the window and all views (launcher shutdown). */
+  /** Current preset index (id + name + Pro), for building the tray submenu. */
+  getPresets(): SuitePresetsIndex;
+  /** Apply a preset by id from the tray: opens the window (needed for the
+   *  settings relay) and tells the renderer to run its apply path. */
+  applyPreset(id: string): void;
   dispose(): void;
 }
 
-/** Map a module id (popjot) to the appName it reports over the pipe (PopJot). */
-function appNameForModule(id: string): string {
-  return MODULE_TABS.find((m) => m.id === id)?.label ?? id;
-}
-function moduleForAppName(appName: string): string | undefined {
-  return MODULE_TABS.find((m) => m.label === appName)?.id;
+function moduleId(value: unknown): ModuleId | null {
+  return value === "popjot" || value === "popkey" ? value : null;
 }
 
-/**
- * Create the launcher's settings-window controller.
- *   - `dirname` is the launcher bundle's __dirname (out/main), used to resolve
- *     each module's renderer/preload in the packaged out/ tree and this window's
- *     own tab-strip/placeholder/preload assets (emitted beside the launcher).
- *   - `trayServer` relays settings IPC to the module processes and reports which
- *     modules are connected.
- *   - `iconPath` is the window icon (reuses the suite tray icon).
- */
+function appNameForModule(id: ModuleId): string {
+  return id === "popjot" ? "PopJot" : "PopKey";
+}
+
 export function createSuiteSettingsWindow(
   dirname: string,
   trayServer: SuiteTrayServer,
-  iconPath: string
+  iconPath: string,
+  onPresetsChanged?: () => void,
 ): SuiteSettingsWindow {
-  let win: BaseWindow | null = null;
-  let tabStrip: WebContentsView | null = null;
-  let placeholder: WebContentsView | null = null;
-  const tabs = new Map<string, ModuleTab>();
-  let activeId = MODULE_TABS[0].id;
+  let win: BrowserWindow | null = null;
+  let windowReady = false;
+  let activeId: ModuleId = "popjot";
+  // A preset id to hand the renderer once it's ready to host, when apply was
+  // requested from the tray while the window was closed/still loading.
+  let pendingApplyId: string | null = null;
+  // Why the current window exists. "visible" is a normal Settings window the
+  // user opened; "hidden-apply" is a window created only to run a tray preset
+  // apply — it must never show, and is destroyed once the apply completes. A
+  // later open() promotes a "hidden-apply" window to "visible".
+  let windowPurpose: "visible" | "hidden-apply" = "visible";
+  // Timer that tears down a hidden apply-only window after the renderer acks (or
+  // after a fallback timeout). Cleared if the window is promoted/closed first.
+  let hiddenApplyTeardown: ReturnType<typeof setTimeout> | null = null;
 
-  // ─── Asset path resolution (mirrors moduleRuntime's layout) ──────────────
-  // Launcher runs from out/main/index.js. A module's settings renderer lives at
-  // out/renderer/<id>/index.html and its preload at out/preload/<id>/index.js —
-  // i.e. ../renderer/<id>/... and ../preload/<id>/... from out/main. This
-  // window's own assets are emitted beside the launcher at out/main/suiteSettings.
-  const moduleRendererHtml = (id: string): string =>
-    join(dirname, "..", "renderer", id, "index.html");
-  const modulePreloadJs = (id: string): string =>
-    join(dirname, "..", "preload", id, "index.js");
-  const hostedPreloadJs = join(dirname, "suiteSettings", "hostedPreload.js");
-  const tabStripPreloadJs = join(dirname, "suiteSettings", "tabStripPreload.js");
-  const tabStripHtml = join(dirname, "suiteSettings", "tabStrip.html");
-  const placeholderHtml = join(dirname, "suiteSettings", "placeholder.html");
+  const presetsFile = join(app.getPath("userData"), "suite-presets-index.json");
 
-  // ─── Layout ──────────────────────────────────────────────────────────────
-  // Tab strip spans the top; the active settings view (or the placeholder) fills
-  // the rest. Inactive views are detached so only one renders. Recomputed on
-  // resize and on every tab switch.
-  function relayout(): void {
-    if (!win) return;
-    const [w, h] = win.getContentSize();
-    tabStrip?.setBounds({ x: 0, y: 0, width: w, height: TAB_STRIP_HEIGHT });
-    const body = { x: 0, y: TAB_STRIP_HEIGHT, width: w, height: Math.max(0, h - TAB_STRIP_HEIGHT) };
-
-    const active = tabs.get(activeId);
-    const connected = trayServer.isConnected(appNameForModule(activeId));
-
-    // Show the module view when its process is connected; otherwise show the
-    // placeholder so the tab is never a blank/broken surface.
-    for (const tab of tabs.values()) {
-      const show = tab.id === activeId && connected;
-      tab.view.setBounds(show ? body : { x: 0, y: 0, width: 0, height: 0 });
-      tab.view.setVisible(show);
-    }
-    const showPlaceholder = Boolean(placeholder) && (!active || !connected);
-    if (placeholder) {
-      placeholder.setBounds(showPlaceholder ? body : { x: 0, y: 0, width: 0, height: 0 });
-      placeholder.setVisible(showPlaceholder);
-      if (showPlaceholder) {
-        // Point the placeholder at the active module's label via the hash.
-        const label = MODULE_TABS.find((m) => m.id === activeId)?.label ?? activeId;
-        const url = `file://${placeholderHtml.replace(/\\/g, "/")}#${encodeURIComponent(label)}`;
-        if (placeholder.webContents.getURL().split("#")[0] !== url.split("#")[0]) {
-          void placeholder.webContents.loadURL(url);
-        } else {
-          placeholder.webContents.executeJavaScript(
-            `location.hash = ${JSON.stringify("#" + encodeURIComponent(label))}; ` +
-              `document.getElementById('title').textContent = ${JSON.stringify(label + " isn't running")};` +
-              `document.getElementById('detail').textContent = ${JSON.stringify(label + "'s settings will appear here once it starts.")};`
-          ).catch(() => {});
-        }
+  function loadPresetsIndex(): SuitePresetsIndex {
+    try {
+      const raw = readFileSync(presetsFile, "utf8");
+      const parsed = JSON.parse(raw) as Partial<SuitePresetsIndex>;
+      if (Array.isArray(parsed.presets)) {
+        return { presets: parsed.presets, isPro: !!parsed.isPro };
       }
+    } catch {
+      // Missing or malformed — start empty.
     }
+    return { presets: [], isPro: false };
   }
 
-  // ─── Tab-strip state ─────────────────────────────────────────────────────
-  function tabState(): { activeId: string; tabs: Array<{ id: string; label: string; connected: boolean }> } {
+  let presetsIndex: SuitePresetsIndex = loadPresetsIndex();
+
+  const rendererHtml = join(
+    dirname,
+    "..",
+    "renderer",
+    "settings",
+    "index.html",
+  );
+  const preloadJs = join(dirname, "suiteSettings", "preload.js");
+
+  function state(): SettingsState {
     return {
       activeId,
-      tabs: MODULE_TABS.map((m) => ({
-        id: m.id,
-        label: m.label,
-        connected: trayServer.isConnected(m.label),
+      tabs: MODULE_TABS.map((tab) => ({
+        ...tab,
+        connected: trayServer.isConnected(tab.label),
       })),
     };
   }
 
-  function pushTabState(): void {
-    tabStrip?.webContents.send("suite:tab-state-changed", tabState());
+  function pushState(): void {
+    if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return;
+    win.webContents.send(STATE_CHANGED_CHANNEL, state());
   }
 
-  // ─── View creation ───────────────────────────────────────────────────────
-  function ensureModuleView(id: string): ModuleTab {
-    const existing = tabs.get(id);
-    if (existing) return existing;
+  function startHosting(id: ModuleId): void {
+    trayServer.relaySend(appNameForModule(id), HOST_START, []);
+  }
 
-    const view = new WebContentsView({
-      webPreferences: {
-        preload: hostedPreloadJs,
-        contextIsolation: true,
-        // Electron 20+ defaults preloads to sandbox: true, which restricts
-        // require() to a small built-in allowlist. hostedPreload.ts must
-        // require() the module's own compiled preload bundle by absolute path
-        // at runtime (see hostedPreload.ts) — that require silently fails under
-        // the sandbox, leaving window.electronAPI undefined in every hosted tab.
-        // The module's standalone settings window preload is a self-contained
-        // bundle with no runtime require of external files, so it works sandboxed;
-        // this view genuinely needs the escape hatch.
-        sandbox: false,
-        // Pass the module id and its real preload path to the hosted preload so
-        // it can tunnel IPC for the right module and boot the module's own bridge.
-        additionalArguments: [
-          `--suite-module=${id}`,
-          `--suite-preload=${modulePreloadJs(id)}`,
-        ],
-      },
-    });
-    view.setVisible(false);
-    const tab: ModuleTab = { id, label: appNameForModule(id), view, loaded: false };
-    tabs.set(id, tab);
-    win?.contentView.addChildView(view);
-
-    // Load the module's real settings renderer (settings=1 mirrors the module's
-    // own createSettingsWindow). Loaded lazily on first open so an unused tab
-    // costs nothing until selected.
-    const html = moduleRendererHtml(id);
-    if (existsSync(html)) {
-      void view.webContents.loadFile(html, { query: { settings: "1" } });
-      tab.loaded = true;
+  function stopHosting(): void {
+    for (const tab of MODULE_TABS) {
+      trayServer.relaySend(tab.label, HOST_STOP, []);
     }
-    return tab;
+  }
+
+  function clearHiddenApplyTeardown(): void {
+    if (hiddenApplyTeardown) {
+      clearTimeout(hiddenApplyTeardown);
+      hiddenApplyTeardown = null;
+    }
+  }
+
+  function destroyWindow(): void {
+    clearHiddenApplyTeardown();
+    if (win && !win.isDestroyed()) win.destroy();
+  }
+
+  /**
+   * Promote a hidden apply-only window to a normal visible Settings window: an
+   * open() arrived while a tray apply was still running. Cancel its scheduled
+   * teardown and show it. Safe to call when the window is already visible.
+   */
+  function promoteToVisible(): void {
+    windowPurpose = "visible";
+    clearHiddenApplyTeardown();
+    if (!win || win.isDestroyed()) return;
+    if (!windowReady) return; // ready-to-show will show it (purpose is now visible)
+    if (win.isMinimized()) win.restore();
+    if (!win.isVisible()) win.show();
+    win.focus();
   }
 
   function ensureWindow(): void {
     if (win && !win.isDestroyed()) return;
 
-    win = new BaseWindow({
+    win = new BrowserWindow({
       width: WINDOW_WIDTH,
       height: WINDOW_HEIGHT,
       minWidth: WINDOW_MIN_WIDTH,
@@ -213,124 +194,212 @@ export function createSuiteSettingsWindow(
       frame: false,
       show: false,
       title: "PopSuite Settings",
-      backgroundColor: "#171717",
-      icon: existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : undefined,
+      // Matches the settings panel surface (bg-[#202020] in app/src/settings/main.tsx)
+      // so the native window paints the same gray before the renderer loads.
+      backgroundColor: "#202020",
+      icon: existsSync(iconPath)
+        ? nativeImage.createFromPath(iconPath)
+        : undefined,
+      webPreferences: {
+        preload: preloadJs,
+        contextIsolation: true,
+        partition: "persist:popsuite-settings",
+        // A tray preset apply runs this renderer in a window that is never
+        // shown; Chromium background-throttles hidden renderers, which would
+        // stall React mounting and the apply. Keep the renderer at full speed.
+        backgroundThrottling: false,
+      },
     });
 
-    // Tab strip on top.
-    tabStrip = new WebContentsView({
-      webPreferences: { preload: tabStripPreloadJs, contextIsolation: true },
+    void win.loadFile(rendererHtml, { query: { settings: "1" } });
+
+    win.once("ready-to-show", () => {
+      if (!win || win.isDestroyed()) return;
+      windowReady = true;
+      pushState();
+      // A window created only to run a tray preset apply stays hidden — showing
+      // it is exactly the regression this guards against. It is torn down once
+      // the renderer acks the apply (see flushPendingApply / the ack handler).
+      if (windowPurpose === "hidden-apply") return;
+      win.show();
+      win.focus();
     });
-    win.contentView.addChildView(tabStrip);
-    void tabStrip.webContents.loadFile(tabStripHtml);
 
-    // Shared placeholder view for disconnected modules.
-    placeholder = new WebContentsView({ webPreferences: { contextIsolation: true } });
-    placeholder.setVisible(false);
-    win.contentView.addChildView(placeholder);
+    // NOTE: deliberately no flushPendingApply here. did-finish-load fires
+    // BEFORE React mounts and attaches the suite:presets-apply listener, so
+    // flushing now would send the apply into a renderer with no listener and
+    // clear pendingApplyId — silently dropping the apply. The renderer sends
+    // suite:presets-ready once its listener is attached; that is the only
+    // trigger that flushes a queued apply.
+    win.webContents.on("did-finish-load", () => {
+      pushState();
+    });
 
-    // One settings view per module (created up front so both tabs preserve state
-    // once loaded, and switching never reloads).
-    for (const m of MODULE_TABS) ensureModuleView(m.id);
-
-    win.on("resize", relayout);
     win.on("closed", () => {
-      // Tearing down the views on close is fine — reopening rebuilds them. State
-      // that must survive a full close is the module's own persisted settings.
-      tabs.clear();
-      tabStrip = null;
-      placeholder = null;
+      clearHiddenApplyTeardown();
+      stopHosting();
+      windowReady = false;
       win = null;
     });
   }
 
-  function selectTab(id: string): void {
-    if (!MODULE_TABS.some((m) => m.id === id)) return;
-    activeId = id;
-    relayout();
-    pushTabState();
-    // Focus the active module's webContents so keyboard input lands in it.
-    const tab = tabs.get(id);
-    if (tab && trayServer.isConnected(appNameForModule(id))) tab.view.webContents.focus();
-  }
-
-  // ─── IPC from the tab strip ──────────────────────────────────────────────
-  ipcMain.on("suite:select-tab", (_e, id: unknown) => {
-    if (typeof id === "string") selectTab(id);
-  });
-  ipcMain.handle("suite:tab-state", () => tabState());
-
-  // ─── IPC from the hosted settings renderers (relay up to modules) ────────
-  // Every hosted renderer's send/invoke arrives here tagged with its module id;
-  // forward to the owning module process over the pipe.
-  ipcMain.on("suite:relay-send", (_e, moduleId: string, channel: string, args: unknown[]) => {
-    // The hosted "Done" button sends close-window; in the launcher-owned window
-    // that must hide THIS window, not ask the (windowless) module to hide its own.
-    // Everything else tunnels to the owning module.
-    if (channel === "close-window") {
-      if (win && !win.isDestroyed()) win.hide();
-      return;
-    }
-    trayServer.relaySend(appNameForModule(moduleId), channel, args);
-  });
-  // Correlate invoke replies by id. The module answers via routeRelay below.
-  let invokeSeq = 0;
-  const pending = new Map<number, (r: { result?: unknown; error?: string }) => void>();
-  ipcMain.handle(
-    "suite:relay-invoke",
-    (_e, moduleId: string, channel: string, args: unknown[]) =>
-      new Promise((resolve, reject) => {
-        const id = ++invokeSeq;
-        pending.set(id, ({ result, error }) => {
-          if (error) reject(new Error(error));
-          else resolve(result);
-        });
-        trayServer.relayInvoke(appNameForModule(moduleId), id, channel, args);
-        // Safety timeout so a dead module can't leak a hung renderer promise.
-        setTimeout(() => {
-          if (pending.delete(id)) reject(new Error("relay invoke timed out"));
-        }, 10000);
-      })
-  );
-
-  function routeRelay(appName: string, msg: ModuleToLauncher): void {
-    const id = moduleForAppName(appName);
+  const onSelect = (_event: Electron.IpcMainEvent, value: unknown) => {
+    const id = moduleId(value);
     if (!id) return;
-    if (msg.type === "relayInvokeResult") {
-      const settle = pending.get(msg.id);
-      if (settle) {
-        pending.delete(msg.id);
-        settle({ result: msg.result, error: msg.error });
-      }
-    } else if (msg.type === "relayPush") {
-      // Deliver a module main→renderer push into its hosted view.
-      tabs.get(id)?.view.webContents.send("suite:relay-push", msg.channel, msg.args);
+    activeId = id;
+    pushState();
+  };
+
+  const onSeed = (_event: Electron.IpcMainEvent, value: unknown) => {
+    const id = moduleId(value);
+    if (id) startHosting(id);
+  };
+
+  const onClose = () => destroyWindow();
+
+  const onPresetsSync = (_event: Electron.IpcMainEvent, value: unknown) => {
+    const payload = value as Partial<SuitePresetsIndex> | undefined;
+    const presets = Array.isArray(payload?.presets)
+      ? payload.presets
+          .filter(
+            (p): p is { id: string; name: string } =>
+              !!p && typeof p.id === "string" && typeof p.name === "string",
+          )
+          .map((p) => ({ id: p.id, name: p.name }))
+      : [];
+    presetsIndex = { presets, isPro: !!payload?.isPro };
+    try {
+      writeFileSync(presetsFile, JSON.stringify(presetsIndex), "utf8");
+    } catch {
+      // Best-effort; the tray falls back to the last-known index in memory.
     }
+    onPresetsChanged?.();
+  };
+
+  /**
+   * Schedule teardown of a hidden apply-only window. Called when the renderer
+   * acks the apply (short grace so the fire-and-forget setting IPCs land first)
+   * and armed as a fallback right after we send the apply, so the window never
+   * lingers invisibly even if the ack is missed.
+   */
+  function scheduleHiddenApplyTeardown(): void {
+    if (windowPurpose !== "hidden-apply") return;
+    clearHiddenApplyTeardown();
+    hiddenApplyTeardown = setTimeout(() => {
+      hiddenApplyTeardown = null;
+      // An open() may have promoted the window meanwhile — only tear down while
+      // it is still a hidden apply-only window.
+      if (windowPurpose === "hidden-apply") destroyWindow();
+    }, HIDDEN_APPLY_TEARDOWN_MS);
   }
+
+  /** Send a queued tray-apply once the renderer's apply listener is attached
+   *  (signaled via PRESETS_READY_CHANNEL — see its doc comment for why this
+   *  must not run any earlier). */
+  function flushPendingApply(): void {
+    if (pendingApplyId === null) return;
+    if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return;
+    win.webContents.send(PRESETS_APPLY_CHANNEL, pendingApplyId);
+    pendingApplyId = null;
+    // If this window exists only to run the apply, arm the fallback teardown now
+    // (the ack shortens it). A visible window is left as-is.
+    scheduleHiddenApplyTeardown();
+  }
+
+  // Renderer finished dispatching a tray apply: tear down a hidden apply-only
+  // window after a short grace so its setting IPCs reach the modules first. A
+  // visible/promoted window ignores this and stays open.
+  // Presets panel mounted + subscribed: deliver any queued tray apply now.
+  const onPresetsReady = () => flushPendingApply();
+
+  const onApplyDone = () => {
+    if (windowPurpose !== "hidden-apply") return;
+    clearHiddenApplyTeardown();
+    hiddenApplyTeardown = setTimeout(() => {
+      hiddenApplyTeardown = null;
+      if (windowPurpose === "hidden-apply") destroyWindow();
+    }, 300);
+  };
+
+  ipcMain.handle(STATE_CHANNEL, () => state());
+  ipcMain.on(SELECT_CHANNEL, onSelect);
+  ipcMain.on(SEED_CHANNEL, onSeed);
+  ipcMain.on(CLOSE_CHANNEL, onClose);
+  ipcMain.on(PRESETS_SYNC_CHANNEL, onPresetsSync);
+  ipcMain.on(PRESETS_APPLY_DONE_CHANNEL, onApplyDone);
+  ipcMain.on(PRESETS_READY_CHANNEL, onPresetsReady);
 
   return {
-    open(moduleId: string): void {
+    open(value): void {
+      activeId = moduleId(value) ?? activeId;
+      // A user-initiated open always wants a visible window. If a hidden
+      // apply-only window is currently running, promote it instead of creating
+      // a second one; otherwise create fresh (purpose defaults to visible).
+      const hadHiddenApply =
+        !!win && !win.isDestroyed() && windowPurpose === "hidden-apply";
+      windowPurpose = "visible";
       ensureWindow();
-      selectTab(MODULE_TABS.some((m) => m.id === moduleId) ? moduleId : MODULE_TABS[0].id);
-      if (win) {
-        relayout();
-        win.show();
-        win.focus();
+      if (!win) return;
+      pushState();
+      if (hadHiddenApply) {
+        promoteToVisible();
+        return;
       }
+      if (!windowReady) return;
+      if (win.isMinimized()) win.restore();
+      if (!win.isVisible()) win.show();
+      win.focus();
     },
-    routeRelay,
+
+    routeRelay(_appName, msg): void {
+      if (msg.type !== "relayPush") return;
+      if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return;
+      win.webContents.send(msg.channel, ...msg.args);
+    },
+
     refreshConnState(): void {
-      // A module connected/disconnected: re-dim tabs and swap placeholder<->view.
-      pushTabState();
-      relayout();
+      pushState();
     },
+
+    getPresets(): SuitePresetsIndex {
+      return presetsIndex;
+    },
+
+    applyPreset(id): void {
+      // Applying from the tray must never open/steal focus. The renderer still
+      // has to run (it owns the preset data + dispatches the settings IPC), so:
+      //   - Already-visible window: just send the apply; leave it visible and
+      //     don't touch focus.
+      //   - No window / still loading: create a HIDDEN apply-only window, run the
+      //     apply, then tear it down once the renderer acks (or on a fallback
+      //     timeout) so nothing lingers invisibly holding the settings relay.
+      const wasReady =
+        !!win && !win.isDestroyed() && windowReady && !win.webContents.isDestroyed();
+
+      if (wasReady && win) {
+        // Existing window: preserve its current purpose (visible stays visible).
+        // No new hidden-apply teardown is scheduled for a visible window.
+        win.webContents.send(PRESETS_APPLY_CHANNEL, id);
+        if (windowPurpose === "hidden-apply") scheduleHiddenApplyTeardown();
+        return;
+      }
+
+      // Creating (or waiting on) a window purely to run the apply — keep it hidden.
+      if (!win || win.isDestroyed()) windowPurpose = "hidden-apply";
+      pendingApplyId = id;
+      ensureWindow();
+    },
+
     dispose(): void {
-      pending.clear();
-      if (win && !win.isDestroyed()) win.destroy();
+      ipcMain.removeHandler(STATE_CHANNEL);
+      ipcMain.removeListener(SELECT_CHANNEL, onSelect);
+      ipcMain.removeListener(SEED_CHANNEL, onSeed);
+      ipcMain.removeListener(CLOSE_CHANNEL, onClose);
+      ipcMain.removeListener(PRESETS_SYNC_CHANNEL, onPresetsSync);
+      ipcMain.removeListener(PRESETS_APPLY_DONE_CHANNEL, onApplyDone);
+      ipcMain.removeListener(PRESETS_READY_CHANNEL, onPresetsReady);
+      destroyWindow();
       win = null;
-      tabStrip = null;
-      placeholder = null;
-      tabs.clear();
     },
   };
 }

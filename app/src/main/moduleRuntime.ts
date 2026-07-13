@@ -1,11 +1,6 @@
 /**
- * Shared runtime helpers for the PopSuite module processes.
- *
- * Both module entries (modules/popjot.ts, modules/popkey.ts) run inside the
- * SAME Electron binary as separate OS processes. These helpers give each one:
- *   - a per-module userData path (own single-instance lock + own storage), and
- *   - the layout that points the shared shell at this module's per-module
- *     renderer/preload/icon locations inside the shared out/ tree.
+ * Layout helpers for the two independent module windows in unified PopSuite.
+ * The legacy userData helper remains for standalone module-main development.
  */
 
 import { app } from "electron";
@@ -30,20 +25,15 @@ export function applyModuleUserData(module: ModuleId): void {
 }
 
 /**
- * Layout for the shared shell in packaged/prod builds. The suite's main bundles
- * live at out/main/<module>/index.js, so the renderer/preload resolve as
- * ../../renderer/<module>/index.html and ../../preload/<module>/index.js
- * relative to that. Icons come from resourcesPath/<module>/... (extraResources).
- *
- * In dev (electron-vite serves the renderer over http and writes preload/main to
- * a dev out/), ELECTRON_RENDERER_URL short-circuits renderer resolution in the
- * shell, and SUITE_ASSETS_DIR points the tray icons at the module's assets.
+ * Resolve each module renderer/preload relative to unified out/main/index.js.
+ * A persistent partition keeps PopJot and PopKey renderer sessions isolated.
  */
 function layoutFor(module: ModuleId) {
   return {
-    rendererHtml: join("..", "..", "renderer", module, "index.html"),
-    preloadScript: join("..", "..", "preload", module, "index.js"),
+    rendererHtml: join("..", "renderer", module, "index.html"),
+    preloadScript: join("..", "preload", module, "index.js"),
     resourceSubdir: module,
+    partition: "persist:popsuite-" + module,
   };
 }
 

@@ -4,10 +4,15 @@
     "baseUrl": ".",
     "types": ["node"],
     "paths": {
-      "@shared/*": ["../shared/src/*"]
+      "@shared/*": ["../shared/src/*"],
+      "@popjot/*": ["modules/popjot/src/*"],
+      "@popkey/*": ["modules/popkey/src/*"]
     }
   },
   "include": [
     "src/**/*"
+  ],
+  "exclude": [
+    "src/settings/**/*"
   ]
 }

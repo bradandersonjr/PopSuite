@@ -14,8 +14,8 @@
 
 import { BrowserWindow, dialog, systemPreferences } from "electron";
 import { createPopApp, type PopAppOptions } from "@shared/main/createPopApp";
-import type { settingsSchema as PopKeySchema } from "@/config/settingsSchema";
-import { settingsSchema } from "@/config/settingsSchema";
+import type { settingsSchema as PopKeySchema } from "../config/settingsSchema";
+import { settingsSchema } from "../config/settingsSchema";
 import { startInputCapture, stopInputCapture } from "./inputCapture";
 
 const isMac = process.platform === "darwin";
@@ -26,7 +26,8 @@ const isMac = process.platform === "darwin";
  */
 export function registerPopKey(
   layout?: PopAppOptions<typeof PopKeySchema>["layout"],
-  trayMode?: "owned" | "reported"
+  trayMode?: "owned" | "reported",
+  embedded = false
 ): void {
   // Mirrors the renderer's `appEnabled` (defaults on). Now owned by the shared
   // shell's suite-suppression reducer: `active` tracks the user's REQUESTED
@@ -39,6 +40,7 @@ export function registerPopKey(
     appName: "PopKey",
     aboutDetail: "Key visualizer for presentations and screen recordings.",
     settingsSchema,
+    embedded,
     settingsWindow: { width: 1160, height: 860, minWidth: 900, minHeight: 680, resizable: true },
     proProduct: "suite",
     layout,
@@ -76,6 +78,8 @@ export function registerPopKey(
         // effective value equals the requested value in that case.
         if (!popApp.isSuiteSuppressed()) active = visible;
         // Absolute set (not toggle) so hide/restore land exactly, never drift.
+        // PopKey's native overlay remains continuously present while the process
+        // is enabled; only renderer content is suppressed/restored here.
         popApp.sendToMainWindow("set-app-enabled", visible);
         // Tray icon reflects whether the visualizer is actually showing.
         popApp.setTrayActive(visible);
@@ -113,7 +117,7 @@ export function registerPopKey(
         if (main && !main.isDestroyed()) windows.push(main);
         if (settings && !settings.isDestroyed()) windows.push(settings);
         return windows;
-      });
+      }, "popkey");
     },
     onWillQuit: () => {
       stopInputCapture();
