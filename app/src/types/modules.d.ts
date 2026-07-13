@@ -36,7 +36,9 @@ declare module "@popjot/components/SystemTray" {
 }
 
 declare module "@popjot/hooks/useTraySettingsSync" {
-  export function useTraySettingsSync(): void;
+  export function useTraySettingsSync(
+    subscribe?: (channel: string, callback: (value: unknown) => void) => () => void,
+  ): void;
 }
 
 declare module "@popjot/hooks/useLicenseSync" {
@@ -53,7 +55,9 @@ declare module "@popkey/components/SystemTray" {
 }
 
 declare module "@popkey/hooks/useTraySettingsSync" {
-  export function useTraySettingsSync(): void;
+  export function useTraySettingsSync(
+    subscribe?: (channel: string, callback: (value: unknown) => void) => () => void,
+  ): void;
 }
 
 declare module "@popkey/hooks/useLicenseSync" {

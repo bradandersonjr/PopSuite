@@ -57,6 +57,13 @@ declare global {
       getState(): Promise<SettingsState>;
       select(id: ModuleId): void;
       seed(id: ModuleId): void;
+      // Subscribe a tray-settings channel bound to a FIXED module namespace,
+      // independent of the preload's mutable activeId. See preload.subscribeSetting.
+      subscribeSetting(
+        id: ModuleId,
+        channel: string,
+        callback: (value: unknown) => void,
+      ): () => void;
       close(): void;
       onStateChanged(callback: (state: SettingsState) => void): () => void;
       syncPresets(payload: {
@@ -216,15 +223,26 @@ const SUITE_APPS = [
   },
 ];
 
+// Module-fixed tray-settings subscribes. Binding each panel to its OWN module's
+// IPC namespace (never the preload's mutable activeId) is what makes seed pushes
+// for BOTH modules reliably land in their stores — otherwise the panel that
+// mounts while the other module is active listens on the wrong namespace and
+// misses its own seed, leaving its store at schema defaults (and presets then
+// capturing those defaults). See @shared/hooks/useTraySettingsSync.
+const subscribePopJotSetting = (channel: string, cb: (value: unknown) => void) =>
+  window.suiteSettings.subscribeSetting("popjot", channel, cb);
+const subscribePopKeySetting = (channel: string, cb: (value: unknown) => void) =>
+  window.suiteSettings.subscribeSetting("popkey", channel, cb);
+
 function PopJotPanel({ section }: { section: SuiteSectionRequest }) {
-  usePopJotTraySettingsSync();
+  usePopJotTraySettingsSync(subscribePopJotSetting);
   usePopJotLicenseSync();
   useEffect(() => window.suiteSettings.seed("popjot"), []);
   return <PopJotSystemTray suiteSection={section} />;
 }
 
 function PopKeyPanel({ section }: { section: SuiteSectionRequest }) {
-  usePopKeyTraySettingsSync();
+  usePopKeyTraySettingsSync(subscribePopKeySetting);
   usePopKeyLicenseSync();
   useEffect(() => window.suiteSettings.seed("popkey"), []);
   return <PopKeySystemTray suiteSection={section} />;

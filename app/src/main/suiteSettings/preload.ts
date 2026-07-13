@@ -50,6 +50,24 @@ for (const key of apiKeys) {
 // This renderer belongs to the suite, so close the unified window instead.
 electronAPI.closeWindow = () => ipcRenderer.send("suite:settings-close");
 
+// Module-fixed tray-settings subscribe. The generated electronAPI.onTrayMenuChange
+// resolves its IPC namespace via the mutable `activeId`, so a panel that mounts
+// while the OTHER module is active would subscribe on the wrong namespace and
+// silently miss its own seed pushes. This binds to the given module's bridge
+// directly, independent of activeId, so both panels' listeners are always
+// correctly namespaced from mount. Consumed by main.tsx's tray-settings sync.
+function subscribeSetting(
+  id: ModuleId,
+  channel: string,
+  callback: (value: unknown) => void,
+): () => void {
+  const onTrayMenuChange = moduleApis[id].onTrayMenuChange as
+    | ((event: string, cb: (value: unknown) => void) => () => void)
+    | undefined;
+  if (typeof onTrayMenuChange !== "function") return () => {};
+  return onTrayMenuChange(channel, callback);
+}
+
 const stateListeners = new Set<(state: SettingsState) => void>();
 
 ipcRenderer.on(
@@ -76,6 +94,7 @@ contextBridge.exposeInMainWorld("suiteSettings", {
   seed: (id: ModuleId): void => {
     ipcRenderer.send("suite:settings-seed", id);
   },
+  subscribeSetting,
   close: (): void => {
     ipcRenderer.send("suite:settings-close");
   },
