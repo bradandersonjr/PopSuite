@@ -34,8 +34,9 @@ both PopJot and PopKey under a single tray.
 
 ### Platform support
 
-- **Windows** — the installer is **signed** and installs like any normal Windows
-  app; it auto-updates in the background.
+- **Windows** — the installer is **unsigned** for now, so SmartScreen may warn
+  on first run — choose **More info > Run anyway**. It installs like any normal
+  Windows app and auto-updates in the background.
 - **macOS and Linux** — builds are provided but are **currently untested** on
   real hardware, and they are **unsigned**. First-launch caveats: on macOS,
   right-click (or Control-click) the app and choose **Open** (a normal

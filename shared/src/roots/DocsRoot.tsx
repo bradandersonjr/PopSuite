@@ -261,7 +261,7 @@ const DocsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
               .
             </P>
             <ul className="list-disc list-inside text-foreground/80 space-y-1 mb-4">
-              <li><strong>Windows</strong> — run the signed <code className="text-sm bg-foreground/10 px-1 rounded mx-0.5">PopSuite Setup</code> installer. Auto-updates in the background.</li>
+              <li><strong>Windows</strong> — run the <code className="text-sm bg-foreground/10 px-1 rounded mx-0.5">PopSuite Setup</code> installer. The build is currently unsigned, so SmartScreen may warn on first launch — choose <strong>More info</strong>, then <strong>Run anyway</strong>. Auto-updates in the background.</li>
               <li>
                 <strong>macOS</strong> — open the <code className="text-sm bg-foreground/10 px-1 rounded mx-0.5">.dmg</code> and drag PopSuite to Applications.
                 The build is currently unsigned, so on first launch macOS will refuse to open it normally.{" "}
