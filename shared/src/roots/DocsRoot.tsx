@@ -524,7 +524,7 @@ const DocsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
             </P>
 
             {/* ─── Customization ─── */}
-            <SectionHeading id="popjot-customization">Customization</SectionHeading>
+            <SectionHeading id="popjot-customization">PopJot Customization</SectionHeading>
 
             <P>
               All customization options live in PopJot&apos;s tab of the PopSuite settings window
@@ -672,7 +672,7 @@ const DocsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
             <ul className="list-disc list-inside text-foreground/80 space-y-1 mb-4">
               <li><strong>Position</strong> — anchor badges to any of the six screen positions (top/bottom &times; left/center/right), with fine horizontal and vertical offset sliders.</li>
               <li><strong>Duration</strong> — how long each badge stays on screen before fading out (1&ndash;5 seconds).</li>
-              <li><strong>Max badges</strong> — how many badges show at once (3, 5, 8, or 12) before the oldest drop off.</li>
+              <li><strong>Max badges</strong> — how many badges show at once (3, 5, 8, or 12) before the oldest ones drop off.</li>
               <li><strong>Scale</strong> — an overall size multiplier for badges, on top of the automatic resolution scaling PopKey shares with PopJot.</li>
             </ul>
 
@@ -690,7 +690,7 @@ const DocsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
               <li><strong>Badge animation</strong> — how badges appear: pop, slide, bounce, fade, or rise.</li>
               <li><strong>Roundness, translucency, and glow</strong> — fine-tune the badge shape and finish.</li>
               <li><strong>Text color</strong> — auto (follows theme) or forced white/black.</li>
-              <li><strong>Branding overlay</strong> — an optional logo/watermark image pinned to a screen corner (shared concept with PopJot).</li>
+              <li><strong>Branding overlay</strong> — an optional logo or watermark image pinned to a screen corner, just like PopJot&apos;s.</li>
             </ul>
 
             {/* ─── PopKey OBS ─── */}
