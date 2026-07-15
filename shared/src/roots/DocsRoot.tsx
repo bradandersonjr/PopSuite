@@ -247,8 +247,8 @@ const DocsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
 
             <SubHeading>Installation</SubHeading>
             <P>
-              <strong>Desktop:</strong> PopJot installs as part of <strong>PopSuite</strong>, a single download
-              that includes both PopJot and PopKey. Get the latest installer for your platform from{" "}
+              <strong>Desktop:</strong> <strong>PopSuite</strong> is a single download that includes both
+              PopJot and PopKey. Get the latest installer for your platform from{" "}
               <a
                 href="https://github.com/bradandersonjr/PopSuite/releases/latest"
                 target="_blank"
@@ -275,8 +275,9 @@ const DocsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
               </li>
             </ul>
             <P>
-              <strong>Chrome Extension:</strong> Install from the Chrome Web Store. It works in all Chromium-based
-              browsers (Chrome, Edge, Brave, Arc, etc.). No restart required.
+              <strong>Chrome Extension (PopJot only):</strong> Install PopJot&apos;s browser overlay from
+              the Chrome Web Store. It works in all Chromium-based browsers (Chrome, Edge, Brave, Arc,
+              etc.). No restart required. PopKey is desktop-only.
             </P>
 
             {/* ─── The PopSuite Tray ─── */}
@@ -377,8 +378,8 @@ const DocsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
             <SectionHeading id="radial-menu">Radial Menu</SectionHeading>
 
             <P>
-              <strong>Right-click</strong> anywhere on the canvas to open the radial menu. Six tool buttons
-              appear in a circle around your cursor: History (undo), Marker, Pen, Highlighter, Eraser, and Screen.
+              <strong>Right-click</strong> anywhere on the canvas to open the radial menu. Six buttons
+              appear in a circle around your cursor: Last Tool, Marker, Pen, Highlighter, Eraser, and Screen.
             </P>
 
             <SubHeading>Selecting a tool</SubHeading>
@@ -390,7 +391,7 @@ const DocsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
 
             <SubHeading>Special tools</SubHeading>
             <ul className="list-disc list-inside text-foreground/80 space-y-1 mb-4">
-              <li><strong>History</strong> — Undoes the last stroke. Each click removes one stroke.</li>
+              <li><strong>Last Tool</strong> — Jumps straight to your last-used drawing tool, skipping the color submenu. It&apos;s the in-menu twin of the Last Tool shortcut (<Kbd>Alt</Kbd>+<Kbd>Shift</Kbd>+<Kbd>W</Kbd>), handy for getting right back to what you were just drawing with.</li>
               <li><strong>Eraser</strong> — Switches to eraser mode. Draw over strokes to remove them.</li>
               <li><strong>Screen</strong> — Opens a submenu to toggle background modes (transparent, dark whiteboard, light whiteboard).</li>
             </ul>
@@ -415,8 +416,8 @@ const DocsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
 
             <SubHeading>Undo</SubHeading>
             <P>
-              Press <strong>middle-click</strong> (scroll wheel button) to undo the last stroke. You can
-              also use the History button in the radial menu.
+              Press <strong>middle-click</strong> (scroll wheel button) to undo the last stroke. Each
+              press removes one more stroke.
             </P>
 
             <SubHeading>Brush size</SubHeading>
@@ -724,6 +725,11 @@ const DocsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
                     <td className="py-2 pr-4">Activate (persistent)</td>
                     <td className="py-2 pr-4"><Kbd>Alt</Kbd>+<Kbd>Shift</Kbd>+<Kbd>S</Kbd></td>
                     <td className="py-2"><Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>S</Kbd></td>
+                  </tr>
+                  <tr className="border-b border-foreground/10">
+                    <td className="py-2 pr-4">Activate with last tool (hold)</td>
+                    <td className="py-2 pr-4"><Kbd>Alt</Kbd>+<Kbd>Shift</Kbd>+<Kbd>W</Kbd></td>
+                    <td className="py-2"><Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>W</Kbd></td>
                   </tr>
                   <tr className="border-b border-foreground/10">
                     <td className="py-2 pr-4">Exit persistent mode</td>
