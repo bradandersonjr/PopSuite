@@ -218,7 +218,7 @@ export function buildSuiteContent({
       planMinHeight: 540,
       plans: [
         {
-          name: "Extensions",
+          name: "Browser Extension",
           price: "Free",
           period: "forever",
           colorIndex: 2,
@@ -226,11 +226,12 @@ export function buildSuiteContent({
           popular: false,
           features: [
             "PopJot annotation on any webpage",
-            "PopKey input badges on any webpage",
-            "Radial menu & 8 color palettes",
-            "Chrome & Chromium browsers",
-            "No install required",
+            "Same radial menu & 8 color palettes",
+            "Chrome, Edge, Brave & other Chromium browsers",
+            "Settings persist across tabs",
+            "No desktop install needed",
           ],
+          crossLink: { label: "PopKey is desktop-only", href: GITHUB_RELEASE_URL },
           cta: "Add to Chrome",
           url: CHROME_STORE_URL,
         },
@@ -243,8 +244,7 @@ export function buildSuiteContent({
           popular: true,
           features: [
             "One install: PopJot + PopKey",
-            "Transparent overlay over any app",
-            "Screen annotation & Spotlight mode",
+            "Annotate & Spotlight over any app",
             "Keyboard, mouse & scroll visualization",
             "4 styles, 8 palettes, dark/light themes",
             "Unified tray & one settings window",
@@ -262,8 +262,7 @@ export function buildSuiteContent({
           ctaColorIndex: 5,
           popular: false,
           features: [
-            "Everything in Desktop",
-            "Covers both PopJot & PopKey",
+            "Everything in Desktop, across both apps",
             "Custom color palettes",
             "PopJot: custom center icon & scalable shape",
             "PopKey: any system font & badge animations",
