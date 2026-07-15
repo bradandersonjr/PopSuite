@@ -106,7 +106,10 @@ function launcherTrayIconPath(): string {
         message: "PopSuite",
         detail:
           `Version ${app.getVersion()}\n` +
-          "Screen-annotation overlay and keystroke visualizer in one place.",
+          "Screen-annotation overlay and keystroke visualizer in one place.\n\n" +
+          "Created by Brad Anderson Jr\n" +
+          "https://github.com/bradandersonjr/PopSuite\n" +
+          "https://www.bradandersonjr.com",
         buttons: ["OK"],
       });
     }
