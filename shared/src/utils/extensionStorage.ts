@@ -3,6 +3,9 @@
  * Used by both the content-script root (ExtensionRoot) and the popup (ExtensionPopup).
  */
 
+// "@/" here is intentional dependency injection: this file is built per-app
+// (extension popup/content-script bundles), and each app's build config
+// points "@" at its own src, so these resolve to the consuming app's store.
 import { useStore } from "@/store/useStore";
 import type {
   MenuStyle,

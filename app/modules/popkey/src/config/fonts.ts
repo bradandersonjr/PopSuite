@@ -1,4 +1,4 @@
-import type { BadgeFont } from "@/store/useStore";
+import type { BadgeFont } from "@popkey/store/useStore";
 
 /** Preset badge fonts available to all users — no Pro required. */
 export const BADGE_FONTS: { key: BadgeFont; label: string }[] = [

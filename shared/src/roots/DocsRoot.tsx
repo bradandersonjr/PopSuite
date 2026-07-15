@@ -44,7 +44,7 @@ const P = ({ children }: { children: React.ReactNode }) => (
 
 /* ─── Component ─── */
 
-const DocsRoot = () => {
+const DocsRoot = ({ brand = "PopJot" }: { brand?: string }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("getting-started");
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -99,7 +99,7 @@ const DocsRoot = () => {
               <ArrowLeft className="w-4 h-4" />
               <span className="font-brand text-lg">
                 <span className="text-pop-yellow">Pop</span>
-                <span className="text-foreground">Jot</span>
+                <span className="text-foreground">{brand.replace(/^Pop/, "")}</span>
               </span>
             </a>
             <span className="text-foreground/30">/</span>
@@ -713,7 +713,7 @@ const DocsRoot = () => {
                   href="/"
                   className="text-sm text-foreground/50 hover:text-foreground transition-colors"
                 >
-                  &larr; Back to PopJot
+                  &larr; Back to {brand}
                 </a>
                 <div className="flex gap-6 text-sm text-foreground/40">
                   <a href="/docs" className="text-foreground/60 hover:text-foreground transition-colors">Docs</a>

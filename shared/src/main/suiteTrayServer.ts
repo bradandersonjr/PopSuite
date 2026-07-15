@@ -37,6 +37,8 @@ export interface SuiteTrayServer {
   toggle(appName: string): void;
   /** Send an action command to the named module. */
   action(appName: string, actionId: string): void;
+  /** Flip a named extra toggle on the named module (e.g. PopKey's OBS Mode). */
+  toggleExtra(appName: string, toggleId: string): void;
   /**
    * Send a suite-only auto-suppress command to the named module (no-op if not
    * connected). Used to hide/restore PopKey while PopJot annotates.
@@ -154,6 +156,10 @@ export function createSuiteTrayServer(
     action(appName: string, actionId: string): void {
       const conn = findByApp(appName);
       if (conn) send(conn, { type: "action", id: actionId });
+    },
+    toggleExtra(appName: string, toggleId: string): void {
+      const conn = findByApp(appName);
+      if (conn) send(conn, { type: "toggleExtra", id: toggleId });
     },
     suppress(appName: string, suppressed: boolean): void {
       const conn = findByApp(appName);

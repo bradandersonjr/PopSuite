@@ -33,6 +33,7 @@ import { existsSync, mkdirSync, writeFileSync, unlinkSync } from "fs";
 import { homedir } from "os";
 import { registerSettingsIpc } from "../settings/main";
 import { createSettingsSync } from "./settingsSync";
+import { loadAppSettings } from "../settings/persistence";
 import {
   createLicenseController,
   registerLicenseIpc,
@@ -75,6 +76,8 @@ export interface PopAppContext<S extends SettingsSchema> {
   sendToMainWindow(channel: string, ...args: unknown[]): void;
   /** Broadcast to overlay + settings windows. */
   sendToRenderers(channel: string, value: unknown): void;
+  /** Resolve a renderer IPC channel inside this app's namespace. */
+  ipcChannel(channel: string): string;
   /** Move the overlay window to cover the display the cursor is on. */
   moveOverlayToCursorDisplay(): void;
   /**
@@ -83,6 +86,23 @@ export interface PopAppContext<S extends SettingsSchema> {
    * window source rather than it being hard-layered over everything).
    */
   setOverlayAlwaysOnTop(onTop: boolean): void;
+  /**
+   * Shrink the overlay to the display's WORK AREA (excludes the taskbar)
+   * instead of its full bounds. Combined with setOverlayAlwaysOnTop(false),
+   * this is what actually keeps a normal-z-order overlay from visually
+   * covering the taskbar — dropping always-on-top alone only affects z-order,
+   * not the window's screen-space footprint, so a full-bounds window still
+   * physically overlaps (and renders over) the taskbar's pixels. Takes effect
+   * on the next bounds reassert (display change / monitor move / ready-to-show).
+   */
+  setOverlayAvoidTaskbar(avoid: boolean): void;
+  /**
+   * Re-pin the overlay's topmost z-order aggressively while a session is live.
+   * Some apps' own topmost popups (menus, tooltips) can win the z-order race
+   * and render OVER the overlay; the idle fallback poll is far too slow to hide
+   * that. Turn on while the overlay is actively in use, off when it isn't.
+   */
+  setOverlayTopmostBoost(boosted: boolean): void;
   /**
    * Reflect the app's active/idle state in the tray icon (swaps to the
    * indicator-dot variant when active). No-ops if no active icon was shipped.
@@ -93,6 +113,14 @@ export interface PopAppContext<S extends SettingsSchema> {
   isPro(): boolean;
   /** Cursor position in the overlay window's coordinate space (DIPs). */
   getCursorDipPosition(): { x: number; y: number };
+  /**
+   * The LIVE Electron accelerator currently registered for a named shortcut
+   * (e.g. "Alt+Shift+A"), reflecting any rebind — not the schema default.
+   * Returns null for an unknown name. Callers that need to reason about the
+   * physical keys a shortcut is bound to (e.g. PopJot's hold-to-draw
+   * release detection) must read it from here rather than assume the default.
+   */
+  getShortcut(name: string): string | null;
   openSettingsWindow(): void;
   /**
    * Suite-only: report this app's annotating on/off transition up through the
@@ -110,6 +138,14 @@ export interface PopAppContext<S extends SettingsSchema> {
    * `suiteSuppressible` (standalone apps without this feature use their own path).
    */
   suiteManualToggle(): void;
+  /**
+   * Suite-suppressible apps (PopKey): react to the user flipping the
+   * auto-suppression gate (e.g. `hideDuringAnnotation`). Turning it off while the
+   * overlay is currently auto-hidden un-hides it immediately; turning it on is a
+   * no-op until the next annotation start. No-op if the app didn't set
+   * `suiteSuppressible`.
+   */
+  setSuiteSuppressionEnabled(enabled: boolean): void;
   /**
    * True while a sibling module is currently auto-suppressing this app's overlay
    * (suite-only). Lets a suppressible app distinguish an effective-visibility
@@ -133,6 +169,8 @@ export interface PopAppOptions<S extends SettingsSchema> {
   /** One-line description shown under the version in the About box. */
   aboutDetail: string;
   settingsSchema: S;
+  /** Skip per-module app ownership when hosted by the unified desktop runtime. */
+  embedded?: boolean;
   /** Side effects to run when a specific setting changes. */
   onSettingChange?: { [K in keyof S]?: (value: SettingValue<S[K]>, ctx: PopAppContext<S>) => void };
   settingsWindow: {
@@ -178,6 +216,20 @@ export interface PopAppOptions<S extends SettingsSchema> {
     onToggle: () => void;
   };
   /**
+   * Suite-only: extra named checkboxes reported to the unified PopSuite
+   * launcher tray beyond the Enable/Disable toggle (e.g. PopKey's "OBS Mode").
+   * Never rendered in the standalone fallback tray — reaching this feature
+   * outside the suite still works via the Settings window. `getChecked` is
+   * called fresh each time state is reported so the checkbox always reflects
+   * the current setting value.
+   */
+  trayExtraToggles?: ReadonlyArray<{
+    id: string;
+    label: string;
+    getChecked: () => boolean;
+    onToggle: () => void;
+  }>;
+  /**
    * Suite-only auto-suppression (PopKey opts in). When set, the shared shell
    * runs the pure suppression reducer (see suiteSuppression.ts) so that while a
    * sibling module (PopJot) is annotating, this app's overlay is force-hidden
@@ -200,6 +252,15 @@ export interface PopAppOptions<S extends SettingsSchema> {
     initialActive: boolean;
     /** Drive the overlay to the given effective visibility. */
     applyActive: (active: boolean) => void;
+    /**
+     * Optional user gate: when it returns false, incoming suppress commands are
+     * ignored (the overlay is never auto-hidden). Omit to always suppress.
+     * PopKey wires this to its `hideDuringAnnotation` setting so the user can
+     * opt out. Consulted live on every suppress command; flipping the setting
+     * off while currently suppressed is handled separately (the shell clears the
+     * active suppression — see setSuiteSuppressionEnabled).
+     */
+    isEnabled?: () => boolean;
   };
   /** What launching a second instance should do. Defaults to "focus-main". */
   secondInstance?: "focus-main" | "open-settings";
@@ -229,6 +290,8 @@ export interface PopAppOptions<S extends SettingsSchema> {
      * passes e.g. "popjot".
      */
     resourceSubdir?: string;
+    /** Dedicated Chromium session partition; keeps module renderers isolated. */
+    partition?: string;
   };
 }
 
@@ -246,14 +309,19 @@ function createInertContext<S extends SettingsSchema>(): PopAppContext<S> {
     getSettingsWindow: () => null,
     sendToMainWindow: () => {},
     sendToRenderers: () => {},
+    ipcChannel: (channel) => channel,
     moveOverlayToCursorDisplay: () => {},
     setOverlayAlwaysOnTop: () => {},
+    setOverlayAvoidTaskbar: () => {},
+    setOverlayTopmostBoost: () => {},
     setTrayActive: () => {},
     isPro: () => false,
     getCursorDipPosition: () => ({ x: 0, y: 0 }),
+    getShortcut: () => null,
     openSettingsWindow: () => {},
     reportSuiteAnnotating: () => {},
     suiteManualToggle: () => {},
+    setSuiteSuppressionEnabled: () => {},
     isSuiteSuppressed: () => false,
   };
 }
@@ -268,13 +336,16 @@ export function createPopApp<S extends SettingsSchema>(
   const rendererHtmlRel = options.layout?.rendererHtml ?? "../renderer/index.html";
   const preloadScriptRel = options.layout?.preloadScript ?? "../preload/index.js";
   const resourceSubdir = options.layout?.resourceSubdir ?? "";
+  const rendererPartition = options.layout?.partition;
+  const ipcNamespace = appName.toLowerCase();
+  const ipcChannel = (channel: string) => ipcNamespace + ":" + channel;
 
   // ─── Single instance lock ────────────────────────────────────────────
   // When we lose the lock a sibling instance is already running: quit and
   // return an inert context immediately. Registering IPC, creating settingsSync
   // (which does file IO), or scheduling whenReady work in the losing instance
   // would race the primary and touch the same settings files before quit lands.
-  const gotTheLock = app.requestSingleInstanceLock();
+  const gotTheLock = options.embedded || app.requestSingleInstanceLock();
   if (!gotTheLock) {
     app.quit();
     return createInertContext<S>();
@@ -293,6 +364,7 @@ export function createPopApp<S extends SettingsSchema>(
   let settingsWindow: BrowserWindow | null = null;
   // Periodic fallback for reassertOverlayAlwaysOnTop; cleared on will-quit.
   let overlayTopmostInterval: ReturnType<typeof setInterval> | null = null;
+  let overlayTopmostIntervalMs = 0;
   let tray: Tray | null = null;
   // Idle/active tray images. The active variant (with an indicator dot) is
   // optional — apps that don't ship one fall back to the idle icon.
@@ -312,17 +384,27 @@ export function createPopApp<S extends SettingsSchema>(
   let suppression: SuppressionState | null = options.suiteSuppressible
     ? initialSuppressionState(options.suiteSuppressible.initialActive)
     : null;
-  // Settings-window relay (suite-only). Engaged while the launcher's single
-  // settings window hosts THIS module's settings renderer in a WebContentsView:
-  // that renderer runs in the launcher's process, so its IPC is tunnelled to us
-  // here and our main→renderer pushes are streamed back. Null until connected;
-  // inert (never `hosting`) unless the launcher opens our tab, so standalone is
-  // completely unaffected. See suiteSettingsRelay.ts.
+  // Settings-window push relay (suite-only). The unified Settings renderer uses
+  // direct namespaced IPC for requests, while this relay mirrors main-to-renderer
+  // state updates into that shared renderer. It stays inert unless Settings has
+  // mounted this module's panel, so standalone behavior is unchanged.
   let suiteSettingsRelay: SuiteSettingsRelay | null = null;
 
+  // Seed from defaults, then overlay any custom accelerators persisted in this
+  // app's settings file (`shortcuts` field). Startup registration validates the
+  // strings, so an invalid saved value simply fails to register and is ignored.
   const shortcutState: Record<string, string> = {};
   for (const sc of options.shortcuts) {
     shortcutState[sc.name] = sc.default;
+  }
+  {
+    const savedShortcuts = loadAppSettings(appName).shortcuts;
+    if (savedShortcuts && typeof savedShortcuts === "object") {
+      for (const sc of options.shortcuts) {
+        const v = (savedShortcuts as Record<string, unknown>)[sc.name];
+        if (typeof v === "string" && v.length > 0) shortcutState[sc.name] = v;
+      }
+    }
   }
 
   function loadRendererWindow(win: BrowserWindow, query?: Record<string, string>): void {
@@ -346,12 +428,13 @@ export function createPopApp<S extends SettingsSchema>(
   }
 
   function sendToRenderers(channel: string, value: unknown): void {
-    mainWindow?.webContents.send(channel, value);
-    settingsWindow?.webContents.send(channel, value);
+    const scopedChannel = ipcChannel(channel);
+    mainWindow?.webContents.send(scopedChannel, value);
+    settingsWindow?.webContents.send(scopedChannel, value);
     // While the launcher hosts our settings tab there is no local settings
     // window, so mirror settings-bound pushes into the relay too (no-op unless
     // hosting). The overlay (mainWindow) is unaffected — it always stays local.
-    suiteSettingsRelay?.pushToHost(channel, [value]);
+    suiteSettingsRelay?.pushToHost(scopedChannel, [value]);
   }
 
   // ─── Settings IPC + cross-app sync ───────────────────────────────────
@@ -361,12 +444,15 @@ export function createPopApp<S extends SettingsSchema>(
   // already merges per-app values with any enabled synced overrides.
   const settingsSync = createSettingsSync({
     appName,
+    ipcNamespace,
     schema: settingsSchema,
     sendToRenderers,
     getValues: (): SettingsValues<S> => settingsController.values,
+    getExtraPersistedFields: () => ({ shortcuts: { ...shortcutState } }),
   });
 
   const settingsController = registerSettingsIpc(settingsSchema, {
+    ipcNamespace,
     sendToRenderers,
     initialValues: settingsSync.initialValues,
     onChange: buildOnChange(),
@@ -433,9 +519,9 @@ export function createPopApp<S extends SettingsSchema>(
 
   function syncTraySettingsToWindow(win: BrowserWindow): void {
     settingsController.syncToWindow(win);
-    win.webContents.send("tray-open-at-login", getOpenAtLoginState());
+    win.webContents.send(ipcChannel("tray-open-at-login"), getOpenAtLoginState());
     for (const name of Object.keys(shortcutState)) {
-      win.webContents.send(`tray-set-${name}-shortcut`, shortcutState[name]);
+      win.webContents.send(ipcChannel("tray-set-" + name + "-shortcut"), shortcutState[name]);
     }
   }
 
@@ -450,11 +536,11 @@ export function createPopApp<S extends SettingsSchema>(
     if (!suiteSettingsRelay?.hosting) return;
     for (const key of Object.keys(settingsSchema) as Array<keyof S & string>) {
       if (settingsSchema[key].volatile) continue;
-      suiteSettingsRelay.pushToHost(trayChannel(key), [settingsController.values[key]]);
+      suiteSettingsRelay.pushToHost(ipcChannel(trayChannel(key)), [settingsController.values[key]]);
     }
-    suiteSettingsRelay.pushToHost("tray-open-at-login", [getOpenAtLoginState()]);
+    suiteSettingsRelay.pushToHost(ipcChannel("tray-open-at-login"), [getOpenAtLoginState()]);
     for (const name of Object.keys(shortcutState)) {
-      suiteSettingsRelay.pushToHost(`tray-set-${name}-shortcut`, [shortcutState[name]]);
+      suiteSettingsRelay.pushToHost(ipcChannel("tray-set-" + name + "-shortcut"), [shortcutState[name]]);
     }
     // License status is pushed by the license controller via sendToRenderers on
     // change; the hosted renderer also pulls it with a license:status invoke on
@@ -463,17 +549,92 @@ export function createPopApp<S extends SettingsSchema>(
 
   // ─── Multi-monitor helpers ───────────────────────────────────────────
 
+  // When true (OBS Mode), the overlay is sized to the display's WORK AREA
+  // instead of its full bounds, so a normal-z-order window doesn't visually
+  // cover the taskbar. Default false: full bounds (not workArea) so
+  // annotation/spotlight can cover the taskbar too — skipTaskbar + this
+  // window never being shell-registered keeps DWM's taskbar composition from
+  // reacting to the transparent overlay sitting above it.
+  let overlayAvoidsTaskbar = false;
+
+  function setOverlayAvoidTaskbar(avoid: boolean): void {
+    overlayAvoidsTaskbar = avoid;
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const display = screen.getDisplayMatching(mainWindow.getBounds());
+    setOverlayBounds(mainWindow, overlayAvoidsTaskbar ? display.workArea : display.bounds);
+  }
+
   function moveOverlayToCursorDisplay(): void {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     const cursor = screen.getCursorScreenPoint();
     const display = screen.getDisplayNearestPoint(cursor);
-    const { x, y, width, height } = display.bounds;
-    mainWindow.setBounds({ x, y, width, height });
+    // setOverlayBounds lifts the resizable lock so Windows doesn't clamp the
+    // height to the work area on its own (see its doc comment) — we choose
+    // full bounds vs. workArea ourselves via overlayAvoidsTaskbar instead.
+    setOverlayBounds(mainWindow, overlayAvoidsTaskbar ? display.workArea : display.bounds);
   }
 
   // Overlay z-order level used when pinned on top. Kept as a constant so
   // window creation and later re-pins stay in sync.
   const OVERLAY_TOP_LEVEL = "screen-saver" as const;
+
+  // Topmost re-assert cadences. Idle is a cheap safety net for the taskbar
+  // silently reclaiming z-order; boosted runs only while an overlay session is
+  // live (see setOverlayTopmostBoost).
+  const OVERLAY_TOPMOST_IDLE_MS = 2000;
+  const OVERLAY_TOPMOST_BOOST_MS = 250;
+
+  // Occlusion workaround. On Windows, Chromium's native window-occlusion tracker
+  // is geometric: a topmost window sized to the full display is treated as fully
+  // occluding everything beneath it, so browsers underneath (e.g. YouTube in
+  // Chrome) throttle/pause video and can blank the <video> element — even though
+  // this overlay is transparent + click-through and visually shows nothing. The
+  // occlusion check ignores `transparent: true` (it is purely geometric), so we
+  // instead drop the window's opacity a hair below 1.0. That marks the window as
+  // non-opaque to the OS/compositor, excluding it from occluding the windows it
+  // sits over, while staying visually imperceptible. Crucially this does NOT
+  // change bounds, so it cannot reintroduce a visible edge/"bounds line": the
+  // window still lands at exactly display.bounds. Applied at creation and after
+  // every setBounds/always-on-top reassert so it survives display/taskbar churn.
+  const OVERLAY_OCCLUSION_OPACITY = 0.999;
+
+  function applyOverlayOcclusionWorkaround(win: BrowserWindow): void {
+    if (process.platform !== "win32") return;
+    if (win.isDestroyed()) return;
+    // setOpacity is idempotent; re-applying after setBounds guards against any
+    // path (surface recreation, DPI change) that could reset it back to 1.0.
+    win.setOpacity(OVERLAY_OCCLUSION_OPACITY);
+  }
+
+  /**
+   * Set the overlay to EXACTLY the given display bounds, defeating the Windows
+   * work-area clamp. With `resizable: false`, Electron pins the window's
+   * min/max size and Windows clamps any programmatic resize to the display's
+   * WORK AREA — so a plain setBounds(display.bounds) lands at e.g. 1920x1032
+   * (stopping at the taskbar) instead of 1920x1080, and the overlay's own edge
+   * shows as a visible line above the taskbar. Temporarily lifting the
+   * resizable lock removes the min=max pin so the bounds land on the full
+   * display; re-locking afterwards re-pins min=max to the now-correct
+   * full-display size. Every bounds site uses this one helper so no path can
+   * regress to the clamped size, and it re-applies the occlusion opacity so
+   * the Issue-1 video workaround survives every geometry change.
+   */
+  function setOverlayBounds(win: BrowserWindow, bounds: Electron.Rectangle): void {
+    if (win.isDestroyed()) return;
+    const wasResizable = win.isResizable();
+    if (!wasResizable) win.setResizable(true);
+    win.setBounds(bounds);
+    if (!wasResizable) {
+      // After setting bounds correctly, re-pin the window by locking min/max
+      // size constraints. setResizable(false) alone may not restore the exact
+      // constraints, so be explicit: the display bounds are the absolute size
+      // the overlay must stay pinned to.
+      win.setMinimumSize(bounds.width, bounds.height);
+      win.setMaximumSize(bounds.width, bounds.height);
+      win.setResizable(false);
+    }
+    applyOverlayOcclusionWorkaround(win);
+  }
 
   // Desired on-top state, independent of what Windows may have silently
   // reverted behind our back (see reassertOverlayAlwaysOnTop below).
@@ -484,6 +645,7 @@ export function createPopApp<S extends SettingsSchema>(
     if (!mainWindow || mainWindow.isDestroyed()) return;
     if (onTop) {
       mainWindow.setAlwaysOnTop(true, OVERLAY_TOP_LEVEL);
+      applyOverlayOcclusionWorkaround(mainWindow);
     } else {
       mainWindow.setAlwaysOnTop(false);
     }
@@ -496,8 +658,41 @@ export function createPopApp<S extends SettingsSchema>(
   // fallback for cases that fire no event at all.
   function reassertOverlayAlwaysOnTop(): void {
     if (!wantsOverlayAlwaysOnTop) return;
-    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) return;
     mainWindow.setAlwaysOnTop(true, OVERLAY_TOP_LEVEL);
+    applyOverlayOcclusionWorkaround(mainWindow);
+  }
+
+  function restartOverlayTopmostInterval(ms: number): void {
+    if (overlayTopmostIntervalMs === ms) return;
+    overlayTopmostIntervalMs = ms;
+    if (overlayTopmostInterval) clearInterval(overlayTopmostInterval);
+    overlayTopmostInterval = setInterval(reassertOverlayAlwaysOnTop, ms);
+  }
+
+  /**
+   * Raise the topmost re-assertion cadence while the overlay is actively in use.
+   *
+   * The idle 2s poll is only a fallback for the Windows taskbar quietly
+   * reclaiming z-order. But apps with their own topmost popups (Fusion 360's
+   * menus and tooltips are the motivating case) can win the topmost race
+   * outright, and then the ink draws UNDERNEATH the very popup being annotated.
+   * Re-pinning aggressively while a session is live is what actually keeps the
+   * strokes on top; 2s is far too slow to hide from the eye. Off outside a
+   * session so the fast timer never runs while the app is merely resident.
+   */
+  function setOverlayTopmostBoost(boosted: boolean): void {
+    restartOverlayTopmostInterval(
+      boosted ? OVERLAY_TOPMOST_BOOST_MS : OVERLAY_TOPMOST_IDLE_MS
+    );
+    if (boosted) reassertOverlayAlwaysOnTop();
+  }
+
+  function syncOverlayBoundsAfterDisplayChange(): void {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const display = screen.getDisplayMatching(mainWindow.getBounds());
+    setOverlayBounds(mainWindow, overlayAvoidsTaskbar ? display.workArea : display.bounds);
+    reassertOverlayAlwaysOnTop();
   }
 
   function getCursorDipPosition(): { x: number; y: number } {
@@ -523,18 +718,44 @@ export function createPopApp<S extends SettingsSchema>(
       frame: false,
       transparent: true,
       hasShadow: false,
+      // Remove Windows non-client shadow and resize chrome; this overlay is
+      // positioned explicitly and never needs a draggable native frame.
+      thickFrame: false,
+      // Windows 11 draws a 1px accent/rounded-corner border around frameless
+      // windows; on a full-display overlay that renders as a faint line at the
+      // screen edge. Opt out so the overlay's coverage reaches the exact display
+      // edge with no chrome line. (No-op where unsupported.)
+      roundedCorners: false,
       skipTaskbar: true,
       resizable: false,
       movable: false,
       show: false,
+      // The overlay must NEVER take foreground focus. Activating a normal window
+      // over an app tears down that app's transient UI — Fusion 360's menus,
+      // submenus, tooltips and flyouts all close the instant something else is
+      // activated, which made PopJot unusable for annotating exactly the thing
+      // the user opened it to annotate. focusable:false keeps the window out of
+      // the activation chain entirely: it still paints on top and still receives
+      // mouse input (drawing works), it just never steals the foreground.
+      // Neither app's overlay needs keyboard focus — PopKey's is a passive,
+      // always-click-through visualizer, and PopJot's key handling (hold-to-draw
+      // release, Escape) is owned by the main process via global hooks — so this
+      // is unconditional rather than an opt-in flag.
+      focusable: false,
       title: appName,
       webPreferences: {
         preload: join(__dirname, preloadScriptRel),
         contextIsolation: true,
+        partition: rendererPartition,
       },
     });
 
     win.setAlwaysOnTop(true, OVERLAY_TOP_LEVEL);
+    // Occlusion workaround (Windows): keep browsers underneath from throttling/
+    // pausing video because a fullscreen-sized topmost window is treated as
+    // opaquely covering them. See applyOverlayOcclusionWorkaround. No bounds
+    // change, so it cannot create an edge line.
+    applyOverlayOcclusionWorkaround(win);
     // macOS: show the overlay over fullscreen apps and on every Space. Marking it
     // non-fullscreenable keeps it from ever entering its own fullscreen Space
     // (which would hide it behind the app the user is drawing over).
@@ -559,9 +780,16 @@ export function createPopApp<S extends SettingsSchema>(
     });
 
     win.once("ready-to-show", () => {
-      // Force full-display bounds after show to override OS working-area constraints
-      win.setBounds({ x, y, width, height });
-      win.show();
+      // Force full-display bounds once Chromium's surface is ready, overriding
+      // the OS work-area constraint: with resizable:false the window was
+      // clamped to ~work-area height at creation, so this reassert (via the
+      // de-clamping helper) is what actually lands it on the full display.
+      // Also re-applies the occlusion opacity after the surface exists.
+      setOverlayBounds(win, { x, y, width, height });
+      // showInactive, never show: show() would activate the window on some
+      // platforms even with focusable:false, and activation is precisely what
+      // closes the menus/tooltips of the app being annotated.
+      win.showInactive();
     });
 
     win.on("closed", () => {
@@ -622,6 +850,7 @@ export function createPopApp<S extends SettingsSchema>(
       webPreferences: {
         preload: join(__dirname, preloadScriptRel),
         contextIsolation: true,
+        partition: rendererPartition,
       },
     });
 
@@ -680,8 +909,22 @@ export function createPopApp<S extends SettingsSchema>(
 
   function applySuiteSuppression(suppressed: boolean): void {
     if (!suppression) return;
+    // User gate: when disabled, ignore a request to suppress (never auto-hide).
+    // A request to UN-suppress is always honored so we can never get stuck hidden.
+    if (suppressed && options.suiteSuppressible?.isEnabled?.() === false) return;
     suppression = applySuppression(suppression, suppressed);
     applyEffectiveActive();
+  }
+
+  // Live-flip of the user's hideDuringAnnotation gate. Turning it OFF while the
+  // overlay is currently auto-hidden must un-hide immediately (treat it like the
+  // sibling stopped annotating) — otherwise the user's opt-out wouldn't take
+  // effect until the next annotation stop. Turning it back ON does nothing here:
+  // there's no live suppress command to replay, so it takes effect at the next
+  // annotation start (the launcher re-sends suppress on the next drawing/spotlight).
+  function setSuiteSuppressionEnabled(enabled: boolean): void {
+    if (!suppression) return;
+    if (!enabled && suppression.suppressed) clearSuiteSuppression();
   }
 
   function clearSuiteSuppression(): void {
@@ -702,15 +945,19 @@ export function createPopApp<S extends SettingsSchema>(
     getSettingsWindow: () => settingsWindow,
     sendToMainWindow: (channel, ...args) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send(channel, ...args);
+        mainWindow.webContents.send(ipcChannel(channel), ...args);
       }
     },
     sendToRenderers,
+    ipcChannel,
     moveOverlayToCursorDisplay,
     setOverlayAlwaysOnTop,
+    setOverlayAvoidTaskbar,
+    setOverlayTopmostBoost,
     setTrayActive,
     isPro: () => licenseController?.isPro() ?? false,
     getCursorDipPosition,
+    getShortcut: (name) => shortcutState[name] ?? null,
     openSettingsWindow,
     reportSuiteAnnotating: (annotating: boolean) => {
       // Only meaningful in suite reported mode; harmless otherwise (no client →
@@ -720,37 +967,38 @@ export function createPopApp<S extends SettingsSchema>(
       reportSuiteState();
     },
     suiteManualToggle,
+    setSuiteSuppressionEnabled,
     isSuiteSuppressed: () => suppression?.suppressed ?? false,
   };
 
   // ─── Common IPC ──────────────────────────────────────────────────────
 
-  ipcMain.on("quit-app", () => {
+  ipcMain.on(ipcChannel("quit-app"), () => {
     app.quit();
   });
 
   // Open a link in the user's default browser (not a new Electron window).
   // Restricted to http/https/mailto so a renderer can't open arbitrary URIs.
-  ipcMain.on("open-external", (_event, url: unknown) => {
+  ipcMain.on(ipcChannel("open-external"), (_event, url: unknown) => {
     if (typeof url !== "string") return;
     if (/^(https?:|mailto:)/i.test(url)) void shell.openExternal(url);
   });
 
   // Clipboard read lives in main: the sandboxed preload can't access the
   // electron `clipboard` module. Used by the license field's Paste button.
-  ipcMain.handle("read-clipboard", () => clipboard.readText());
+  ipcMain.handle(ipcChannel("read-clipboard"), () => clipboard.readText());
 
-  ipcMain.on("close-window", () => {
+  ipcMain.on(ipcChannel("close-window"), () => {
     if (settingsWindow && !settingsWindow.isDestroyed()) {
       settingsWindow.hide();
     }
   });
 
-  ipcMain.handle("get-open-at-login", () => {
+  ipcMain.handle(ipcChannel("get-open-at-login"), () => {
     return getOpenAtLoginState();
   });
 
-  ipcMain.on("set-open-at-login", (_event, enabled: boolean) => {
+  ipcMain.on(ipcChannel("set-open-at-login"), (_event, enabled: boolean) => {
     setOpenAtLoginState(Boolean(enabled));
     sendToRenderers("tray-open-at-login", Boolean(enabled));
   });
@@ -820,11 +1068,16 @@ export function createPopApp<S extends SettingsSchema>(
   }
 
   for (const sc of options.shortcuts) {
-    ipcMain.handle(`set-${sc.name}-shortcut`, (_event, shortcut: string) => {
+    ipcMain.handle(ipcChannel("set-" + sc.name + "-shortcut"), (_event, shortcut: string) => {
       const electronFormat = shortcut.replace(/ /g, "");
       const result = updateShortcuts({ ...shortcutState, [sc.name]: electronFormat });
       if (result.ok) {
         sendToRenderers(`tray-set-${sc.name}-shortcut`, electronFormat);
+        // Persist the rebind: schedule an app-settings save so the new accelerator
+        // survives a restart. shortcutState is written via getExtraPersistedFields
+        // on the next save. (sc.name isn't a schema key, so this only triggers the
+        // save — it never touches the cross-app shared file.)
+        settingsSync.onLocalChange(sc.name, electronFormat);
         // Keep the suite menu's shortcut hint current after a rebind.
         reportSuiteState();
         return { ok: true, shortcut: electronFormat };
@@ -833,7 +1086,7 @@ export function createPopApp<S extends SettingsSchema>(
     });
   }
 
-  ipcMain.handle("get-shortcuts", () => ({ ...shortcutState }));
+  ipcMain.handle(ipcChannel("get-shortcuts"), () => ({ ...shortcutState }));
 
   // ─── System tray ─────────────────────────────────────────────────────
 
@@ -964,6 +1217,11 @@ export function createPopApp<S extends SettingsSchema>(
         : undefined,
       canToggle: Boolean(options.trayToggle),
       actions: suiteActions(),
+      extraToggles: options.trayExtraToggles?.map((t) => ({
+        id: t.id,
+        label: t.label,
+        checked: t.getChecked(),
+      })),
       // Only annotating apps (PopJot) ever set this; false otherwise.
       annotating: suiteAnnotating ? true : undefined,
       // Only suppressible apps (PopKey) ever set this; reflects a sibling forcing
@@ -976,19 +1234,17 @@ export function createPopApp<S extends SettingsSchema>(
     suiteTrayClient?.report(currentSuiteState());
   }
 
-  // Control channels the launcher-hosted settings preload uses (over the relay's
-  // send path) to bracket a hosting session: start when the WebContentsView's
-  // renderer has mounted (begin serving + seed initial state), stop when the tab
-  // or window goes away (fall back to local behavior). Kept as reserved channel
+  // Control channels bracket a unified Settings hosting session: start when a
+  // module panel mounts (begin push forwarding and seed its current values), then
+  // stop when the Settings window closes (fall back to local behavior). Kept as reserved channel
   // names so they can't collide with a real settings IPC channel.
   const SUITE_HOST_START = "__suite_host_start";
   const SUITE_HOST_STOP = "__suite_host_stop";
 
   function connectSuiteTray(): void {
-    // Create the settings relay for this connection. It captures our invoke
-    // handlers up front (a no-op recording shim over ipcMain.handle) so a relayed
-    // invoke from the hosted renderer can be answered from this process, and it
-    // forwards our main→renderer pushes up the pipe while hosting.
+    // Create the settings push relay for this suite connection. Its compatibility
+    // send/invoke handlers remain available, and it forwards state pushes while
+    // the unified Settings renderer is hosting this module's panel.
     suiteSettingsRelay = createSuiteSettingsRelay((channel, args) =>
       suiteTrayClient?.relayPush(channel, args)
     );
@@ -1002,6 +1258,10 @@ export function createPopApp<S extends SettingsSchema>(
         onAction: (id) => {
           if (id === SUITE_ACTION_SETTINGS) openSettingsWindow();
           else if (id === SUITE_ACTION_ABOUT) showAboutDialog();
+        },
+        onToggleExtra: (id) => {
+          options.trayExtraToggles?.find((t) => t.id === id)?.onToggle();
+          reportSuiteState();
         },
         onQuit: () => app.quit(),
         onSuppress: (suppressed) => {
@@ -1057,16 +1317,16 @@ export function createPopApp<S extends SettingsSchema>(
       licenseController = createLicenseController(options.proProduct, (status) =>
         sendToRenderers("license-changed", status)
       );
-      registerLicenseIpc(licenseController, sendToRenderers);
+      registerLicenseIpc(licenseController, sendToRenderers, ipcNamespace);
     }
 
     mainWindow = createWindow();
 
-    // Re-pin the overlay above the taskbar whenever the work area changes
-    // (taskbar auto-hide/show, display changes) and on a light poll, since
-    // Windows can silently reclaim topmost without firing any event.
-    screen.on("display-metrics-changed", reassertOverlayAlwaysOnTop);
-    overlayTopmostInterval = setInterval(reassertOverlayAlwaysOnTop, 2000);
+    // Keep the overlay aligned with the usable display when the taskbar moves,
+    // auto-hide changes, or display geometry changes. The light poll still keeps
+    // it above ordinary app windows without overlapping Windows system UI.
+    screen.on("display-metrics-changed", syncOverlayBoundsAfterDisplayChange);
+    restartOverlayTopmostInterval(OVERLAY_TOPMOST_IDLE_MS);
 
     if (options.tray?.mode === "reported") {
       // Suite: hand our tray to the launcher's unified icon. Falls back to a
@@ -1076,19 +1336,21 @@ export function createPopApp<S extends SettingsSchema>(
       createTray();
     }
 
-    // Register sync IPC + start watching the shared file for the sibling app's
-    // changes (applies enabled synced values and live-updates toggle state).
-    settingsSync.start();
-
+    // Register the shortcuts (defaults + any persisted rebinds seeded above).
     const shortcutRegistration = registerShortcutHandlers(shortcutState);
     if (!shortcutRegistration.ok) {
       dialog.showErrorBox("Shortcut Registration Failed", shortcutRegistration.error);
     }
 
+    // Register sync IPC + start watching the shared file for the sibling app's
+    // changes (applies enabled synced values and live-updates toggle state).
+    settingsSync.start();
+
     options.onReady?.(ctx);
   });
 
   app.on("window-all-closed", () => {
+    if (options.embedded) return;
     // On macOS, apps conventionally remain in the dock until the user explicitly quits.
     if (process.platform !== "darwin") app.quit();
   });
@@ -1102,10 +1364,11 @@ export function createPopApp<S extends SettingsSchema>(
 
   app.on("will-quit", () => {
     options.onWillQuit?.();
-    screen.removeListener("display-metrics-changed", reassertOverlayAlwaysOnTop);
+    screen.removeListener("display-metrics-changed", syncOverlayBoundsAfterDisplayChange);
     if (overlayTopmostInterval) {
       clearInterval(overlayTopmostInterval);
       overlayTopmostInterval = null;
+      overlayTopmostIntervalMs = 0;
     }
     suiteSettingsRelay?.stop();
     suiteSettingsRelay = null;
@@ -1120,6 +1383,7 @@ export function createPopApp<S extends SettingsSchema>(
   });
 
   app.on("second-instance", () => {
+    if (options.embedded) return;
     if (options.secondInstance === "open-settings") {
       openSettingsWindow();
       return;

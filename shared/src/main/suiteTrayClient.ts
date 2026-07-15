@@ -29,6 +29,9 @@ export interface SuiteTrayClientHandlers {
   onToggle(): void;
   /** Run a named extra action, e.g. "settings" or "about". */
   onAction(id: string): void;
+  /** Flip a named extra toggle, e.g. PopKey's "obsMode". Optional; only
+   *  modules that report extraToggles need to handle this. */
+  onToggleExtra?(id: string): void;
   /** Quit this module process (launcher asked, via "Quit All"). */
   onQuit(): void;
   /**
@@ -122,6 +125,9 @@ export function createSuiteTrayClient(
           break;
         case "action":
           handlers.onAction(msg.id);
+          break;
+        case "toggleExtra":
+          handlers.onToggleExtra?.(msg.id);
           break;
         case "quit":
           handlers.onQuit();

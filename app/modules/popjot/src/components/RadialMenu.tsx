@@ -1,15 +1,15 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Bolt, History, Pen, PenLine, Highlighter, Eraser, TvMinimal, Circle, Moon, Sun, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useStore, Tool, StrokeType, BackgroundMode, MenuStyle, ColorPalette, DRAWING_TOOLS } from "@/store/useStore";
-import { normalizeKey, isHotkeyPressed, isMac } from "@shared/lib/hotkeys";
-import { isDesktop, onShortcutActivate, onShortcutPersistent, overlayActivated, overlayDeactivated } from "@/lib/platform";
-import { getGradientVariantStops, getHighlighterGradientStops } from "@/config/themes";
+import { useStore, Tool, StrokeType, BackgroundMode, MenuStyle, ColorPalette, DRAWING_TOOLS } from "@popjot/store/useStore";
+import { normalizeKey, isHotkeyPressed } from "@shared/lib/hotkeys";
+import { isDesktop, onOverlayDeactivateRequested, onShortcutActivate, onShortcutLastTool, onShortcutPersistent, overlayActivated, overlayDeactivated } from "@popjot/lib/platform";
+import { getGradientVariantStops, getHighlighterGradientStops } from "@popjot/config/themes";
 import { getAnimationConfig } from "@shared/config/animations";
-import { getEffectiveColors, getProPalette } from "@/pro";
+import { getEffectiveColors, getProPalette } from "@popjot/pro";
 import RadialButton from "./RadialButton";
 import PaletteEffectOverlay from "@shared/components/PaletteEffectOverlay";
-import { withAlpha } from "@/lib/color";
+import { withAlpha } from "@popjot/lib/color";
 
 const BASE_SCREEN_ITEMS = [
   { icon: X, bg: "transparent" as const, color: undefined },
@@ -46,11 +46,8 @@ const getPosition = (index: number, total: number, radius: number, offset: numbe
 
 const SPRING_CONFIG = { type: "spring", stiffness: 1500, damping: 40 } as const;
 
-const pickPopColors = (palette: ColorPalette, solidColor: string): { colors: string[]; centerColor: string; centerGradient?: [string, string]; gradientStops?: readonly string[][] } => {
-  // "solid" has no fixed palette — every slot is the single chosen color.
-  const { draw, tertiary } = palette === "solid"
-    ? { draw: [solidColor, solidColor, solidColor, solidColor, solidColor, solidColor], tertiary: [solidColor, solidColor, solidColor] }
-    : getEffectiveColors(palette);
+const pickPopColors = (palette: ColorPalette): { colors: string[]; centerColor: string; centerGradient?: [string, string]; gradientStops?: readonly string[][] } => {
+  const { draw, tertiary } = getEffectiveColors(palette);
 
   // Fisher-Yates shuffle for random button coloring each time
   const colors = Array.from(draw);
@@ -125,6 +122,7 @@ const RadialMenu = () => {
   const menuOriginRef = useRef({ x: 0, y: 0 });
   const submenuOriginRef = useRef({ x: 0, y: 0 });
   const wasActive = useRef(false);
+  const lastToolWasActive = useRef(false);
   const menuOpenRef = useRef(false);
   const shortcutActivatedRef = useRef(false); // Track if desktop shortcut was activated
   const popTimerRef = useRef<number | null>(null);
@@ -136,10 +134,9 @@ const RadialMenu = () => {
   const setBackground = useStore(state => state.setBackground);
   const hotkey = useStore(state => state.hotkey);
   const persistentHotkey = useStore(state => state.persistentHotkey);
+  const lastToolHotkey = useStore(state => state.lastToolHotkey);
   const menuStyle = useStore(state => state.menuStyle);
   const colorPalette = useStore(state => state.colorPalette);
-  const lastColorPalette = useStore(state => state.lastColorPalette);
-  const solidColor = useStore(state => state.solidColor);
   const glowIntensity = useStore(state => state.glowIntensity);
   const textColor = useStore(state => state.textColor);
   const themeMode = useStore(state => state.themeMode);
@@ -160,18 +157,20 @@ const RadialMenu = () => {
   const SUB_RADIUS = BASE_SUB_RADIUS * effectiveScale;
 
   /** Random pop colors — reshuffled each time the menu opens */
-  const popColorsRef = useRef(pickPopColors(colorPalette, solidColor));
+  const popColorsRef = useRef(pickPopColors(colorPalette));
 
-  const paletteVersion = useStore(state => state.paletteVersion);
+  // Subscribed directly (not read via getEffectiveColors() alone) so a Pro
+  // custom-palette edit — which arrives here as a schema-synced IPC broadcast
+  // from the Settings window, a separate renderer process — invalidates this
+  // memo immediately instead of waiting on an unrelated re-render.
+  const proDrawPalette = useStore(state => state.proDrawPalette);
+  const proHighlighterPalette = useStore(state => state.proHighlighterPalette);
+  const proPaletteActive = useStore(state => state.proPaletteActive);
 
   const SUB_MENUS = useMemo(() => {
-    // Solid only restyles the menu chrome — strokes keep real, multi-color
-    // swatches from the last non-Solid palette so you can still draw in any color.
-    const strokePalette: ColorPalette =
-      colorPalette === "solid" ? (lastColorPalette === "solid" ? "retro" : lastColorPalette) : colorPalette;
-    const { draw: drawColors, highlighter: highlighterColors } = getEffectiveColors(strokePalette);
+    const { draw: drawColors, highlighter: highlighterColors } = getEffectiveColors(colorPalette);
     // Only use gradient rendering when the built-in gradient palette is active with no custom Pro override
-    const useGradient = strokePalette === "gradient" && getProPalette(strokePalette) === null;
+    const useGradient = colorPalette === "gradient" && getProPalette(colorPalette) === null;
 
     const drawItems = toColorItems(drawColors, useGradient ? "gradient" : "muted", "draw");
     const highlighterItems = toColorItems(highlighterColors, useGradient ? "gradient" : "muted", "highlighter");
@@ -188,7 +187,7 @@ const RadialMenu = () => {
       { offset: 180, items: screenItems },
     ];
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colorPalette, lastColorPalette, paletteVersion]); // paletteVersion invalidates when Pro palette changes
+  }, [colorPalette, proDrawPalette, proHighlighterPalette, proPaletteActive]);
 
   const checkHotkey = useCallback(
     () => isHotkeyPressed(hotkey, keysDown.current),
@@ -200,6 +199,11 @@ const RadialMenu = () => {
     [persistentHotkey]
   );
 
+  const checkLastToolHotkey = useCallback(
+    () => isHotkeyPressed(lastToolHotkey, keysDown.current),
+    [lastToolHotkey]
+  );
+
   const toOverlayPoint = useCallback(
     (x: number, y: number) => ({ x: x * pageZoomFactor, y: y * pageZoomFactor }),
     [pageZoomFactor],
@@ -207,7 +211,7 @@ const RadialMenu = () => {
 
   const openMenuAtCursor = useCallback(() => {
     const state = useStore.getState();
-    popColorsRef.current = pickPopColors(state.colorPalette, state.solidColor);
+    popColorsRef.current = pickPopColors(state.colorPalette);
     const origin = { x: mousePos.current.x, y: mousePos.current.y };
     menuOriginRef.current = origin;
     setMenuPos(origin);
@@ -250,7 +254,7 @@ const RadialMenu = () => {
       const leftHeld = (e.buttons & 1) !== 0;
       if (state.appEnabled && !state.isDrawing && !leftHeld) {
         e.preventDefault();
-        popColorsRef.current = pickPopColors(state.colorPalette, state.solidColor);
+        popColorsRef.current = pickPopColors(state.colorPalette);
         setMenuOpen(true);
         const origin = toOverlayPoint(e.clientX, e.clientY);
         menuOriginRef.current = origin;
@@ -277,9 +281,21 @@ const RadialMenu = () => {
   // ─── Hotkey state machine ────────────────────────────────────────
 
   const checkKeys = useCallback((keyEvent?: string) => {
-    const isActive = checkHotkey();
+    const isMainActive = checkHotkey();
+    // Last-tool combo activates like the main hotkey but skips the radial menu
+    // (web builds; on desktop the key is swallowed by globalShortcut and this
+    // path is driven over IPC instead).
+    const isLastToolActive = checkLastToolHotkey();
+    const isActive = isMainActive || isLastToolActive;
     const isPersistentSetupActive = checkPersistentHotkey();
     const state = useStore.getState();
+
+    // Rising edge of the last-tool combo while the menu is up: dismiss it and
+    // keep drawing with the current tool.
+    if (isLastToolActive && !lastToolWasActive.current && menuOpenRef.current) {
+      setMenuOpen(false);
+    }
+    lastToolWasActive.current = isLastToolActive;
 
     if (isPersistentSetupActive && !state.isPersistentMode && !isDesktop()) {
       state.setIsPersistentMode(true);
@@ -287,13 +303,21 @@ const RadialMenu = () => {
       state.setBackground("transparent");
     }
 
-    if (keyEvent === "escape" && state.isPersistentMode) {
+    // Escape exits any active session, not just persistent mode — a momentary
+    // (hold-to-draw) session in Snapshot overlay mode is also appEnabled but
+    // isPersistentMode is false, and previously had no way to Escape out.
+    //
+    // Web/extension only. The desktop overlay is non-focusable so it never sees
+    // key events at all; main owns Escape there (globalShortcut) and drives the
+    // exact same teardown over onOverlayDeactivateRequested below.
+    if (keyEvent === "escape" && state.appEnabled && !isDesktop()) {
       state.setIsPersistentMode(false);
       state.setAppEnabled(false);
       state.setSnapshotDataUrl(null);
       setMenuOpen(false);
       state.triggerClearCanvas();
       wasActive.current = false;
+      shortcutActivatedRef.current = false;
       overlayDeactivated();
       return;
     }
@@ -301,7 +325,7 @@ const RadialMenu = () => {
     if (state.isPersistentMode) {
       if (isActive && !wasActive.current) {
         // In desktop mode, activation comes from globalShortcut IPC — skip here
-        if (!isDesktop()) openMenuAtCursor();
+        if (!isDesktop() && isMainActive) openMenuAtCursor();
       } else if (!isActive && wasActive.current) {
         setMenuOpen(false);
       }
@@ -311,7 +335,7 @@ const RadialMenu = () => {
         if (!isDesktop()) {
           state.setAppEnabled(true);
           state.setBackground("transparent");
-          openMenuAtCursor();
+          if (isMainActive) openMenuAtCursor();
         }
       } else if (!isActive && wasActive.current) {
         state.setAppEnabled(false);
@@ -322,55 +346,33 @@ const RadialMenu = () => {
       }
     }
     wasActive.current = isActive;
-  }, [checkHotkey, checkPersistentHotkey, openMenuAtCursor]);
+  }, [checkHotkey, checkLastToolHotkey, checkPersistentHotkey, openMenuAtCursor]);
 
   // ─── Keyboard listeners ──────────────────────────────────────────
 
+  // These drive the hotkey state machine for the WEB and EXTENSION builds, where
+  // there is no main process and DOM events are the only input the app ever gets.
+  //
+  // On DESKTOP the overlay is non-focusable — activating it would close the menus
+  // and tooltips of the app being annotated — so it receives no key events at all
+  // and these listeners are inert. Hold-to-draw release, Escape, and the focus-loss
+  // fallback are all owned by the main process there (annotationKeys.ts +
+  // globalShortcut), which drives the identical teardown over the
+  // onOverlayDeactivateRequested IPC below. The `blur` fallback in particular has
+  // no desktop meaning left: a window that never takes focus can never lose it.
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
       keysDown.current.add(normalizeKey(e.key));
-      if (checkHotkey() || checkPersistentHotkey()) e.preventDefault();
+      if (checkHotkey() || checkPersistentHotkey() || checkLastToolHotkey()) e.preventDefault();
       checkKeys(normalizeKey(e.key));
     };
     const onUp = (e: KeyboardEvent) => {
       keysDown.current.delete(normalizeKey(e.key));
       checkKeys(normalizeKey(e.key));
-
-      // Desktop shortcut deactivation: if modifier keys are released while shortcut was active
-      if (isDesktop() && shortcutActivatedRef.current) {
-        const normalizedKey = normalizeKey(e.key);
-        const modifierKeys = isMac() ? ["meta", "shift"] : ["alt", "shift"];
-        if (modifierKeys.includes(normalizedKey)) {
-          const allReleased = modifierKeys.every(k => !keysDown.current.has(k));
-          if (allReleased) {
-            const state = useStore.getState();
-            if (!state.isPersistentMode) {
-              state.setAppEnabled(false);
-              state.setSnapshotDataUrl(null);
-              setMenuOpen(false);
-              state.triggerClearCanvas();
-              overlayDeactivated();
-              shortcutActivatedRef.current = false;
-            }
-          }
-        }
-      }
     };
     const onBlur = () => {
       keysDown.current.clear();
       checkKeys();
-      // If we lose focus while shortcut was active, deactivate
-      if (isDesktop() && shortcutActivatedRef.current) {
-        const state = useStore.getState();
-        if (!state.isPersistentMode) {
-          state.setAppEnabled(false);
-          state.setSnapshotDataUrl(null);
-          setMenuOpen(false);
-          state.triggerClearCanvas();
-          overlayDeactivated();
-          shortcutActivatedRef.current = false;
-        }
-      }
     };
     window.addEventListener("keydown", onDown);
     window.addEventListener("keyup", onUp);
@@ -380,7 +382,7 @@ const RadialMenu = () => {
       window.removeEventListener("keyup", onUp);
       window.removeEventListener("blur", onBlur);
     };
-  }, [checkKeys, checkHotkey, checkPersistentHotkey]);
+  }, [checkKeys, checkHotkey, checkLastToolHotkey, checkPersistentHotkey]);
 
   // ─── Desktop global shortcut handler (Electron IPC) ───────────────
 
@@ -397,12 +399,15 @@ const RadialMenu = () => {
         state.setSnapshotDataUrl(snapshotDataUrl);
         overlayActivated();
       }
-      popColorsRef.current = pickPopColors(state.colorPalette, state.solidColor);
+      popColorsRef.current = pickPopColors(state.colorPalette);
       menuOriginRef.current = { x, y };
       setMenuPos({ x, y });
       setMenuOpen(true);
       setActiveIndex(null);
-      shortcutActivatedRef.current = true; // Mark that shortcut is active (will be cleared on key release)
+      // Guards against a re-fire while already up. Cleared when main drives the
+      // teardown (onOverlayDeactivateRequested) — main owns release detection
+      // now, since the non-focusable overlay never sees the keyup itself.
+      shortcutActivatedRef.current = true;
     });
 
     const cleanupPersistent = onShortcutPersistent(({ x, y }, snapshotDataUrl) => {
@@ -417,7 +422,7 @@ const RadialMenu = () => {
           state.setSnapshotDataUrl(snapshotDataUrl);
           overlayActivated();
         }
-        popColorsRef.current = pickPopColors(state.colorPalette, state.solidColor);
+        popColorsRef.current = pickPopColors(state.colorPalette);
         menuOriginRef.current = { x, y };
         setMenuPos({ x, y });
         setMenuOpen(true);
@@ -435,7 +440,7 @@ const RadialMenu = () => {
       }
       // Only update position if menu wasn't already open
       if (!menuOpenRef.current) {
-        popColorsRef.current = pickPopColors(state.colorPalette, state.solidColor);
+        popColorsRef.current = pickPopColors(state.colorPalette);
         menuOriginRef.current = { x, y };
         setMenuPos({ x, y });
         setMenuOpen(true);
@@ -447,6 +452,21 @@ const RadialMenu = () => {
       cleanupActivate();
       cleanupPersistent();
     };
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktop()) return;
+    return onOverlayDeactivateRequested(() => {
+      const state = useStore.getState();
+      state.setIsPersistentMode(false);
+      state.setAppEnabled(false);
+      state.setSnapshotDataUrl(null);
+      setMenuOpen(false);
+      state.triggerClearCanvas();
+      wasActive.current = false;
+      shortcutActivatedRef.current = false;
+      overlayDeactivated();
+    });
   }, []);
 
   // Tray-settings broadcasts are applied generically by useTraySettingsSync
@@ -475,6 +495,25 @@ const RadialMenu = () => {
     popClearTimerRef.current = window.setTimeout(() => setSelectedItemId(null), animConfig.selectionDuration + 10);
   }, [animConfig]);
 
+  // Last-tool shortcut (e.g. Alt+Shift+W): activate straight into drawing with
+  // the last-used tool, skipping the radial menu — the keyboard twin of the top
+  // (History) slot. If the menu is already open, dismiss it with the same pop.
+  useEffect(() => {
+    if (!isDesktop()) return;
+    return onShortcutLastTool((snapshotDataUrl) => {
+      const state = useStore.getState();
+      if (!state.appEnabled) {
+        state.setAppEnabled(true);
+        state.setBackground("transparent");
+        state.setSnapshotDataUrl(snapshotDataUrl);
+        overlayActivated();
+        shortcutActivatedRef.current = true; // cleared when main detects the modifier release
+      } else if (menuOpenRef.current) {
+        playSelectionPop("main-0");
+      }
+    });
+  }, [playSelectionPop]);
+
   const hasActiveSelection = selectedItemId !== null;
 
   const clearHoverSelectionTimer = useCallback(() => {
@@ -501,7 +540,11 @@ const RadialMenu = () => {
   return (
     <AnimatePresence>
       {menuOpen && (
-        <div className="fixed inset-0 z-[100000] pointer-events-none cursor-default">
+        // No cursor-* here: EngineShell hides the cursor for the whole overlay
+        // while a session is live, and drawing draws its own. A cursor-default on
+        // this full-screen layer sits ABOVE the canvas and hands the system
+        // cursor straight back.
+        <div className="fixed inset-0 z-[100000] pointer-events-none">
           <div className="absolute" style={{ left: menuPos.x, top: menuPos.y }}>
             {/* Main items */}
             <AnimatePresence>

@@ -37,6 +37,17 @@ export interface SuiteTrayAction {
 }
 
 /**
+ * An extra named checkbox a module exposes beyond its Enable/Disable toggle,
+ * e.g. PopKey's "OBS Mode". `id` is echoed back in a ToggleExtraMessage so the
+ * module knows which one was clicked.
+ */
+export interface SuiteTrayExtraToggle {
+  id: string;
+  label: string;
+  checked: boolean;
+}
+
+/**
  * Snapshot of a module's tray-relevant state. Sent by the module on connect and
  * whenever anything changes (toggle flips active, a shortcut is rebound).
  */
@@ -53,6 +64,8 @@ export interface SuiteModuleState {
   canToggle: boolean;
   /** Extra per-module actions (settings, about, ...). */
   actions: SuiteTrayAction[];
+  /** Extra named checkboxes beyond Enable/Disable (e.g. PopKey's OBS Mode). */
+  extraToggles?: SuiteTrayExtraToggle[];
   /**
    * Suite-only cross-module signal: true while this module is actively
    * annotating (PopJot drawing mode on). The launcher relays this to the other
@@ -86,6 +99,12 @@ export interface ToggleMessage {
 /** Launcher → module: run a named extra action (settings/about/...). */
 export interface ActionMessage {
   type: "action";
+  id: string;
+}
+
+/** Launcher → module: flip a named extra toggle (e.g. PopKey's OBS Mode). */
+export interface ToggleExtraMessage {
+  type: "toggleExtra";
   id: string;
 }
 
@@ -161,6 +180,7 @@ export type ModuleToLauncher = StateMessage | RelayInvokeResultMessage | RelayPu
 export type LauncherToModule =
   | ToggleMessage
   | ActionMessage
+  | ToggleExtraMessage
   | QuitMessage
   | SuppressMessage
   | RelaySendMessage
@@ -216,8 +236,8 @@ export interface SuiteMenuItem {
 }
 
 /** Suite-wide external links, always shown regardless of connected modules. */
-export const SUITE_CHANGELOG_URL = "https://popjot.app/changelog";
-export const SUITE_DOCS_URL = "https://popjot.app/docs";
+export const SUITE_CHANGELOG_URL = "https://popsuite.app/changelog";
+export const SUITE_DOCS_URL = "https://popsuite.app/docs";
 
 /** Action ids modules honor for the Edit Settings picker (mirror createPopApp). */
 export const SUITE_ACTION_SETTINGS = "settings";
@@ -228,6 +248,8 @@ export const SUITE_ACTION_ABOUT = "about";
 export interface SuiteTrayHandlers {
   onToggle(appName: string): void;
   onAction(appName: string, actionId: string): void;
+  /** Flip a module's named extra toggle (e.g. PopKey's OBS Mode). */
+  onToggleExtra(appName: string, toggleId: string): void;
   /** Toggle whether the launcher (PopSuite.exe) is registered to run at login. */
   onOpenAtLoginToggle(): void;
   /** Open an external URL in the default browser (Changelog / Documentation). */
@@ -242,7 +264,19 @@ export interface SuiteTrayHandlers {
    */
   onInstallUpdate(): void;
   onQuitAll(): void;
+  /** Apply a preset by id from the tray (Pro). Includes the Default sentinel. */
+  onApplyPreset?(id: string): void;
 }
+
+/** A situational preset as surfaced in the tray (Pro feature). */
+export interface SuiteTrayPreset {
+  id: string;
+  name: string;
+}
+
+/** Sentinel id for the built-in factory-defaults preset (mirror of the
+ *  renderer's DEFAULT_PRESET_ID in app/src/settings/SuitePresets.tsx). */
+export const SUITE_PRESET_DEFAULT_ID = "__default__";
 
 /** Extra inputs to the menu builder beyond the connected-module list. */
 export interface SuiteTrayMenuOptions {
@@ -254,6 +288,13 @@ export interface SuiteTrayMenuOptions {
    * staged (dev, offline, already current, or still downloading).
    */
   updateReady?: { version: string };
+  /**
+   * Situational Presets (Pro). When `isPro` is true, a "Presets" submenu is
+   * rendered under "About PopSuite" with a built-in Default entry plus each
+   * saved preset. Omitted entirely for non-Pro users. The saved list may be
+   * empty (only Default shows).
+   */
+  presets?: { isPro: boolean; saved: SuiteTrayPreset[] };
 }
 
 /**
@@ -290,7 +331,8 @@ export function buildSuiteTrayMenu(
     items.push({ label: "No modules running", enabled: false });
   }
 
-  // Flat toggles: one checkbox per module directly under the title.
+  // Flat toggles: one checkbox per module directly under the title, followed
+  // by any of that module's extra named toggles (e.g. PopKey's OBS Mode).
   for (const mod of sorted) {
     if (mod.canToggle) {
       // While auto-suppressed by a sibling (PopJot annotating), flag it so the
@@ -309,6 +351,14 @@ export function buildSuiteTrayMenu(
     } else {
       // No toggle: still show the module name as a heading so it isn't lost.
       items.push({ label: mod.appName, enabled: false });
+    }
+    for (const extra of mod.extraToggles ?? []) {
+      items.push({
+        label: extra.label,
+        type: "checkbox",
+        checked: extra.checked,
+        click: () => handlers.onToggleExtra(mod.appName, extra.id),
+      });
     }
   }
 
@@ -339,6 +389,29 @@ export function buildSuiteTrayMenu(
   // launcher-local (shows the suite's own version), never per module. Always
   // shown — it's about the product, not a connected module.
   items.push({ label: "About PopSuite", click: () => handlers.onAbout() });
+
+  // Situational Presets (Pro): a submenu of the built-in Default plus each saved
+  // preset, applied via the launcher (which opens the settings window so its
+  // relay can push settings to the module processes). Only for Pro users.
+  if (options.presets?.isPro) {
+    const presetItems: SuiteMenuItem[] = [
+      {
+        label: "Default",
+        click: () => handlers.onApplyPreset?.(SUITE_PRESET_DEFAULT_ID),
+      },
+    ];
+    if (options.presets.saved.length > 0) {
+      presetItems.push({ type: "separator" });
+      for (const preset of options.presets.saved) {
+        presetItems.push({
+          label: preset.name,
+          click: () => handlers.onApplyPreset?.(preset.id),
+        });
+      }
+    }
+    items.push({ type: "separator" });
+    items.push({ label: "Presets", submenu: presetItems });
+  }
 
   // ─── Launcher-local items (never depend on a connected module) ─────────
   items.push({ type: "separator" });

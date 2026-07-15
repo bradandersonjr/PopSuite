@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useStore } from "@/store/useStore";
+import { useStore } from "@popkey/store/useStore";
 import {
   isDesktop,
   onInputKeyDown,
@@ -11,8 +11,9 @@ import {
   onInputFocusLost,
   onShortcutToggle,
   onSetAppEnabled,
-} from "@/lib/platform";
-import type { KeyEvent, ClickEvent, WheelEventData } from "@/lib/platform";
+} from "@popkey/lib/platform";
+import type { KeyEvent, ClickEvent, WheelEventData } from "@popkey/lib/platform";
+import { isMac } from "@shared/lib/hotkeys";
 
 export type BadgeType = "key" | "combo" | "click" | "scroll" | "drag";
 
@@ -56,7 +57,7 @@ const DOM_MODIFIER_MAP: Record<string, string> = {
 
 // Display names that uiohook uses for modifier keys (from inputCapture.ts DISPLAY_NAMES).
 // Used as a reliable fallback since the `data.modifier` boolean can be stale across IPC.
-const MODIFIER_NAMES = new Set(["Ctrl", "Shift", "Alt", "Win"]);
+const MODIFIER_NAMES = new Set(["Ctrl", "Shift", "Alt", "Win", "Cmd"]);
 
 let badgeCounter = 0;
 function nextId(): string { return `b${++badgeCounter}`; }
@@ -100,6 +101,15 @@ export const SHIFT_SYMBOLS: Record<string, string> = {
 // `event.key` (e.g. "!"), so we only need to drop the redundant Shift there.
 const SHIFTED_GLYPHS = new Set(Object.values(SHIFT_SYMBOLS));
 
+// Numpad digit labels (desktop/uiohook path — see DISPLAY_NAMES in
+// inputCapture.ts) mapped to their plain digit, for the "plain numpad digits"
+// setting. Numpad operators (Num*, Num+, etc.) are left alone: they aren't
+// ambiguous with anything, so there's nothing to simplify.
+const NUMPAD_DIGIT_TO_PLAIN: Record<string, string> = {
+  Num0: "0", Num1: "1", Num2: "2", Num3: "3", Num4: "4",
+  Num5: "5", Num6: "6", Num7: "7", Num8: "8", Num9: "9",
+};
+
 /**
  * When Shift is the only held modifier, turn a shiftable key into the glyph it
  * produces and consume the Shift (so "Shift + 1" becomes "!"). Combos with other
@@ -127,6 +137,7 @@ export function useInputCapture() {
     showMouseClicks,
     showScrollWheel,
     showKeyRepeat,
+    plainNumpadDigits,
   } = useStore();
 
   const [badges, setBadges] = useState<Badge[]>([]);
@@ -142,6 +153,8 @@ export function useInputCapture() {
   maxBadgesRef.current   = maxBadges;
   const showKeyRepeatRef = useRef(showKeyRepeat);
   showKeyRepeatRef.current = showKeyRepeat;
+  const plainNumpadDigitsRef = useRef(plainNumpadDigits);
+  plainNumpadDigitsRef.current = plainNumpadDigits;
   // Tracks the live badge for each held key so OS auto-repeats can bump a ×N count.
   // Keyed by uiohook keycode (desktop) or DOM `event.code` (web).
   const heldKeyBadgeRef = useRef<Map<string | number, { id: string; labelBase: string; count: number }>>(new Map());
@@ -301,6 +314,19 @@ export function useInputCapture() {
     // Word mode integration point: wordCapture.clearCaption()
   }, []);
 
+  // Disabling the visualizer (manual toggle or suite suppression while PopJot
+  // annotates) clears everything on screen, not just held state: capture
+  // listeners are torn down while disabled, so the key-ups for the very chord
+  // that triggered the disable never arrive — without this, those keys restore
+  // as "held" badges that never expire.
+  useEffect(() => {
+    if (appEnabled) return;
+    clearAllHeld();
+    setBadges([]);
+    setClicks([]);
+    setScrolls([]);
+  }, [appEnabled, clearAllHeld]);
+
   // ─── Badge expiry ──────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -349,8 +375,29 @@ export function useInputCapture() {
 
     if (!appEnabled) return () => cleanups.forEach((fn) => fn());
 
+    const syncModifiers = (data: KeyEvent) => {
+      if (data.altKey !== undefined) {
+        if (data.altKey) heldModifiersRef.current.add("Alt");
+        else heldModifiersRef.current.delete("Alt");
+      }
+      if (data.ctrlKey !== undefined) {
+        if (data.ctrlKey) heldModifiersRef.current.add("Ctrl");
+        else heldModifiersRef.current.delete("Ctrl");
+      }
+      if (data.shiftKey !== undefined) {
+        if (data.shiftKey) heldModifiersRef.current.add("Shift");
+        else heldModifiersRef.current.delete("Shift");
+      }
+      if (data.metaKey !== undefined) {
+        const metaLabel = isMac() ? "Cmd" : "Win";
+        if (data.metaKey) heldModifiersRef.current.add(metaLabel);
+        else heldModifiersRef.current.delete(metaLabel);
+      }
+    };
+
     if (keyboardEnabled) {
       cleanups.push(onInputKeyDown((data: KeyEvent) => {
+        syncModifiers(data);
         const isMod = data.modifier || MODIFIER_NAMES.has(data.key);
         // Already held → this is an OS auto-repeat; optionally show a ×N counter.
         if (heldKeysRef.current.has(data.keycode)) {
@@ -364,10 +411,14 @@ export function useInputCapture() {
           showModifierBadge();
           return;
         }
-        pressKey(data.keycode, data.key);
+        const base = plainNumpadDigitsRef.current
+          ? NUMPAD_DIGIT_TO_PLAIN[data.key] ?? data.key
+          : data.key;
+        pressKey(data.keycode, base);
       }));
 
       cleanups.push(onInputKeyUp((data: KeyEvent) => {
+        syncModifiers(data);
         heldKeysRef.current.delete(data.keycode);
         heldKeyBadgeRef.current.delete(data.keycode);
         // Word mode integration point: if (wordCapture.handleDesktopKeyUp(...)) return;

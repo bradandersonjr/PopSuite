@@ -10,7 +10,7 @@ const P = ({ children }: { children: React.ReactNode }) => (
   <p className="text-foreground/80 leading-relaxed mb-4">{children}</p>
 );
 
-const PrivacyRoot = () => {
+const PrivacyRoot = ({ brand = "PopJot" }: { brand?: string }) => {
   return (
     <div className="w-full min-h-screen bg-background theme-dark">
       {/* ─── Top bar ─── */}
@@ -21,7 +21,7 @@ const PrivacyRoot = () => {
               <ArrowLeft className="w-4 h-4" />
               <span className="font-brand text-lg">
                 <span className="text-pop-yellow">Pop</span>
-                <span className="text-foreground">Jot</span>
+                <span className="text-foreground">{brand.replace(/^Pop/, "")}</span>
               </span>
             </a>
             <span className="text-foreground/30">/</span>
@@ -37,15 +37,15 @@ const PrivacyRoot = () => {
 
         <SectionHeading id="overview" isFirst>Overview</SectionHeading>
         <P>
-          PopJot is a screen annotation tool made by Brad Anderson Jr, distributed as part of the
-          PopSuite desktop install alongside PopKey. This policy explains what data PopJot does and
-          does not collect. The short version: PopJot collects nothing. Everything you draw stays
+          {brand} is made by Brad Anderson Jr and distributed as part of the PopSuite desktop
+          install (PopJot and PopKey). This policy explains what data {brand} does and
+          does not collect. The short version: {brand} collects nothing. Everything stays
           on your device.
         </P>
 
         <SectionHeading id="data-collected">Data We Collect</SectionHeading>
         <P>
-          PopJot does not collect, transmit, or store any personal data, usage data, analytics,
+          {brand} does not collect, transmit, or store any personal data, usage data, analytics,
           telemetry, crash reports, or diagnostic information. No data is sent to any server at any
           time, including during installation, use, or uninstallation.
         </P>
@@ -66,14 +66,14 @@ const PrivacyRoot = () => {
         </P>
         <P>
           The Chrome extension requests permission to inject a content script into web pages. This
-          permission is used solely to display the drawing overlay on top of the active webpage.
-          PopJot does not read page content, form data, passwords, or any information on the pages
+          permission is used solely to display the overlay on top of the active webpage.
+          {" "}{brand} does not read page content, form data, passwords, or any information on the pages
           you visit.
         </P>
 
         <SectionHeading id="third-parties">Third Parties</SectionHeading>
         <P>
-          PopJot does not use any third-party analytics services, advertising networks, or tracking
+          {brand} does not use any third-party analytics services, advertising networks, or tracking
           software. No data is shared with any third party for any purpose.
         </P>
         <P>
@@ -84,7 +84,7 @@ const PrivacyRoot = () => {
 
         <SectionHeading id="local-storage">Local Storage</SectionHeading>
         <P>
-          PopJot saves your preferences (menu style, color palette, theme, animation intensity,
+          {brand} saves your preferences (such as color palette, theme, animation intensity,
           keyboard shortcuts, and UI scale) locally on your device. On desktop this uses the
           operating system&apos;s local application storage, plus a small settings file under{" "}
           <code className="text-sm bg-foreground/10 px-1 rounded mx-0.5">~/.popsuite/</code> used
@@ -96,14 +96,14 @@ const PrivacyRoot = () => {
 
         <SectionHeading id="children">Children&apos;s Privacy</SectionHeading>
         <P>
-          PopJot is not directed at children under the age of 13 and does not knowingly collect
+          {brand} is not directed at children under the age of 13 and does not knowingly collect
           any information from children.
         </P>
 
         <SectionHeading id="changes">Changes to This Policy</SectionHeading>
         <P>
           If this policy changes materially, the updated policy will be posted at this URL with a
-          new "Last updated" date. Continued use of PopJot after a policy change constitutes
+          new "Last updated" date. Continued use of {brand} after a policy change constitutes
           acceptance of the updated policy.
         </P>
 
@@ -120,7 +120,7 @@ const PrivacyRoot = () => {
         <div className="mt-20 pt-8 border-t border-foreground/10">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <a href="/" className="text-sm text-foreground/50 hover:text-foreground transition-colors">
-              &larr; Back to PopJot
+              &larr; Back to {brand}
             </a>
             <div className="flex gap-6 text-sm text-foreground/40">
               <a href="/docs" className="hover:text-foreground transition-colors">Docs</a>

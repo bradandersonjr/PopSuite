@@ -3,6 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@popjot/*": ["./src/*"],
       "@/*": ["./src/*"],
       "@shared/*": ["../../../shared/src/*"]
     }

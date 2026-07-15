@@ -3,6 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@popkey/*": ["./src/*"],
       "@/*": ["./src/*"],
       "@shared/*": ["../../../shared/src/*"]
     }

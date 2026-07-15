@@ -1,6 +1,6 @@
 import type { MotionProps } from "framer-motion";
 import type { getAnimationConfig } from "@shared/config/animations";
-import type { BadgeAnimation } from "@/store/useStore";
+import type { BadgeAnimation } from "@popkey/store/useStore";
 
 type AnimConfig = ReturnType<typeof getAnimationConfig>;
 type BadgeMotion = Required<Pick<MotionProps, "initial" | "animate" | "exit">>;

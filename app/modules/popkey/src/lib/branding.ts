@@ -1,4 +1,4 @@
-import type { BrandingCorner } from "@/store/useStore";
+import type { BrandingCorner } from "@popkey/store/useStore";
 
 /**
  * The corner currently occupied by the keystroke badges (null when badges are

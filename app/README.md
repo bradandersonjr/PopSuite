@@ -1,77 +1,54 @@
-# app (PopSuite desktop shell)
+# app (PopSuite desktop runtime)
 
-`app/` builds the **PopSuite desktop app** — the single Electron binary that
-ships PopJot and PopKey as one install. It is the only shipped desktop
-deliverable; standalone per-app installers are deprecated. See the
-[root README](../README.md) for how this fits into the repo's three product
-surfaces (desktop app, websites, extensions).
+The app package builds the single shipped PopSuite desktop application. PopJot
+and PopKey remain independent websites and independent UI modules, but the
+desktop installation now uses one Electron main runtime.
 
 ## Architecture
 
-One binary, two run modes, selected by an argv flag:
+The unified main process creates two separate native BrowserWindows:
 
-- **Launcher** (`PopSuite.exe`, no `--module` arg) — a resident, lightweight hub
-  process. It creates the **single unified system tray icon** for the whole
-  suite, spawns a detached child process per module (`--module=popjot`,
-  `--module=popkey`), and stays alive listening on a local named pipe
-  (`\\.\pipe\popsuite-tray` on Windows). Each module reports its state over
-  that pipe (name, active, shortcut hints, annotating, etc.); the launcher
-  builds one dynamic tray menu from whichever modules are currently connected
-  and relays menu clicks back to the right module. The launcher owns **no**
-  overlay/settings windows and never touches a module's window/focus/overlay
-  behavior — it only relays.
-- **Module** (`PopSuite.exe --module=<id>`) — boots that module's normal main
-  process in this same executable: own userData, own single-instance lock, own
-  overlay window, identical to the standalone app. Delegated to
-  `src/main/<module>/index.ts` (loaded at runtime, not bundled at build time, so
-  each module's bundle stays independent). It runs the shared app shell in
-  `tray.mode: "reported"`, so it reports to the launcher instead of drawing its
-  own OS tray icon.
+- PopJot owns its transparent annotation window, focus lifecycle, mouse-input
+  policy, preload, renderer, settings state, and global shortcuts.
+- PopKey owns its transparent visualization window, click-through behavior,
+  preload, renderer, settings state, and global shortcut.
 
-Cross-module glue lives in the launcher (`src/main/index.ts`): PopJot reports
-annotating on/off transitions up the pipe, and the launcher relays a `suppress`
-command to PopKey, which force-hides its overlay while PopJot is active and
-restores to the user's last requested state afterward. PopJot's Spotlight
-presenter mode (dim-screen-except-cursor-circle, toggled via its own global
-shortcut) reuses this same "annotating" signal, so PopKey auto-hides during
-Spotlight too, and Spotlight/annotation are mutually exclusive with each other
-in PopJot's own main process. This behavior is suite-only — it never engages
-for standalone builds or a module run directly via `--module=` with no
-launcher.
+The windows are not combined or layered into one shared renderer. Each module
+uses a dedicated persistent Chromium session partition and namespaced IPC
+channels, so a PopJot message cannot be handled by PopKey and vice versa.
+Sharing the main process reduces duplicated Chromium services while preserving
+the same two-tool interaction model.
+
+The main process also owns the unified tray, updater, tabbed settings shell, and
+cross-tool coordination. PopJot annotation or Spotlight activity temporarily
+suppresses PopKey, then restores the previous requested PopKey state. Module
+state still travels through the suite coordinator, but both module runtimes now
+live inside the same Electron process.
 
 ### Unified settings window
 
-The launcher owns a single settings window (`src/main/suiteSettingsWindow.ts`)
-instead of each module opening its own. It is one frameless `BaseWindow`
-containing a thin tab-strip `WebContentsView` at the top plus one settings
-`WebContentsView` per module, each loading that module's real settings
-renderer. Only the active tab's view is visible; switching tabs re-lays-out the
-views (attach/detach) rather than reloading, so scroll position and in-progress
-form state survive flipping back and forth. Each hosted renderer's IPC is
-tunneled over the suite pipe to its owning module process via a relay preload
-(`src/main/suiteSettings/hostedPreload.ts`), so the real per-module settings
-handlers keep running in the module process — nothing is duplicated in the
-launcher. If a module isn't connected, its tab shows a placeholder instead of a
-blank view. The tray's single "Settings" item opens this window.
+Settings uses one desktop-only BrowserWindow, one preload, and one React
+renderer. Its PopJot and PopKey tabs mount the selected tool's settings panel
+against that tool's namespaced IPC bridge. Switching tabs does not merge tool
+state, and closing Settings destroys this renderer so its helper process can be
+reclaimed. The two overlay windows stay separate throughout.
 
-### Fallback / resilience model
+### Native input ownership
 
-- **Module started without a launcher** (`--module=` run directly, or the
-  launcher isn't running): the pipe connection fails immediately, so the module
-  falls back to creating its own local tray icon and behaves exactly like the
-  standalone app. This is the same fallback code path the standalone apps use
-  by default (`tray.mode: "owned"`).
-- **Launcher dies while modules are running**: the suite tray icon disappears;
-  each connected module detects the dropped pipe and re-creates its own local
-  tray icon (graceful degradation — no module is ever left without a tray). Any
-  active PopJot->PopKey suppression is cleared at the same time, so PopKey can
-  never get stuck hidden.
-- A module's own single-instance lock and userData are independent of the
-  launcher's. Per-module userData lives at `%APPDATA%/PopSuite/modules/popjot`
-  and `.../modules/popkey`; the launcher's own single-instance lock lives at
-  `%APPDATA%/PopSuite` (no `modules/` segment). Settings sync between modules
-  still flows through `~/.popsuite/<app>.json` and `~/.popsuite/shared.json`,
-  independent of userData isolation.
+PopKey needs the native uIOhook listener for its lifetime. PopJot uses the same
+native singleton only while Spotlight wheel-resize is active. A shared
+reference-counted owner keeps PopJot from stopping PopKey capture when
+Spotlight exits.
+
+### Failure model
+
+There is one desktop single-instance lock and one updater lifecycle. A fatal
+main-process failure can now affect both tools; renderer failures remain
+isolated by window. Standalone per-module development commands are retained for
+debugging either tool independently.
+
+The two public websites are unchanged and continue to build independently from
+their WebRoot entry points.
 
 ## Development
 
@@ -106,7 +83,7 @@ npm run package:suite        # from repo root: build + electron-builder (Windows
 Equivalent commands run directly inside `app/`:
 
 ```sh
-npm run build --prefix app          # build:popjot + build:popkey + build:launcher
+npm run build --prefix app          # build:popjot + build:popkey + build:settings + build:launcher
 npm run package:win --prefix app    # build + electron-builder --win
 ```
 
@@ -116,8 +93,8 @@ Packaged output lands in `app/release/` (e.g.
 icons and the launcher's own unified tray icon are copied in as
 `extraResources` under `popjot/`, `popkey/`, and `suite/` inside the packaged
 resources dir. `uiohook-napi`'s native binding (PopKey's input hook) is
-unpacked from the asar via `asarUnpack` so it can be loaded at runtime; the
-PopJot module bundle contains no reference to it.
+unpacked from the asar so the shared PopKey/Spotlight input-hook owner can
+load it at runtime.
 
 macOS (dmg, universal) and Linux (AppImage) targets are also configured in
 `electron-builder.yml`. `package`/`package:win` build the Windows NSIS

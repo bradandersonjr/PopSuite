@@ -3,12 +3,12 @@ import react from "@vitejs/plugin-react-swc";
 import { aliases } from "./vite";
 
 /** Shared electron-vite config (electron.vite.config.ts). */
-export function createElectronConfig({ root }: { root: string }) {
+export function createElectronConfig({ root, moduleAlias }: { root: string; moduleAlias: string }) {
   return defineConfig({
     main: {
       plugins: [externalizeDepsPlugin()],
       resolve: {
-        alias: aliases(root),
+        alias: aliases(root, moduleAlias),
       },
       build: {
         outDir: "out/main",
@@ -25,7 +25,7 @@ export function createElectronConfig({ root }: { root: string }) {
     preload: {
       plugins: [externalizeDepsPlugin()],
       resolve: {
-        alias: aliases(root),
+        alias: aliases(root, moduleAlias),
       },
       build: {
         outDir: "out/preload",
@@ -52,7 +52,7 @@ export function createElectronConfig({ root }: { root: string }) {
         __IS_DESKTOP__: JSON.stringify(true),
       },
       resolve: {
-        alias: aliases(root),
+        alias: aliases(root, moduleAlias),
       },
     },
   });

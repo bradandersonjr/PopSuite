@@ -1,358 +1,122 @@
-# PopSuite single-install — manual verification checklist
+# PopSuite unified desktop manual verification
 
-The suite build, path resolution, native-module packaging, and argv routing are
-verified headlessly (see the final report). GUI behavior could not be exercised
-from the build agent (launching an Electron GUI there crashes at startup — a
-known environmental issue, not a code bug). Run these checks on a normal Windows
-desktop session after installing `release/PopSuite Setup 1.0.0.exe` (or launching
-`release/win-unpacked/PopSuite.exe`).
+Use a packaged or win-unpacked build. The two public websites are separate Vite
+outputs and are not exercised by this desktop checklist.
 
-Build the package first:
+## Process and window model
 
-```
-npm run package:suite      # from repo root, or: npm run package:win --prefix app
-```
+1. Launch PopSuite once.
 
-## Checklist
+   - Task Manager should show one PopSuite application runtime rather than a
+     launcher plus two module main processes.
+   - Electron will still create helper processes for graphics, networking, and
+     renderers. The current Windows idle baseline is five processes; Electron or
+     Windows updates may shift that slightly.
+   - No PopSuite command line should contain --module=popjot or --module=popkey.
 
-### Unified suite tray (single icon)
+2. Confirm two independent native overlays.
 
-1. **Exactly ONE suite tray icon.**
-   Double-click `PopSuite.exe`. Within a second or two, exactly ONE tray icon
-   appears (PopSuite), NOT one per module. In Task Manager you should see THREE
-   `PopSuite.exe` processes: the resident launcher/tray-owner plus one child per
-   module (popjot, popkey). The launcher no longer exits after spawning — it
-   stays alive to own the tray.
+   - PopJot and PopKey each have their own BrowserWindow and renderer.
+   - Activating PopJot must not focus, resize, reload, or toggle PopKey.
+   - Toggling PopKey must not focus, resize, reload, or dismiss PopJot.
+   - Disabling either tool from the tray must leave the other fully functional.
 
-2. **Menu reflects the new layout once both modules are running.**
-   Left- or right-click the suite tray icon. The menu shows, top to bottom:
-   - a disabled "PopSuite" title, then a separator;
-   - a FLAT checkbox toggle per connected module ("Disable PopJot
-     (Alt+Shift+A)", "Disable PopKey  (Alt+Shift+K)") directly under the title —
-     NOT wrapped in per-module submenus — with a checkmark when active;
-   - "Edit Settings" (submenu / picker) listing ONLY "PopJot Settings" and
-     "PopKey Settings" — NO per-module About entries in the picker anymore;
-   - a single "About PopSuite" item (one product-level About, not one per module);
-   - a separator, then "Launch Preferences" (submenu) containing the single
-     "Open PopSuite at Login" checkbox;
-   - a separator, then "Changelog" and "Documentation";
-   - a separator, then "Quit PopSuite".
-   Modules appear only once they have connected over the pipe; the toggles and
-   the Edit Settings picker update live as modules connect/disconnect, while
-   Launch Preferences / Changelog / Documentation / Quit PopSuite are always
-   present regardless of connected modules.
+3. Confirm PopJot remains resident while enabled.
 
-3. **Toggling from the tray menu activates/deactivates the correct module.**
-   Click "Disable PopJot" — PopJot's shortcuts suspend and its checkbox clears;
-   click again to re-enable. Do the same for PopKey (its visualizer toggles).
-   Confirm toggling one module never affects the other. Toggle a module via its
-   own hotkey instead and re-open the menu: the checkmark/label reflects the new
-   state (state is pushed back to the launcher over the pipe).
+   - Activate momentary drawing, release it, then activate again.
+   - Activate persistent drawing, exit with Escape, then activate again.
+   - The transparent PopJot surface should remain present between activations.
+   - Disabling PopJot hides the surface; re-enabling restores it immediately.
 
-4. **Edit Settings picker opens the correct module's window (Settings only).**
-   From "Edit Settings > PopJot Settings" the PopJot settings window opens; from
-   "Edit Settings > PopKey Settings" the PopKey settings window opens. Both relay
-   over the existing per-module action pipe. The picker no longer contains any
-   "About" entries — those moved out to the single "About PopSuite" item (below).
+4. Confirm taskbar-safe bounds on Windows.
 
-4-About. **Single "About PopSuite" shows the suite's own version.**
-   Click "About PopSuite" (a top-level item, shown ONCE, not per module — it is
-   present even with no module connected). A dialog titled "About PopSuite" with
-   message "PopSuite" appears, whose version line reads the SUITE's own version
-   (from `suite/package.json`, currently 1.0.0) — NOT PopJot's or PopKey's
-   individual version. The detail also names both capabilities as one product
-   (screen-annotation overlay + keystroke visualizer). This is launcher-local: no
-   round-trip to a module, so it works even if a module is not running/connected.
+   - Test the taskbar on the bottom, top, left, and right edges.
+   - Test taskbar auto-hide on and off.
+   - PopJot and PopKey overlays must use the work area and must not alter,
+     discolor, or cover the taskbar.
+   - Moving the taskbar or changing display metrics must realign both overlays.
 
-4a. **Launch Preferences registers PopSuite.exe for login.**
-   Open "Launch Preferences > Open PopSuite at Login" and tick it. Confirm
-   PopSuite (PopSuite.exe with NO `--module` arg) now appears enabled in Windows
-   Settings > Apps > Startup (or Task Manager > Startup apps tab). Untick it and
-   confirm the entry is removed/disabled. Re-open the tray menu each time: the
-   checkbox reflects the current state. Reboot (or sign out/in): PopSuite should
-   auto-launch and bring up both modules when the toggle is on, and NOT launch
-   when off — the state persists across relaunch (it lives in the OS login-items
-   registry, not in app state). This registers the LAUNCHER only; a module's own
-   standalone per-app login toggle is independent and unaffected.
+## Independent interaction behavior
 
-4b. **Changelog / Documentation open the correct URLs.**
-   Click "Changelog" — the default browser opens https://popjot.app/changelog.
-   Click "Documentation" — it opens https://popjot.app/docs. Both are suite-wide
-   (not per-module) and remain available even with no modules connected.
+5. PopJot drawing focus.
 
-5. **Quit PopSuite exits everything.**
-   Click "Quit PopSuite" (formerly "Quit All"; same behavior). Both module
-   processes and the launcher/tray-owner exit; the tray icon disappears and no
-   `PopSuite.exe` processes remain in Task Manager.
+   - With PopKey enabled, hold the PopJot momentary shortcut and draw.
+   - The radial menu opens at the cursor and the stroke remains responsive.
+   - Release the shortcut and confirm PopJot returns to click-through mode.
+   - Repeat in persistent mode and confirm Escape exits only PopJot.
 
-6. **Launcher death → each module falls back to its own tray (graceful
-   degradation).**
-   With all three processes running, end the LAUNCHER `PopSuite.exe` process in
-   Task Manager (the one with no `--module` arg / lowest memory, owning the tray).
-   The suite tray icon disappears, and within a moment EACH module re-creates its
-   OWN local tray icon (two icons appear). Right-click them — the classic
-   per-module menus are back. No module is ever left without a tray.
+6. PopKey visualization.
 
-7. **Starting a module directly (bypassing the launcher) still shows its own
-   tray.**
-   Run `PopSuite.exe --module=popjot` from a terminal (no launcher running).
-   Because the pipe is unavailable, PopJot immediately falls back to its own tray
-   icon and behaves exactly like standalone PopJot. Same for `--module=popkey`.
+   - With PopJot idle, type keys, click, scroll, and drag.
+   - PopKey badges and indicators should behave exactly as before.
+   - Toggle PopKey off and on with its shortcut and with the tray item.
 
-8. **Standalone PopJot.exe / PopKey.exe are unaffected (redesign regression).**
-   The standalone builds still create their own independent tray icons and menus
-   exactly as before — the unified tray is suite-only (`tray.mode: "reported"` is
-   passed only by the suite module entries; standalone omits it, defaulting to
-   "owned"). The new unified-menu layout (flat toggles / Edit Settings picker /
-   About PopSuite / Launch Preferences / Changelog / Documentation / Quit
-   PopSuite) lives entirely in the launcher; the standalone per-app menu
-   (Enable/Disable, Settings, About, Quit <App>) and each app's own per-app
-   login-at-startup toggle in its settings window are untouched by this change.
-   In particular, standalone PopJot.exe's "About" and standalone PopKey.exe's
-   "About" each STILL show their OWN per-app dialog with their OWN module version
-   and their own `aboutDetail` copy — the per-module About was only removed from
-   the SUITE's unified picker, not from the standalone trays (which build their
-   menu via a separate code path, `createTray`/`buildTrayMenu` in createPopApp).
+7. PopJot suppression of PopKey.
 
-### PopJot annotation auto-hides PopKey (suite-only)
+   - Enable PopKey, then activate PopJot drawing.
+   - PopKey content should hide while PopJot is active.
+   - End PopJot and confirm PopKey restores to the previously requested state.
+   - While suppressed, toggle PopKey; it must remain hidden until PopJot ends,
+     then honor the new requested state.
 
-A1. **Annotating PopJot auto-hides PopKey.**
-   With BOTH modules running under the launcher and PopKey's visualizer ON,
-   activate PopJot (Alt+Shift+A) and start drawing. PopKey's visualizer overlay
-   should disappear the moment PopJot becomes active (key/click badges stop
-   showing). This is driven over the suite pipe — PopJot's main process reports
-   "annotating" up to the launcher, which relays a suppress command to PopKey.
+8. Spotlight and shared native input hook.
 
-A2. **Stopping annotation restores PopKey to its prior state.**
-   Dismiss PopJot's overlay (Escape / click away, so annotation ends). PopKey's
-   visualizer reappears in whatever state it was before (ON if it was ON). If you
-   had PopKey OFF before PopJot activated, it stays OFF — it restores to your last
-   requested state, not blindly to ON.
+   - Enable PopKey and confirm key/click visualization works.
+   - Toggle PopJot Spotlight and resize the spotlight with the mouse wheel.
+   - Exit Spotlight.
+   - Immediately type, click, scroll, and drag again.
+   - PopKey input capture must still work; exiting Spotlight must not stop the
+     shared native hook.
 
-A3. **PopJot always wins: toggling PopKey while PopJot is active does not show
-   it, but is honored afterward.**
-   While PopJot is actively annotating (PopKey auto-hidden), press PopKey's hotkey
-   (Alt+Shift+K) or click its tray toggle. PopKey must STAY hidden (PopJot wins).
-   Then end PopJot's annotation: PopKey should now reflect that toggle — i.e. if
-   it was ON and you toggled once while suppressed, it comes back OFF; toggle
-   again while suppressed and it comes back ON. The LATEST request wins; requests
-   are never silently dropped.
+## Tray and settings
 
-A4. **Tray shows the auto-hidden state.**
-   While PopKey is auto-hidden by PopJot, open the suite tray menu: PopKey's entry
-   is suffixed "(auto-hidden)". Its checkbox still reflects your requested state
-   (checked if you last asked for it ON). The suffix clears once PopJot stops.
+9. Unified tray.
 
-A5. **Killing the launcher mid-suppression un-sticks PopKey.**
-   With PopJot annotating and PopKey auto-hidden, end the LAUNCHER `PopSuite.exe`
-   process in Task Manager. PopKey must NOT stay stuck hidden: it falls back to
-   its own local tray (per check 6) AND clears the auto-suppression, returning to
-   normal manual control (visualizer restores to your last requested state, hotkey
-   toggles work immediately).
+   - Exactly one PopSuite tray icon appears.
+   - PopJot and PopKey each have independent enabled state and shortcut hints.
+   - About, documentation, changelog, update, open-at-login, and Quit work.
 
-A6. **Standalone PopJot.exe + PopKey.exe side-by-side do NOT interact
-   (regression / out-of-scope check).**
-   Launch the STANDALONE `PopJot.exe` and `PopKey.exe` (not via the suite
-   launcher) at the same time. Annotate with PopJot: PopKey's visualizer must be
-   COMPLETELY UNAFFECTED (stays visible, keeps showing keys/clicks). The auto-hide
-   feature is gated entirely behind the suite pipe, so it must not engage for
-   standalone apps. Same when running a module directly via `--module=` with no
-   launcher.
+10. Unified settings shell.
 
-### Regression checks (unchanged behavior)
+    - Open Settings and switch repeatedly between PopJot and PopKey.
+    - Task Manager should add one Settings renderer only (six total with the
+      current five-process idle baseline). Tab changes reuse that renderer.
+    - A PopJot setting must update only PopJot unless that setting is explicitly
+      opted into cross-tool sync. Repeat in the other direction.
+    - Shortcut changes must update the correct module and tray hint.
+    - Close Settings and confirm the process count returns to the idle baseline.
+    - Reopen Settings; persisted values should remain correct.
 
-9. **PopJot annotation activation / focus works with PopKey running (CRITICAL
-   REGRESSION TEST).**
-   With BOTH modules running, press PopJot's activate hotkey (Alt+Shift+A).
-   The radial menu should appear and STAY active — draw a stroke, confirm the
-   overlay holds focus and does not collapse on blur. This is the exact failure
-   mode of the abandoned single-process merge; because each module now has its
-   own process with exactly one overlay window, it must behave identically to
-   standalone PopJot. Also test persistent mode (Alt+Shift+S).
+11. Renderer/session isolation.
 
-10. **Killing one module leaves the other running.**
-   In Task Manager, end one module `PopSuite.exe` process. The other module keeps
-   running normally, and the suite tray menu drops the killed module's toggle
-   while keeping the surviving one (the pipe disconnect updates the menu live).
+    - Reload or inspect one overlay during development.
+    - The other overlay must remain loaded and responsive.
+    - Clipboard, license, settings, and shortcut IPC from the selected panel must
+      never resolve against the other module's namespace.
 
-11. **Settings sync still flows between modules.**
-   In one app's Settings > Sync tab, enable a synced key (e.g. a shared style or
-   branding value) and change it. Confirm the sibling app picks up the change
-   live. Both modules read/write `~/.popsuite/<app>.json` and
-   `~/.popsuite/shared.json` (under your home dir, NOT userData), so per-module
-   userData isolation does not affect sync.
+## Lifecycle
 
-12. **Single-instance behavior on relaunch.**
-   With everything running, double-click `PopSuite.exe` again. The launcher's own
-   single-instance lock (under `%APPDATA%/PopSuite`, distinct from the modules'
-   `.../modules/<module>` locks) routes the relaunch to the running launcher's
-   second-instance handler, which re-spawns modules. Each module's own lock then
-   causes the freshly spawned child to lose the lock and quit cleanly, and the
-   running module handles its own second-instance event (PopJot focuses its
-   overlay; PopKey opens its settings). You should NOT get a duplicate suite tray
-   icon or duplicate processes.
+12. Launch PopSuite a second time.
 
-13. **PopKey input capture works; PopJot never loads the native hook.**
-   Confirm PopKey visualizes keystrokes/clicks (uiohook-napi is unpacked at
-   `resources/app.asar.unpacked/.../win32-x64/uiohook-napi.node`). The PopJot
-   module process must NOT load uiohook — its bundle contains zero references to
-   it (verified at build time).
+    - No duplicate runtime or tray icon should remain.
+    - The existing Settings window should open and focus.
 
-### PopJot spotlight presenter mode
+13. Quit PopSuite.
 
-Spotlight dims the whole screen except a soft circle that follows the cursor —
-a presentation aid like snapshot mode, with NO drawing while it is active. It is
-a PopJot-internal mode (the unified suite tray is untouched). Cursor position is
-polled in PopJot's main process (~60Hz) and pushed to the overlay while spotlight
-is active — the overlay stays click-through, so it never enables `{ forward: true }`
-(which the shared shell warns intercepts Huion-stylus synthetic clicks).
+    - Both overlays, the native input hook, helper processes, Settings window,
+      and tray icon should exit together.
+    - Relaunch and confirm both module settings remain intact.
 
-14. **Shortcut toggles spotlight on and off.**
-   With PopJot running, press `Alt+Shift+D` (`Cmd+Shift+D` on macOS). The screen
-   dims to a black overlay with a bright circle at the cursor. Press it again —
-   the dim clears completely. Confirm the chord does NOT collide with the main
-   (`Alt+Shift+A`), persistent (`Alt+Shift+S`), or PopKey (`Alt+Shift+K`)
-   shortcuts: those still work independently.
+14. Update/install path.
 
-15. **Circle follows the cursor smoothly.**
-   With spotlight on, move the mouse around. The transparent circle tracks the
-   cursor across the whole display with no visible stutter or React re-render lag.
-   Move to a second monitor: the overlay follows to whichever display the cursor
-   was on when spotlight was toggled (it covers one display, like the other modes).
+    - A downloaded update should quit the unified runtime once and restart one
+      PopSuite instance.
+    - Open-at-login should register PopSuite without module arguments.
 
-16. **Clicks pass through to the apps underneath.**
-   With spotlight on, click a button in the app below (e.g. switch browser tabs,
-   click a taskbar item). The click lands on that app — spotlight never steals it.
-   This is the core presenter requirement: keep presenting/clicking while dimmed.
+## Website independence
 
-17. **Escape exits spotlight.**
-   With spotlight on, press `Escape`. The dim clears. Confirm this does NOT
-   interfere with persistent drawing mode's own Escape (test #9 above).
+15. Build the two websites from the repository root.
 
-18. **Annotation shortcut while spotlighted force-exits spotlight (CRITICAL).**
-   Turn spotlight ON, then press PopJot's activate hotkey (`Alt+Shift+A`) or
-   persistent (`Alt+Shift+S`). Spotlight must instantly clear AND annotation must
-   activate normally — the radial menu appears and holds focus, drawing works.
-   Conversely, pressing the spotlight shortcut WHILE annotating is a no-op
-   (ignored). Spotlight must never break the focus-sensitive annotation state
-   machine: draw a stroke afterward to confirm the overlay still holds focus.
-
-19. **Settings sliders live-update the effect.**
-   Open PopJot Settings > Behavior > Spotlight. With spotlight active on screen,
-   drag the Dim slider (0-100%) and Radius slider (80-400px), and toggle Soft edge
-   on/off. Each change updates the on-screen effect immediately. Rebind the
-   spotlight shortcut with the shortcut widget and confirm the new chord toggles it.
-
-20. **PopKey stays visible during spotlight (no suppression).**
-   With BOTH modules running and PopKey visualizing keys, turn spotlight ON.
-   PopKey's key/click visualizer must REMAIN visible — spotlight is not annotating,
-   so it must NOT report `annotating=true` up the suite pipe and must NOT trigger
-   PopKey auto-hide (contrast with real annotation in test #9, which does hide it).
-
-### One launcher-owned settings window (suite settings tabs)
-
-In the suite there is ONE settings window, owned by the launcher, with a tab per
-module ("PopJot | PopKey"). Each tab hosts that module's REAL settings renderer
-in a WebContentsView; its IPC is tunnelled over the suite pipe to the owning
-module process, so the UI is fully functional even though the window belongs to
-the launcher. These checks require a PACKAGED/installed suite (the launcher only
-exists in the built suite; in `dev` the modules run standalone with their own
-windows). Install from `release/PopSuite Setup 1.0.0.exe`.
-
-21. **Edit Settings opens one window with instant tabs.**
-   With both modules running under the launcher, right-click the suite tray icon
-   and choose Edit Settings > PopJot (Open) Settings. ONE frameless window opens
-   with a "PopJot | PopKey" tab strip at the top, PopJot's tab active. Choose Edit
-   Settings > PopKey Settings from the tray — the SAME window comes forward with
-   the PopKey tab selected (no second window is ever created).
-
-22. **Each tab is that module's real, fully-functional settings UI.**
-   On the PopJot tab, change a setting (e.g. a palette/toggle) and confirm the
-   overlay reflects it and the value persists (reopen to confirm). Rebind a
-   shortcut and confirm the new chord works. Do the same on the PopKey tab. Each
-   tab drives its OWN module process (they have separate settings files) — a change
-   on one tab must NOT alter the other module.
-
-23. **Switching tabs preserves in-progress state (no reload).**
-   On the PopJot tab, scroll partway down and start editing a field (e.g. focus the
-   license input and type a few characters WITHOUT saving). Click the PopKey tab,
-   then click back to PopJot. The scroll position and the half-typed field are
-   exactly as you left them — switching shows/hides the views, it never reloads or
-   navigates them.
-
-24. **Killing a module while its tab is open shows a graceful placeholder.**
-   With the settings window open on the PopKey tab, end the PopKey child
-   `PopSuite.exe` process (Task Manager) or use its Quit. The PopKey tab's content
-   is replaced by a centered "PopKey isn't running" placeholder (not a blank or
-   broken view), and its tab is dimmed with "(off)". Click the PopJot tab — it
-   still works normally. Re-spawn PopKey (double-click the tray icon); its tab
-   re-enables and its real settings UI returns.
-
-25. **Standalone module (no launcher) still gets its own local settings window.**
-   Launch a standalone `PopJot.exe` (or `PopSuite.exe --module=popjot` with no
-   launcher running). Its tray's Settings item opens the module's OWN local
-   settings window exactly as before — no launcher window, no tabs, pixel-identical
-   to the pre-suite behavior. Same for PopKey standalone.
-
-26. **Reopening after closing the settings window works.**
-   Close the launcher settings window (Done / window close). Choose Edit Settings
-   again from the tray — the window reopens with both tabs functional and current
-   values. Repeat a couple of times to confirm no stale/dead views.
-
-## Notes
-
-- **Unified tray architecture.** The launcher (`PopSuite.exe` with no `--module`
-  arg) is now a resident tray-owner: it creates the single suite tray icon,
-  listens on a local named pipe (`\\.\pipe\popsuite-tray` on Windows), spawns the
-  module children, and builds one dynamic menu from whichever modules have
-  connected. It owns no overlay/settings windows and never touches a module's
-  window/focus/overlay behavior — it only relays menu clicks over the pipe.
-- **Reported vs owned tray.** Each suite module runs in `tray.mode: "reported"`:
-  it skips creating its own OS tray and instead reports state (name, active,
-  shortcut hints, actions) to the launcher. Standalone PopJot.exe/PopKey.exe use
-  the default `"owned"` mode and are unchanged.
-- **Resilience / graceful degradation.** If the launcher pipe is unreachable at
-  connect time (module started standalone via `--module`, or launcher not
-  running) OR the connection later drops (launcher killed/crashed), the module
-  automatically falls back to creating its OWN local tray icon — so a module is
-  never left without a tray. This is the same code path the standalone apps use.
-- Per-module userData lives at `%APPDATA%/PopSuite/modules/popjot` and
-  `.../modules/popkey`. Delete these to reset a module's local state; the shared
-  sync files under `~/.popsuite` are separate. The launcher's own single-instance
-  lock lives at `%APPDATA%/PopSuite` (no `modules/` segment).
-- Licensing is untouched: both modules use the `suite` Pro product and the same
-  offline license layer as the standalone apps.
-- **PopJot annotation auto-hide (suite-only).** PopJot's main process reports its
-  annotating on/off transitions (surfaced from the existing renderer
-  `overlay-activated` / `overlay-deactivated` IPC — RadialMenu's activation logic
-  is untouched) up the unified-tray pipe. The launcher relays a `suppress` message
-  to PopKey, which runs a pure state reducer (`suiteSuppression.ts`): while
-  suppressed it force-hides its overlay (absolute `set-app-enabled`, not a toggle)
-  and defers manual toggles, restoring the user's last requested state when PopJot
-  stops. It is gated entirely behind the suite pipe — outside the suite (standalone
-  or `--module=` with no launcher) no suppression ever engages, and if the pipe
-  drops mid-suppression the fallback to a local tray also clears the suppression so
-  PopKey can never get stuck hidden.
-- **Launcher-owned settings window (suite-only "one window").** The launcher
-  creates ONE `BaseWindow` (`app/src/main/suiteSettingsWindow.ts`) holding a thin
-  tab-strip `WebContentsView` (its own `tabStrip.html`, no module bundle) plus one
-  settings `WebContentsView` per module, each loading that module's REAL renderer
-  (`out/renderer/<id>/index.html?settings=1`) resolved via the same layout paths
-  `moduleRuntime` uses. Tab switching only re-lays-out the views (attach/detach) —
-  never reload — so scroll/form state survive. A disconnected module's tab shows a
-  placeholder view instead of a blank one.
-  - **IPC relay (why the hosted UI works cross-process).** A hosted view's renderer
-    runs in the LAUNCHER process, so its IPC can't reach the owning module directly.
-    A launcher-only preload (`hostedPreload.ts`) patches `ipcRenderer` into a
-    forwarding transport, then requires the module's OWN unchanged preload so its
-    real `electronAPI` is rebuilt on top. Every send/invoke is tunnelled over the
-    suite pipe (`relaySend`/`relayInvoke`) to the module, answered from the module's
-    real handlers (`suiteSettingsRelay.ts`; `ipcMain.emit` for sends, a captured
-    handler map for invokes), and the module's main→renderer pushes are streamed
-    back (`relayPush`). None of the shared settings/preload/renderer code or the
-    standalone/web paths are modified — the relay is additive and engaged only while
-    the launcher hosts a module's tab.
-  - **Standalone fallback.** A module that isn't suite-connected never hosts: it
-    creates its own local settings window exactly as before (mirrors the existing
-    owned/reported tray fallback). The launcher opens the window itself and never
-    relays a settings action to a module, so the two paths can't both fire.
+    - PopJot and PopKey produce separate dist directories.
+    - Neither site imports Electron-only runtime code.
+    - Desktop IPC/session changes must not alter either public site.

@@ -1,11 +1,11 @@
 import { TooltipProvider } from "@shared/components/ui/tooltip";
-import { useStore } from "@/store/useStore";
+import { useStore } from "@popkey/store/useStore";
 import { useScaleSync } from "@shared/hooks/useScaleSync";
-import { useTraySettingsSync } from "@/hooks/useTraySettingsSync";
-import { useLicenseSync } from "@/hooks/useLicenseSync";
-import EngineShell from "@/engine/EngineShell";
-import SystemTray from "@/components/SystemTray";
-import { isSettingsWindow } from "@/lib/platform";
+import { useTraySettingsSync } from "@popkey/hooks/useTraySettingsSync";
+import { useLicenseSync } from "@popkey/hooks/useLicenseSync";
+import EngineShell from "@popkey/engine/EngineShell";
+import SystemTray from "@popkey/components/SystemTray";
+import { isSettingsWindow } from "@popkey/lib/platform";
 import { getSurfacePalette } from "@shared/config/desktopTheme";
 
 const DesktopRoot = () => {

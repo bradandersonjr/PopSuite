@@ -1,7 +1,7 @@
-import { useStore } from "@/store/useStore";
-import { isDesktop } from "@/lib/platform";
-import { getBadgeGradientStops, resolvePaletteColors } from "@/config/themes";
-import { fontStackFor } from "@/config/fonts";
+import { useStore } from "@popkey/store/useStore";
+import { isDesktop } from "@popkey/lib/platform";
+import { getBadgeGradientStops, resolvePaletteColors } from "@popkey/config/themes";
+import { fontStackFor } from "@popkey/config/fonts";
 
 function withAlpha(color: string, alpha: number): string {
   const clamped = Math.max(0, Math.min(1, alpha));

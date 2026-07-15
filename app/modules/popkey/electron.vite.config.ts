@@ -1,3 +1,3 @@
 import { createElectronConfig } from "../../../shared/config/electron-vite";
 
-export default createElectronConfig({ root: __dirname });
+export default createElectronConfig({ root: __dirname, moduleAlias: "@popkey" });

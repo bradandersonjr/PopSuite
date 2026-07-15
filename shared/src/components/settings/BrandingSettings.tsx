@@ -21,6 +21,8 @@ export function BrandingSettings({
   image,
   corner,
   size,
+  offsetX,
+  offsetY,
   opacity,
   radius,
   grayscale,
@@ -28,6 +30,8 @@ export function BrandingSettings({
   onImage,
   onCorner,
   onSize,
+  onOffsetX,
+  onOffsetY,
   onOpacity,
   onRadius,
   onGrayscale,
@@ -36,6 +40,8 @@ export function BrandingSettings({
   image: string;
   corner: BrandingCorner;
   size: number;
+  offsetX: number;
+  offsetY: number;
   opacity: number;
   radius: number;
   grayscale: boolean;
@@ -43,6 +49,8 @@ export function BrandingSettings({
   onImage: (dataUrl: string) => void;
   onCorner: (c: BrandingCorner) => void;
   onSize: (px: number) => void;
+  onOffsetX: (v: number) => void;
+  onOffsetY: (v: number) => void;
   onOpacity: (v: number) => void;
   onRadius: (v: number) => void;
   onGrayscale: (v: boolean) => void;
@@ -126,6 +134,14 @@ export function BrandingSettings({
           <div className="rounded-[12px] px-3 py-2" style={{ backgroundColor: palette.card }}>
             <div className="mb-1 text-xs font-medium" style={{ color: palette.text }}>Size</div>
             <SliderRow value={size} min={32} max={240} step={4} onChange={onSize} valueSuffix="px" defaultValue={80} />
+          </div>
+          <div className="rounded-[12px] px-3 py-2" style={{ backgroundColor: palette.card }}>
+            <div className="mb-1 text-xs font-medium" style={{ color: palette.text }}>Horizontal Offset</div>
+            <SliderRow value={offsetX} min={-200} max={200} step={4} onChange={onOffsetX} valueSuffix="px" defaultValue={0} />
+          </div>
+          <div className="rounded-[12px] px-3 py-2" style={{ backgroundColor: palette.card }}>
+            <div className="mb-1 text-xs font-medium" style={{ color: palette.text }}>Vertical Offset</div>
+            <SliderRow value={offsetY} min={-200} max={200} step={4} onChange={onOffsetY} valueSuffix="px" defaultValue={0} />
           </div>
           <div className="rounded-[12px] px-3 py-2" style={{ backgroundColor: palette.card }}>
             <div className="mb-1 text-xs font-medium" style={{ color: palette.text }}>Opacity</div>

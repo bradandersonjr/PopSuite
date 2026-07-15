@@ -2,13 +2,13 @@ import { useCallback, useRef } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
 import { getSurfacePalette } from "@shared/config/desktopTheme";
 import { SliderRow } from "@shared/components/settings";
-import { useStore } from "@/store/useStore";
-import { sendBrandingEnabled, sendBrandingImage, sendBrandingScale } from "@/lib/platform";
+import { useStore } from "@popjot/store/useStore";
+import { sendBrandingEnabled, sendBrandingImage, sendBrandingScale } from "@popjot/lib/platform";
 
 /**
  * Branding logo for PopJot — replaces the radial menu's center shape with a
  * custom image. Styled to match PopKey's branding picker (thumbnail + choose +
- * size slider). Stored in settings (not the @/pro stub) so it renders in every
+ * size slider). Stored in settings (not the @popjot/pro stub) so it renders in every
  * build; setting a logo enables branding (and syncs that on/off with PopKey),
  * clearing it disables branding. Rendering is still gated on Pro in RadialMenu.
  */

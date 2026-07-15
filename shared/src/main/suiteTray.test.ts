@@ -5,6 +5,7 @@ import {
   decodeFrames,
   SUITE_CHANGELOG_URL,
   SUITE_DOCS_URL,
+  SUITE_PRESET_DEFAULT_ID,
   type SuiteModuleState,
   type SuiteTrayHandlers,
   type SuiteTrayMenuOptions,
@@ -31,12 +32,14 @@ function noopHandlers(): SuiteTrayHandlers {
   return {
     onToggle: vi.fn(),
     onAction: vi.fn(),
+    onToggleExtra: vi.fn(),
     onOpenAtLoginToggle: vi.fn(),
     onOpenLink: vi.fn(),
     onAbout: vi.fn(),
     onCheckForUpdates: vi.fn(),
     onInstallUpdate: vi.fn(),
     onQuitAll: vi.fn(),
+    onApplyPreset: vi.fn(),
   };
 }
 
@@ -102,6 +105,46 @@ describe("buildSuiteTrayMenu", () => {
     expect(menu[2].label).toContain("PopJot");
     expect(menu[3].type).toBe("checkbox");
     expect(menu[3].label).toContain("PopKey");
+  });
+
+  it("renders a module's extra toggles right after its own Enable/Disable checkbox", () => {
+    const menu = buildSuiteTrayMenu(
+      [
+        makeModule({
+          appName: "PopKey",
+          extraToggles: [{ id: "obsMode", label: "OBS Mode", checked: false }],
+        }),
+      ],
+      noopHandlers(),
+      opts()
+    );
+    const toggleIndex = menu.findIndex((i) => i.type === "checkbox" && i.label?.includes("PopKey"));
+    const extra = menu[toggleIndex + 1];
+    expect(extra.type).toBe("checkbox");
+    expect(extra.label).toBe("OBS Mode");
+    expect(extra.checked).toBe(false);
+  });
+
+  it("wires an extra toggle's click to onToggleExtra with the module and toggle id", () => {
+    const handlers = noopHandlers();
+    const menu = buildSuiteTrayMenu(
+      [
+        makeModule({
+          appName: "PopKey",
+          extraToggles: [{ id: "obsMode", label: "OBS Mode", checked: true }],
+        }),
+      ],
+      handlers,
+      opts()
+    );
+    const extra = menu.find((i) => i.label === "OBS Mode")!;
+    extra.click!();
+    expect(handlers.onToggleExtra).toHaveBeenCalledWith("PopKey", "obsMode");
+  });
+
+  it("omits extra toggles entirely when a module reports none", () => {
+    const menu = buildSuiteTrayMenu([makeModule({ appName: "PopKey" })], noopHandlers(), opts());
+    expect(menu.find((i) => i.label === "OBS Mode")).toBeUndefined();
   });
 
   it("shows a single Settings item when any module offers settings", () => {
@@ -195,11 +238,11 @@ describe("buildSuiteTrayMenu", () => {
 
     menu.find((i) => i.label === "Changelog")!.click!();
     expect(handlers.onOpenLink).toHaveBeenCalledWith(SUITE_CHANGELOG_URL);
-    expect(SUITE_CHANGELOG_URL).toBe("https://popjot.app/changelog");
+    expect(SUITE_CHANGELOG_URL).toBe("https://popsuite.app/changelog");
 
     menu.find((i) => i.label === "Documentation")!.click!();
     expect(handlers.onOpenLink).toHaveBeenCalledWith(SUITE_DOCS_URL);
-    expect(SUITE_DOCS_URL).toBe("https://popjot.app/docs");
+    expect(SUITE_DOCS_URL).toBe("https://popsuite.app/docs");
   });
 
   it("wires toggle and Quit PopSuite clicks to the handlers", () => {
@@ -245,6 +288,88 @@ describe("buildSuiteTrayMenu", () => {
     expect(menu.some((i) => i.type === "checkbox")).toBe(false);
     const heading = menu.find((i) => i.label === "PopJot");
     expect(heading?.enabled).toBe(false);
+  });
+
+  describe("Situational Presets (Pro)", () => {
+    it("omits the Presets submenu entirely for non-Pro users", () => {
+      const menu = buildSuiteTrayMenu(
+        [makeModule()],
+        noopHandlers(),
+        opts({ presets: { isPro: false, saved: [{ id: "a", name: "Fusion" }] } })
+      );
+      expect(menu.some((i) => i.label === "Presets")).toBe(false);
+    });
+
+    it("shows a Presets submenu with only Default when no presets are saved", () => {
+      const menu = buildSuiteTrayMenu(
+        [makeModule()],
+        noopHandlers(),
+        opts({ presets: { isPro: true, saved: [] } })
+      );
+      const presets = menu.find((i) => i.label === "Presets");
+      expect(presets?.submenu?.map((i) => i.label ?? `<${i.type}>`)).toEqual([
+        "Default",
+      ]);
+    });
+
+    it("lists Default then a separator then each saved preset", () => {
+      const menu = buildSuiteTrayMenu(
+        [makeModule()],
+        noopHandlers(),
+        opts({
+          presets: {
+            isPro: true,
+            saved: [
+              { id: "a", name: "Fusion" },
+              { id: "b", name: "Recording" },
+            ],
+          },
+        })
+      );
+      const presets = menu.find((i) => i.label === "Presets");
+      expect(presets?.submenu?.map((i) => i.label ?? `<${i.type}>`)).toEqual([
+        "Default",
+        "<separator>",
+        "Fusion",
+        "Recording",
+      ]);
+    });
+
+    it("appears directly after About PopSuite", () => {
+      const menu = buildSuiteTrayMenu(
+        [makeModule()],
+        noopHandlers(),
+        opts({ presets: { isPro: true, saved: [] } })
+      );
+      const aboutIdx = menu.findIndex((i) => i.label === "About PopSuite");
+      // About, then a separator, then the Presets submenu.
+      expect(menu[aboutIdx + 1]?.type).toBe("separator");
+      expect(menu[aboutIdx + 2]?.label).toBe("Presets");
+    });
+
+    it("wires Default to onApplyPreset with the default sentinel", () => {
+      const handlers = noopHandlers();
+      const menu = buildSuiteTrayMenu(
+        [makeModule()],
+        handlers,
+        opts({ presets: { isPro: true, saved: [] } })
+      );
+      const presets = menu.find((i) => i.label === "Presets");
+      presets?.submenu?.find((i) => i.label === "Default")?.click?.();
+      expect(handlers.onApplyPreset).toHaveBeenCalledWith(SUITE_PRESET_DEFAULT_ID);
+    });
+
+    it("wires a saved preset to onApplyPreset with its id", () => {
+      const handlers = noopHandlers();
+      const menu = buildSuiteTrayMenu(
+        [makeModule()],
+        handlers,
+        opts({ presets: { isPro: true, saved: [{ id: "xyz", name: "Fusion" }] } })
+      );
+      const presets = menu.find((i) => i.label === "Presets");
+      presets?.submenu?.find((i) => i.label === "Fusion")?.click?.();
+      expect(handlers.onApplyPreset).toHaveBeenCalledWith("xyz");
+    });
   });
 });
 

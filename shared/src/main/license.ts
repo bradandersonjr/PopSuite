@@ -163,15 +163,17 @@ export function createLicenseController(
  */
 export function registerLicenseIpc(
   controller: LicenseController,
-  sendToRenderers: (channel: string, value: unknown) => void
+  sendToRenderers: (channel: string, value: unknown) => void,
+  ipcNamespace = ""
 ): void {
-  ipcMain.handle("license:status", () => controller.status());
-  ipcMain.handle("license:activate", (_event, key: string) => {
+  const channel = (name: string) => ipcNamespace ? ipcNamespace + ":" + name : name;
+  ipcMain.handle(channel("license:status"), () => controller.status());
+  ipcMain.handle(channel("license:activate"), (_event, key: string) => {
     const next = controller.activate(key);
     sendToRenderers("license-changed", next);
     return next;
   });
-  ipcMain.handle("license:deactivate", () => {
+  ipcMain.handle(channel("license:deactivate"), () => {
     const next = controller.deactivate();
     sendToRenderers("license-changed", next);
     return next;

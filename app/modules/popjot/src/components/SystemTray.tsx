@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { isValidElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { activateLicense, deactivateLicense } from "@shared/license/renderer";
-import CustomPaletteSettings from "@/components/pro/CustomPaletteSettings";
-import CenterCircleSettings from "@/components/pro/CenterCircleSettings";
-import { DEFAULT_SPOTLIGHT_FEATHER_PCT } from "@/lib/spotlight";
+import CenterCircleSettings from "@popjot/components/pro/CenterCircleSettings";
+import PalettePiePreview from "@popjot/components/PalettePiePreview";
+import { DEFAULT_SPOTLIGHT_FEATHER_PCT } from "@popjot/lib/spotlight";
 
 /** Ko-fi product page where buyers get a PopJot Pro key. */
 const POPJOT_PRO_URL = "https://ko-fi.com/s/264fd0031f";
@@ -23,13 +23,13 @@ import {
   sendTextColor,
   sendButtonRoundness,
   sendMenuTranslucency,
-  sendSolidColor,
   sendScaleMultiplier,
   sendThemeMode,
   setMainShortcut,
   setPersistentShortcut,
   setSpotlightShortcut,
-} from "@/lib/platform";
+  setLastToolShortcut,
+} from "@popjot/lib/platform";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +44,7 @@ import {
   OptionGrid,
   SettingGroup,
   SettingsColumns,
+  SettingsSection,
   SettingsUIProvider,
   SettingsWindowFrame,
   EmbeddedSettingsPanel,
@@ -58,7 +59,7 @@ import {
   useShortcutRecorder,
 } from "@shared/components/settings";
 import { SubMenuSection } from "@shared/components/settings/dropdown";
-import { LogOut, Settings } from "lucide-react";
+import { LogOut, Lock, Settings } from "lucide-react";
 import {
   AnimationIntensity,
   ColorPalette,
@@ -69,11 +70,12 @@ import {
   TextColor,
   ThemeMode,
   useStore,
-} from "@/store/useStore";
-import { settingsSchema } from "@/config/settingsSchema";
-import { getEffectiveColors, getProPalette } from "@/pro";
+} from "@popjot/store/useStore";
+import { settingsSchema } from "@popjot/config/settingsSchema";
+import { getEffectiveColors, getProPalette, setProPalette, setProPaletteActive } from "@popjot/pro";
+import { ColorMixerPopover } from "@shared/components/settings";
 import { getMenuColors, getSurfacePalette, PRO_ACCENT, type SurfacePalette } from "@shared/config/desktopTheme";
-import { getColors, getHighlighterGradientStops, PALETTE_NAMES } from "@/config/themes";
+import { getColors, getGradientVariantStops, getHighlighterGradientStops, PALETTE_NAMES } from "@popjot/config/themes";
 import { isMac } from "@shared/lib/hotkeys";
 
 
@@ -83,7 +85,6 @@ interface MenuStylePickerProps {
   surfacePalette: SurfacePalette;
   themeMode: ThemeMode;
   colorPalette: ColorPalette;
-  solidColor: string;
   textColor: TextColor;
   glowIntensity: number;
   buttonRoundness: number;
@@ -95,14 +96,14 @@ const MenuStylePicker = ({
   surfacePalette,
   themeMode,
   colorPalette,
-  solidColor,
   textColor,
   glowIntensity,
   buttonRoundness,
 }: MenuStylePickerProps) => {
   const isDark = themeMode === "dark";
-  // Reflect the live palette/solid color so the preview matches the real menu.
-  const color = colorPalette === "solid" ? solidColor : getEffectiveColors(colorPalette).draw[0];
+  // Reflect the live palette color (Custom sources from the Pro palette) so the
+  // preview matches the real menu.
+  const color = getEffectiveColors(colorPalette).draw[0];
   const stops = getHighlighterGradientStops(color);
   const textOverride = textColor === "white" ? "#ffffff" : textColor === "black" ? "#111111" : null;
   const popBorder = isDark ? "#111111" : "#f5f5f5";
@@ -182,12 +183,48 @@ const MenuStylePicker = ({
   );
 };
 
+/**
+ * Suite-composed rendering: the suite settings window owns the section
+ * navigation and asks this component for one section's content at a time.
+ * `undefined` = not in suite mode; `null` = suite mode with this module's
+ * content hidden (hooks stay mounted so state/IPC stay live); an object
+ * selects a section by title, optionally omitting items by their JSX key.
+ */
+export type SuiteSectionRequest = { title: string; omitKeys?: string[] } | null;
+
 type SystemTrayProps = {
   settingsWindowMode?: boolean;
   embedded?: boolean;
+  unifiedSettingsMode?: boolean;
+  suiteSection?: SuiteSectionRequest;
+  /** Web-demo override: record real hotkeys into the store even off desktop. */
+  demoShortcuts?: boolean;
+  /**
+   * Module-fixed shortcut read for the suite Settings window, which mounts
+   * BOTH modules' panels at once against a single mutable-`activeId` bridge
+   * (see app/src/main/suiteSettings/preload.ts). Without this, the ambient
+   * getShortcuts() below would resolve through whichever module happens to be
+   * "active" at mount time, so the non-active panel would read the OTHER
+   * module's shortcuts. Standalone builds omit it and use the module's own
+   * (already correctly namespaced) getShortcuts().
+   */
+  getShortcutsOverride?: () => Promise<{ main: string; persistent: string; spotlight: string; lastTool: string }>;
 };
 
-const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTrayProps) => {
+const SystemTray = ({
+  settingsWindowMode = false,
+  embedded = false,
+  unifiedSettingsMode = false,
+  suiteSection,
+  demoShortcuts = false,
+  getShortcutsOverride,
+}: SystemTrayProps) => {
+  /** Which ring the center pie preview is showing. */
+  const [pieMode, setPieMode] = useState<"draw" | "highlighter">("draw");
+  /** Which Custom-palette chip is being recolored right now, if any. */
+  const [activeSlot, setActiveSlot] = useState<{ group: "draw" | "highlighter"; index: number } | null>(null);
+  /** The pie-preview card — the color mixer anchors beside this, not its own trigger. */
+  const pieCardRef = useRef<HTMLDivElement>(null);
 
   const {
     hotkey,
@@ -196,6 +233,8 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     setPersistentHotkey,
     spotlightHotkey,
     setSpotlightHotkey,
+    lastToolHotkey,
+    setLastToolHotkey,
     spotlightDimOpacity,
     setSpotlightDimOpacity: setSpotlightDimOpacityLocal,
     spotlightRadius,
@@ -210,8 +249,6 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     setTextColor: setTextColorLocal,
     colorPalette,
     setColorPalette: setColorPaletteLocal,
-    solidColor,
-    setSolidColor: setSolidColorLocal,
     themeMode,
     setThemeMode: setThemeModeLocal,
     animationIntensity,
@@ -225,6 +262,7 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     overlayMode,
     setOverlayMode: setOverlayModeLocal,
     paletteVersion,
+    bumpPaletteVersion,
     buttonRoundness,
     setButtonRoundness: setButtonRoundnessLocal,
     menuTranslucency,
@@ -268,19 +306,21 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
           ? await setMainShortcut(formatted)
           : kind === "persistent"
             ? await setPersistentShortcut(formatted)
-            : await setSpotlightShortcut(formatted);
+            : kind === "lastTool"
+              ? await setLastToolShortcut(formatted)
+              : await setSpotlightShortcut(formatted);
       if (result.ok) {
         const apply =
-          kind === "main" ? setHotkey : kind === "persistent" ? setPersistentHotkey : setSpotlightHotkey;
+          kind === "main" ? setHotkey : kind === "persistent" ? setPersistentHotkey : kind === "lastTool" ? setLastToolHotkey : setSpotlightHotkey;
         apply(formatted);
       }
       return result;
     },
-    [setHotkey, setPersistentHotkey, setSpotlightHotkey]
+    [setHotkey, setPersistentHotkey, setSpotlightHotkey, setLastToolHotkey]
   );
 
   const { recordingKind, activeKeys, shortcutError, startRecording } = useShortcutRecorder({
-    enabled: settingsWindowMode || embedded,
+    enabled: settingsWindowMode || embedded || unifiedSettingsMode || suiteSection !== undefined,
     commit: commitShortcut,
   });
 
@@ -288,18 +328,20 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     if (!desktop) return;
 
     let mounted = true;
-    void getShortcuts().then(({ main, persistent, spotlight }) => {
+    const load = getShortcutsOverride ?? getShortcuts;
+    void load().then(({ main, persistent, spotlight, lastTool }) => {
       if (mounted) {
         setHotkey(main);
         setPersistentHotkey(persistent);
         setSpotlightHotkey(spotlight);
+        setLastToolHotkey(lastTool);
       }
     });
 
     return () => {
       mounted = false;
     };
-  }, [desktop, setHotkey, setPersistentHotkey, setSpotlightHotkey]);
+  }, [desktop, setHotkey, setPersistentHotkey, setSpotlightHotkey, setLastToolHotkey, getShortcutsOverride]);
 
   const applyThemeMode = (mode: ThemeMode) => {
     setThemeModeLocal(mode);
@@ -309,6 +351,18 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
   const applyColorPalette = (palette: ColorPalette) => {
     setColorPaletteLocal(palette);
     sendColorPalette(palette);
+    // "Custom" (formerly Solid) is a live editable palette backed by the Pro
+    // custom-palette store — selecting it activates that override; picking any
+    // other built-in deactivates it so getEffectiveColors falls back correctly.
+    if (palette === "solid") {
+      if (getProPalette(null) === null) {
+        setProPalette([...getColors("muted").draw], [...getColors("muted").highlighter]);
+      }
+      setProPaletteActive(true);
+    } else {
+      setProPaletteActive(false);
+    }
+    bumpPaletteVersion();
   };
 
   const applyAnimationIntensity = (intensity: AnimationIntensity) => {
@@ -342,10 +396,6 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
   };
 
 
-  const applySolidColor = (color: string) => {
-    setSolidColorLocal(color);
-    sendSolidColor(color);
-  };
 
   const applyScaleMultiplier = (multiplier: number) => {
     setScaleMultiplierLocal(multiplier);
@@ -420,76 +470,143 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
     ])
   );
 
-  /** Rich palette picker matching PopKey style — 2-column grid + color swatches */
-  const renderPalettePicker = () => (
-    <div className="grid grid-cols-2 gap-3">
-      {PALETTE_NAMES.map((name) => {
-        const isSolid = name === "solid";
-        const colors = isSolid ? [solidColor] : getColors(name).draw;
-        const isSelected = colorPalette === name;
-        return (
-          <button
-            key={name}
-            onClick={() => applyColorPalette(name)}
-            className="flex flex-col items-center gap-1.5 rounded-[12px] px-4 py-3 text-sm font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-            style={{
-              backgroundColor: isSelected ? surfacePalette.selected : surfacePalette.card,
-              color: isSelected ? surfacePalette.text : surfacePalette.muted,
-              border: `1.5px solid ${isSelected ? surfacePalette.text : "transparent"}`,
-            }}
+  // Left/right picker columns: PALETTE_NAMES is [muted, vibrant, retro, neon,
+  // pastel, gradient, glitter, solid] — even indices are the left column, odd
+  // are the right, matching the existing 2-column pairing (muted/vibrant,
+  // retro/neon, pastel/gradient, glitter/solid) so nothing reorders visually.
+  const paletteLeftNames = PALETTE_NAMES.filter((_, i) => i % 2 === 0);
+  const paletteRightNames = PALETTE_NAMES.filter((_, i) => i % 2 === 1);
+
+  const paletteDisplayLabel = (name: ColorPalette) => (name === "solid" ? "Custom" : name.charAt(0).toUpperCase() + name.slice(1));
+
+  const renderPaletteButton = (name: ColorPalette) => {
+    const isCustom = name === "solid";
+    const locked = isCustom && !effectiveIsPro;
+    const colors = isCustom ? getEffectiveColors("solid").draw : getColors(name).draw;
+    const isSelected = colorPalette === name;
+    return (
+      <button
+        key={name}
+        onClick={() => { if (!locked) applyColorPalette(name); }}
+        title={locked ? "Unlock with PopJot Pro" : undefined}
+        className="relative flex w-full flex-col items-center gap-1.5 rounded-[12px] px-3 py-3 text-sm font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+        style={{
+          backgroundColor: isSelected ? surfacePalette.selected : surfacePalette.card,
+          color: isSelected ? surfacePalette.text : surfacePalette.muted,
+          border: `1.5px solid ${isSelected ? surfacePalette.text : "transparent"}`,
+          opacity: locked ? 0.55 : 1,
+          cursor: locked ? "not-allowed" : "pointer",
+        }}
+      >
+        {locked && (
+          <Lock className="absolute right-2 top-2 h-3.5 w-3.5" style={{ color: surfacePalette.muted }} />
+        )}
+        <span>{paletteDisplayLabel(name)}</span>
+        <div className="flex flex-wrap justify-center gap-1">
+          {colors.slice(0, 6).map((hex: string, i: number) => (
+            <span
+              key={`${hex}-${i}`}
+              style={{
+                display: "inline-block",
+                width: 16,
+                height: 16,
+                borderRadius: "50%",
+                backgroundColor: hex,
+                flexShrink: 0,
+              }}
+            />
+          ))}
+        </div>
+      </button>
+    );
+  };
+
+  /** 3-column palette picker: name columns flank a live pie preview of the
+   *  selected palette's actual radial sub-menu (Draw or Highlighter ring). */
+  const renderPalettePicker = () => {
+    // Editable only for licensed users — guards legacy sessions where
+    // colorPalette was already persisted as "solid" before Custom existed.
+    const isCustom = colorPalette === "solid" && effectiveIsPro;
+    const { draw: pieDrawColors, highlighter: pieHlColors, tertiary } = getEffectiveColors(colorPalette);
+    const pieColors = pieMode === "draw" ? pieDrawColors : pieHlColors;
+    // Same gating as RadialMenu.tsx's SUB_MENUS: gradient/glitter effects only
+    // apply to the real built-in palette, never a Pro override (Custom).
+    const useGradient = colorPalette === "gradient" && getProPalette(colorPalette) === null;
+    const pieGradientStops = useGradient
+      ? pieMode === "draw"
+        ? pieColors.map((_, i) => getGradientVariantStops(i))
+        : pieColors.map((c) => getHighlighterGradientStops(c))
+      : undefined;
+    const isGlitter = colorPalette === "glitter" && getProPalette(colorPalette) === null;
+
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-[1fr_1.6fr_1fr] items-start gap-3">
+          <div className="space-y-2">{paletteLeftNames.map(renderPaletteButton)}</div>
+
+          <div
+            ref={pieCardRef}
+            className="flex aspect-square flex-col items-center justify-center gap-2 rounded-[12px] p-4"
+            style={{ backgroundColor: surfacePalette.card }}
           >
-            <span className="capitalize">{name}</span>
-            {isSolid && isSelected ? (
-              <div
-                className="flex items-center gap-2"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <span
-                  style={{ width: 20, height: 20, borderRadius: "50%", backgroundColor: solidColor, flexShrink: 0 }}
-                />
-                <input
-                  type="text"
-                  value={solidColor}
-                  onChange={(e) => {
-                    const val = e.currentTarget.value;
-                    if (/^#[0-9a-fA-F]{6}$/.test(val)) applySolidColor(val);
-                  }}
-                  maxLength={7}
-                  spellCheck={false}
+            <div className="flex rounded-full p-0.5" style={{ backgroundColor: surfacePalette.selected }}>
+              {(["draw", "highlighter"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => { setPieMode(mode); setActiveSlot(null); }}
+                  className="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors"
                   style={{
-                    width: 72,
-                    fontFamily: "'Space Mono', monospace",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: surfacePalette.text,
-                    background: "transparent",
-                    border: "none",
-                    outline: "none",
+                    backgroundColor: pieMode === mode ? PRO_ACCENT : "transparent",
+                    color: pieMode === mode ? "#fff" : surfacePalette.muted,
                   }}
+                >
+                  {mode === "draw" ? "Draw" : "Highlighter"}
+                </button>
+              ))}
+            </div>
+            <div className={`theme-${themeMode}`}>
+              <PalettePiePreview
+                colors={pieColors}
+                menuStyle={menuStyle}
+                buttonRoundness={buttonRoundness}
+                glowIntensity={glowIntensity}
+                centerColor={tertiary[0]}
+                angleOffset={pieMode === "draw" ? 30 : 45}
+                gradientStops={pieGradientStops}
+                isGlitter={isGlitter}
+                onChipClick={isCustom ? (i) => setActiveSlot({ group: pieMode, index: i }) : undefined}
+              />
+            </div>
+            <span className="text-center text-[10px] font-medium leading-tight" style={{ color: surfacePalette.muted }}>
+              {isCustom ? "Click a chip, then the swatch below to recolor it" : "How the real menu looks"}
+            </span>
+            {/* Always visible (when Custom), same as PopKey's Solid picker —
+                click a chip in the pie to select it (defaults to slot 0), then
+                click this swatch to open the mixer for the selected slot. */}
+            {isCustom && (() => {
+              const slotIndex = activeSlot && activeSlot.group === pieMode ? activeSlot.index : 0;
+              return (
+                <ColorMixerPopover
+                  currentColor={pieColors[slotIndex]}
+                  onColorChange={(hex) => {
+                    const nextDraw = pieMode === "draw" ? pieDrawColors.map((c, i) => (i === slotIndex ? hex : c)) : [...pieDrawColors];
+                    const nextHl = pieMode === "highlighter" ? pieHlColors.map((c, i) => (i === slotIndex ? hex : c)) : [...pieHlColors];
+                    setProPalette(nextDraw, nextHl);
+                  }}
+                  surfacePalette={surfacePalette}
+                  historyColors={[...pieDrawColors, ...pieHlColors]}
+                  label={`${pieMode === "draw" ? "Draw" : "Highlighter"} ${slotIndex + 1}`}
+                  anchorRef={pieCardRef}
                 />
-              </div>
-            ) : (
-              <div className="flex gap-1">
-                {colors.map((hex: string) => (
-                  <span
-                    key={hex}
-                    style={{
-                      display: "inline-block",
-                      width: 20,
-                      height: 20,
-                      borderRadius: "50%",
-                      backgroundColor: hex,
-                      flexShrink: 0,
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
+              );
+            })()}
+          </div>
+
+          <div className="space-y-2">{paletteRightNames.map(renderPaletteButton)}</div>
+        </div>
+      </div>
+    );
+  };
 
   const animationOptions: Option<AnimationIntensity>[] = [
     {
@@ -560,7 +677,6 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
             surfacePalette={surfacePalette}
             themeMode={themeMode}
             colorPalette={colorPalette}
-            solidColor={solidColor}
             textColor={textColor}
             glowIntensity={glowIntensity}
             buttonRoundness={buttonRoundness}
@@ -580,23 +696,9 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
         <SettingGroup
           key="palette"
           title="Color Palette"
-          description={hasProPalette ? "Custom Pro palette is active" : "Select your preferred color scheme"}
+          description="Select your preferred color scheme"
         >
-          <div className="relative">
-            <div style={{ opacity: hasProPalette ? 0.35 : 1, pointerEvents: hasProPalette ? "none" : "auto" }}>
-              {renderPalettePicker()}
-            </div>
-            {hasProPalette && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span
-                  className="rounded-full px-3 py-1 text-xs font-semibold"
-                  style={{ backgroundColor: PRO_ACCENT, color: "#fff" }}
-                >
-                  Custom Palette Active
-                </span>
-              </div>
-            )}
-          </div>
+          {renderPalettePicker()}
         </SettingGroup>,
         <SettingGroup key="roundness" title="Roundness" description="0% = square corners, 100% = circle">
           <SliderRow value={buttonRoundness} min={0} max={100} step={5} onChange={applyButtonRoundness} valueSuffix="%" defaultValue={100} />
@@ -604,23 +706,8 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
         <SettingGroup key="translucency" title="Translucency" description="Menu button background opacity">
           <SliderRow value={menuTranslucency} min={0} max={95} step={5} onChange={applyMenuTranslucency} valueSuffix="%" defaultValue={0} />
         </SettingGroup>,
-      ],
-    },
-    {
-      title: "Branding",
-      items: [
-        <SettingGroup key="branding" title="Branding" description="Replace the menu's center shape with your logo, plus a custom palette" pro locked={!effectiveIsPro} buyUrl={POPJOT_PRO_URL}>
-          <div className="space-y-5">
-            <div>
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Logo</div>
-              <CenterCircleSettings />
-            </div>
-            <div className="h-px" style={{ backgroundColor: surfacePalette.divider }} />
-            <div>
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Custom Palette</div>
-              <CustomPaletteSettings />
-            </div>
-          </div>
+        <SettingGroup key="scale" title="Size" description="Scale interface size">
+          <SliderRow value={Math.round(scaleMultiplier * 100)} min={50} max={200} step={5} onChange={(v) => applyScaleMultiplier(v / 100)} valueSuffix="%" defaultValue={100} />
         </SettingGroup>,
       ],
     },
@@ -630,7 +717,11 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
         <SettingGroup key="animation" title="Animation Intensity" description="Control how animated your interactions feel">
           <OptionGrid options={animationOptions} columns="grid-cols-3" compact />
         </SettingGroup>,
-        <SettingGroup key="overlay" title="Overlay Mode" description="Choose between live drawing or snapshot capture">
+        <SettingGroup
+          key="overlay"
+          title="Overlay Mode"
+          description="Live draws straight onto the screen and keeps most menus and tooltips open. Snapshot freezes the screen first — slower to appear, but it holds anything Live can't, like dropdowns that close the moment you click away."
+        >
           <OptionGrid options={overlayModeOptions} columns="grid-cols-2" />
         </SettingGroup>,
         <SettingGroup
@@ -643,14 +734,6 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
           }
         >
           <div className="space-y-4">
-            {desktop && (
-              <ShortcutButton
-                currentShortcut={spotlightHotkey}
-                isRecording={recordingKind === "spotlight"}
-                activeKeys={activeKeys}
-                onStartRecording={() => startRecording("spotlight")}
-              />
-            )}
             <div>
               <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Dim</div>
               <SliderRow value={spotlightDimOpacity} min={0} max={100} step={5} onChange={applySpotlightDimOpacity} valueSuffix="%" defaultValue={65} />
@@ -666,40 +749,21 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
           </div>
         </SettingGroup>,
         <SettingGroup key="grid" title="Canvas Grid" description="Display reference grid or dots on canvas">
-          <OptionGrid options={gridModeOptions} columns="grid-cols-3" compact />
-        </SettingGroup>,
-        <SettingGroup key="grid-size" title="Grid Size" description="Adjust grid density if visible">
-          <OptionGrid options={gridSizeOptions} columns="grid-cols-2" />
-        </SettingGroup>,
-        <SettingGroup key="scale" title="Size" description="Scale interface size">
-          <SliderRow value={Math.round(scaleMultiplier * 100)} min={50} max={200} step={5} onChange={(v) => applyScaleMultiplier(v / 100)} valueSuffix="%" defaultValue={100} />
-        </SettingGroup>,
-      ],
-    },
-    {
-      title: "Sync",
-      items: [
-        <SettingGroup
-          key="sync"
-          title="Sync with PopKey"
-          description="Keep these settings identical across PopJot and PopKey. Toggles are shared, so changes here appear in PopKey instantly."
-        >
-          <SyncSettings schema={settingsSchema} />
+          <div className="space-y-3">
+            <OptionGrid options={gridModeOptions} columns="grid-cols-3" compact />
+            {gridMode !== "none" && (
+              <div>
+                <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Grid Size</div>
+                <OptionGrid options={gridSizeOptions} columns="grid-cols-2" />
+              </div>
+            )}
+          </div>
         </SettingGroup>,
       ],
     },
     {
-      title: "System",
-      items: desktop ? [
-        <ProSection
-          key="pro"
-          palette={surfacePalette}
-          isPro={effectiveIsPro}
-          buyUrl={POPJOT_PRO_URL}
-          tagline="Custom palette, center icon, circle size & stroke effects — in the Appearance tab."
-          onActivate={(key) => activateLicense(key)}
-          onDeactivate={() => void deactivateLicense()}
-        />,
+      title: "Shortcuts",
+      items: desktop || demoShortcuts ? [
         <SettingGroup
           key="main-shortcut"
           title="Main Shortcut"
@@ -724,6 +788,75 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
             onStartRecording={() => startRecording("persistent")}
           />
         </SettingGroup>,
+        <SettingGroup
+          key="last-tool-shortcut"
+          title="Last Tool Shortcut"
+          description="Hold to draw with your last-used tool, skipping the menu"
+        >
+          <ShortcutButton
+            currentShortcut={lastToolHotkey}
+            isRecording={recordingKind === "lastTool"}
+            activeKeys={activeKeys}
+            onStartRecording={() => startRecording("lastTool")}
+          />
+        </SettingGroup>,
+        <SettingGroup
+          key="spotlight-shortcut"
+          title="Spotlight Shortcut"
+          description="Hold to activate spotlight mode, release to exit"
+        >
+          <ShortcutButton
+            currentShortcut={spotlightHotkey}
+            isRecording={recordingKind === "spotlight"}
+            activeKeys={activeKeys}
+            onStartRecording={() => startRecording("spotlight")}
+          />
+        </SettingGroup>,
+      ] : [
+        <p key="desktop-only" className="text-xs" style={{ color: surfacePalette.muted }}>
+          Shortcuts are available in the desktop app.
+        </p>,
+      ],
+    },
+    {
+      title: "Pro",
+      items: [
+        // License activation talks to the desktop preload bridge; web builds
+        // only show the feature cards (matches the old System-tab gating).
+        desktop && (
+          <ProSection
+            key="pro"
+            palette={surfacePalette}
+            isPro={effectiveIsPro}
+            buyUrl={POPJOT_PRO_URL}
+            tagline="A custom color palette and a center logo for your radial menu."
+            onActivate={(key) => activateLicense(key)}
+            onDeactivate={() => void deactivateLicense()}
+          />
+        ),
+        <SettingGroup key="branding" title="Branding" description="Replace the menu's center shape with your logo" pro locked={!effectiveIsPro} buyUrl={POPJOT_PRO_URL}>
+          <div>
+            <div className="mb-2 text-[11px] font-bold uppercase tracking-widest" style={{ color: surfacePalette.muted }}>Logo</div>
+            <CenterCircleSettings />
+          </div>
+        </SettingGroup>,
+      ],
+    },
+    {
+      title: "Sync",
+      items: [
+        <SettingGroup
+          key="sync"
+          title="Sync with PopKey"
+          description="Keep these settings identical across PopJot and PopKey. Toggles are shared, so changes here appear in PopKey instantly."
+        >
+          <SyncSettings schema={settingsSchema} />
+        </SettingGroup>,
+      ],
+    },
+    {
+      title: "System",
+      items: desktop ? [
         <SettingGroup key="startup" title="Startup" description="Configure application startup behavior">
           <ToggleRow label="Open at login" checked={openAtLogin} onChange={toggleOpenAtLogin} />
         </SettingGroup>,
@@ -845,6 +978,31 @@ const SystemTray = ({ settingsWindowMode = false, embedded = false }: SystemTray
       </DropdownMenuItem>
     </DropdownMenuContent>
   );
+
+  if (suiteSection !== undefined) {
+    if (suiteSection === null) return null;
+    const column = settingsColumns.find((c) => c.title === suiteSection.title);
+    if (!column) return null;
+    const omit = suiteSection.omitKeys ?? [];
+    const items = column.items.filter(
+      (item) =>
+        !(isValidElement(item) && item.key !== null && omit.includes(String(item.key))),
+    );
+    return (
+      <SettingsUIProvider density="compact" palette={surfacePalette}>
+        <ShortcutErrorBanner error={shortcutError} isDark={isDark} />
+        <SettingsSection items={items} />
+      </SettingsUIProvider>
+    );
+  }
+
+  if (unifiedSettingsMode) {
+    return (
+      <SettingsUIProvider density="compact" palette={surfacePalette}>
+        <div className="flex h-full flex-col overflow-hidden px-6 py-4">{sectionsContent}</div>
+      </SettingsUIProvider>
+    );
+  }
 
   if (embedded) {
     return (

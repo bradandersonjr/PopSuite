@@ -1,20 +1,20 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { getStroke } from "perfect-freehand";
-import { useStore } from "@/store/useStore";
+import { useStore } from "@popjot/store/useStore";
 import {
     ALL_DRAW_PALETTES,
     ALL_HL_PALETTES,
     DRAW_COLORS_GRADIENT,
     getGradientVariantStops,
     getHighlighterGradientStops,
-} from "@/config/themes";
-import { getEffectiveColors, getProPalette, getProEffect } from "@/pro";
+} from "@popjot/config/themes";
+import { getEffectiveColors, getProPalette, getProEffect } from "@popjot/pro";
 import { CANVAS_BG } from "@shared/config/desktopTheme";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-export type { StrokeType } from "@/store/useStore";
-import type { StrokeType } from "@/store/useStore";
+export type { StrokeType } from "@popjot/store/useStore";
+import type { StrokeType } from "@popjot/store/useStore";
 
 export type Stroke = {
     id: string;
@@ -446,7 +446,12 @@ const Canvas = ({ tool, color }: CanvasProps) => {
     const pageZoomFactor = useStore((state) => state.pageZoomFactor);
     const toolSizeMultiplier = useStore((state) => state.toolSizeMultiplier);
     const adjustToolSize = useStore((state) => state.adjustToolSize);
-    const paletteVersion = useStore((state) => state.paletteVersion);
+    // Subscribed directly so a Pro custom-palette edit — synced here via the
+    // schema's tray-settings IPC from the Settings window, a separate renderer
+    // process — invalidates colorRemap immediately.
+    const proDrawPalette = useStore((state) => state.proDrawPalette);
+    const proHighlighterPalette = useStore((state) => state.proHighlighterPalette);
+    const proPaletteActive = useStore((state) => state.proPaletteActive);
 
     const scaleRef = useRef(effectiveScale);
     const sizeMultRef = useRef(toolSizeMultiplier);
@@ -476,7 +481,7 @@ const Canvas = ({ tool, color }: CanvasProps) => {
 
         return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [colorPalette, paletteVersion]); // paletteVersion invalidates when Pro palette changes
+    }, [colorPalette, proDrawPalette, proHighlighterPalette, proPaletteActive]);
 
     // When Pro palette is active, use the Pro-chosen effect instead of the built-in palette's effect
     const proOverrideActive = getProPalette(colorPalette) !== null;

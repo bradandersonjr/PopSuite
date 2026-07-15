@@ -19,6 +19,8 @@ export function BrandingOverlay({
   scaleFactor,
   blockedCorner,
   grayscale = false,
+  offsetX = 0,
+  offsetY = 0,
 }: {
   image: string;
   corner: BrandingCorner;
@@ -30,6 +32,10 @@ export function BrandingOverlay({
   blockedCorner?: BrandingCorner | null;
   /** Render the logo black & white. */
   grayscale?: boolean;
+  /** Fine-tune away from the corner anchor, in px: +X right, +Y down — same
+   *  convention as the badges' positionOffsetX/Y, regardless of which corner. */
+  offsetX?: number;
+  offsetY?: number;
 }) {
   if (!image) return null;
 
@@ -53,8 +59,8 @@ export function BrandingOverlay({
         zIndex: 99998,
         pointerEvents: "none",
         userSelect: "none",
-        ...(isTop ? { top: inset } : { bottom: inset }),
-        ...(isLeft ? { left: inset } : { right: inset }),
+        ...(isTop ? { top: inset + offsetY } : { bottom: inset - offsetY }),
+        ...(isLeft ? { left: inset + offsetX } : { right: inset - offsetX }),
         maxWidth: max,
         maxHeight: max,
         width: "auto",

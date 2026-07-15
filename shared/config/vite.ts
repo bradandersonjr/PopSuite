@@ -13,10 +13,16 @@ export interface WebConfigOptions {
   root: string;
   /** Dev-server port — must differ per app so both can run concurrently. */
   port: number;
+  /**
+   * Module-scoped alias name for this app's own `src`, e.g. "@popjot" or
+   * "@popkey". The generic "@" alias is always defined too (pointing at the
+   * same directory) for shared/src injection consumers — see aliases().
+   */
+  moduleAlias: string;
 }
 
 /** Web/landing-page build + dev server (vite.config.mts). */
-export function createWebConfig({ root, port }: WebConfigOptions) {
+export function createWebConfig({ root, port, moduleAlias }: WebConfigOptions) {
   return defineConfig(({ mode }) => {
     const isDesktop = mode === "desktop";
 
@@ -39,7 +45,7 @@ export function createWebConfig({ root, port }: WebConfigOptions) {
       },
       plugins: [react()],
       resolve: {
-        alias: aliases(root),
+        alias: aliases(root, moduleAlias),
       },
       build: {
         // Split heavy, rarely-changing vendors into their own cacheable chunks
@@ -59,10 +65,67 @@ export function createWebConfig({ root, port }: WebConfigOptions) {
   });
 }
 
+export interface SiteConfigOptions {
+  /** Site root directory (pass __dirname from site/vite.config.mts). */
+  root: string;
+  /** Dev-server port. */
+  port: number;
+}
+
+/**
+ * Multi-module marketing site build (site/vite.config.mts).
+ *
+ * The PopSuite site mounts BOTH modules' engines and settings panels on one
+ * page, so its build graph spans site/src, both app module srcs, and shared/.
+ * Aliases are module-scoped (`@popjot`, `@popkey`, `@shared`, `@site`); there
+ * is intentionally NO generic `@` alias here — extension dependency-injection
+ * files are not in this graph, so a stray `@/` import would be a bug to scope,
+ * not to resolve.
+ */
+export function createSiteConfig({ root, port }: SiteConfigOptions) {
+  const modules = path.resolve(root, "../app/modules");
+  return defineConfig(() => ({
+    base: "/",
+    optimizeDeps: {
+      entries: ["index.html"],
+    },
+    define: {
+      __IS_DESKTOP__: JSON.stringify(false),
+    },
+    server: {
+      host: "::",
+      port,
+      hmr: { overlay: false },
+    },
+    plugins: [react()],
+    resolve: {
+      alias: {
+        "@popjot": path.resolve(modules, "popjot/src"),
+        "@popkey": path.resolve(modules, "popkey/src"),
+        "@shared": path.resolve(root, "../shared/src"),
+        "@site": path.resolve(root, "./src"),
+      },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            react: ["react", "react-dom"],
+            motion: ["framer-motion"],
+            icons: ["lucide-react"],
+          },
+        },
+      },
+    },
+  }));
+}
+
 export interface ExtensionConfigOptions {
   root: string;
   /** IIFE global for the popup bundle, e.g. "PopJotPopup". */
   popupGlobalName: string;
+  /** Module-scoped alias name for this app's own `src`, e.g. "@popjot". */
+  moduleAlias: string;
 }
 
 /**
@@ -71,10 +134,14 @@ export interface ExtensionConfigOptions {
  * by shared/scripts/build-content.mjs (esbuild), which avoids Rollup TDZ
  * issues with Framer Motion in IIFE format.
  */
-export function createExtensionConfig({ root, popupGlobalName }: ExtensionConfigOptions) {
+export function createExtensionConfig({ root, popupGlobalName, moduleAlias }: ExtensionConfigOptions) {
   const outDir = path.resolve(root, "dist-extension");
 
   return defineConfig(() => ({
+    // The extension bundle is a lib build; the module `public/` dir holds only
+    // web-site assets (favicon) that no extension surface references. Disabling
+    // publicDir keeps them out of dist-extension/.
+    publicDir: false,
     define: {
       __IS_DESKTOP__: false,
       __IS_EXTENSION__: true,
@@ -84,7 +151,7 @@ export function createExtensionConfig({ root, popupGlobalName }: ExtensionConfig
     },
     plugins: [react()],
     resolve: {
-      alias: aliases(root),
+      alias: aliases(root, moduleAlias),
     },
     build: {
       outDir,
@@ -106,9 +173,17 @@ export function createExtensionConfig({ root, popupGlobalName }: ExtensionConfig
   }));
 }
 
-export function aliases(root: string): Record<string, string> {
+/**
+ * `@` stays defined (pointing at the same directory as the module-scoped
+ * alias) because a handful of shared/src files intentionally import `@/...`
+ * as dependency injection — the consuming app's own build resolves it to
+ * its own src. See shared/src/roots/Extension* and extensionStorage.ts.
+ */
+export function aliases(root: string, moduleAlias: string): Record<string, string> {
+  const src = path.resolve(root, "./src");
   return {
-    "@": path.resolve(root, "./src"),
+    [moduleAlias]: src,
+    "@": src,
     "@shared": path.resolve(root, "../../../shared/src"),
   };
 }

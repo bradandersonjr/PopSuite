@@ -1,4 +1,9 @@
-import { uIOhook, UiohookKey } from "uiohook-napi";
+import { UiohookKey } from "uiohook-napi";
+import {
+  acquireGlobalInputHook,
+  releaseGlobalInputHook,
+  uIOhook,
+} from "@shared/main/globalInputHook";
 import { BrowserWindow } from "electron";
 
 // Build reverse map: keycode number → display name
@@ -39,13 +44,13 @@ const DISPLAY_NAMES: Record<string, string> = {
   Pause: "Pause",
   ContextMenu: "Menu",
   // Modifiers
-  ShiftLeft: "Shift",
+  Shift: "Shift",
   ShiftRight: "Shift",
-  CtrlLeft: "Ctrl",
+  Ctrl: "Ctrl",
   CtrlRight: "Ctrl",
-  AltLeft: "Alt",
+  Alt: "Alt",
   AltRight: "Alt",
-  MetaLeft: META_KEY_LABEL,
+  Meta: META_KEY_LABEL,
   MetaRight: META_KEY_LABEL,
   // Number keys
   "0": "0", "1": "1", "2": "2", "3": "3", "4": "4",
@@ -80,8 +85,8 @@ const DISPLAY_NAMES: Record<string, string> = {
 };
 
 const MODIFIER_KEYS = new Set([
-  "ShiftLeft", "ShiftRight", "CtrlLeft", "CtrlRight",
-  "AltLeft", "AltRight", "MetaLeft", "MetaRight",
+  "Shift", "ShiftRight", "Ctrl", "CtrlRight",
+  "Alt", "AltRight", "Meta", "MetaRight",
 ]);
 
 function getKeyName(keycode: number): string {
@@ -94,6 +99,8 @@ function isModifier(keycode: number): boolean {
   return MODIFIER_KEYS.has(rawName);
 }
 
+let hookAcquired = false;
+
 const DRAG_THRESHOLD = 8; // pixels — below this is a click, above is a drag
 
 // Map dx/dy to one of 8 sectors (0–7) for direction-change dedup
@@ -101,7 +108,12 @@ function dirSector(dx: number, dy: number): number {
   return Math.floor(((Math.atan2(dy, dx) * (180 / Math.PI) + 202.5) % 360) / 45);
 }
 
-export function startInputCapture(getWindows: () => BrowserWindow[]): void {
+export function startInputCapture(
+  getWindows: () => BrowserWindow[],
+  ipcNamespace = ""
+): void {
+  const sendToWindow = (win: BrowserWindow, channel: string, ...args: unknown[]) =>
+    win.webContents.send(ipcNamespace ? ipcNamespace + ":" + channel : channel, ...args);
   // Track per-button mousedown position to detect drags in real-time
   const downPos: Record<number, { x: number; y: number }> = {};
   const wasDrag = new Set<number>(); // buttons currently dragging
@@ -130,7 +142,7 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
           lastDragSector[button] = dirSector(dx, dy);
           for (const win of getWindows()) {
             if (!win.isDestroyed()) {
-              win.webContents.send("input:drag", {
+              sendToWindow(win, "input:drag", {
                 button,
                 x: e.x,
                 y: e.y,
@@ -152,7 +164,7 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
           lastDragSector[button] = sector;
           for (const win of getWindows()) {
             if (!win.isDestroyed()) {
-              win.webContents.send("input:dragmove", { button, dx, dy });
+              sendToWindow(win, "input:dragmove", { button, dx, dy });
             }
           }
         }
@@ -175,11 +187,15 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
     const modifier = isModifier(e.keycode);
     for (const win of getWindows()) {
       if (!win.isDestroyed()) {
-        win.webContents.send("input:keydown", {
+        sendToWindow(win, "input:keydown", {
           key,
           keycode: e.keycode,
           modifier,
           time: Date.now(),
+          altKey: e.altKey,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          shiftKey: e.shiftKey,
         });
       }
     }
@@ -191,7 +207,7 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
     if (process.platform === "win32" && WIN_KEYCODES.has(e.keycode)) {
       setTimeout(() => {
         for (const win of getWindows()) {
-          if (!win.isDestroyed()) win.webContents.send("input:focus-lost");
+          if (!win.isDestroyed()) sendToWindow(win, "input:focus-lost");
         }
       }, 200);
     }
@@ -202,11 +218,15 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
     const modifier = isModifier(e.keycode);
     for (const win of getWindows()) {
       if (!win.isDestroyed()) {
-        win.webContents.send("input:keyup", {
+        sendToWindow(win, "input:keyup", {
           key,
           keycode: e.keycode,
           modifier,
           time: Date.now(),
+          altKey: e.altKey,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          shiftKey: e.shiftKey,
         });
       }
     }
@@ -220,7 +240,7 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
     }
     for (const win of getWindows()) {
       if (!win.isDestroyed()) {
-        win.webContents.send("input:click", {
+        sendToWindow(win, "input:click", {
           button, // 1=left, 2=right, 3=middle
           x: e.x,
           y: e.y,
@@ -237,7 +257,7 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
   uIOhook.on("wheel", (e) => {
     for (const win of getWindows()) {
       if (!win.isDestroyed()) {
-        win.webContents.send("input:wheel", {
+        sendToWindow(win, "input:wheel", {
           direction: e.rotation > 0 ? "down" : "up",
           x: e.x,
           y: e.y,
@@ -248,15 +268,15 @@ export function startInputCapture(getWindows: () => BrowserWindow[]): void {
     }
   });
 
-  try {
-    uIOhook.start();
-  } catch (err) {
-    // A native hook failure (missing macOS permission, Wayland session on Linux,
-    // etc.) must not crash the main process — the rest of the app stays usable.
-    console.error(`Failed to start input capture (uIOhook): ${String(err)}`);
+  hookAcquired = acquireGlobalInputHook();
+  if (!hookAcquired) {
+    // A native hook failure must not crash the rest of the desktop suite.
+    console.error("Failed to start input capture (uIOhook).");
   }
 }
 
 export function stopInputCapture(): void {
-  uIOhook.stop();
+  if (!hookAcquired) return;
+  releaseGlobalInputHook();
+  hookAcquired = false;
 }

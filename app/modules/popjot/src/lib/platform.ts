@@ -10,7 +10,7 @@ import {
   setNamedShortcut,
   type ShortcutUpdateResult,
 } from "@shared/settings/renderer";
-import { settingsSchema } from "@/config/settingsSchema";
+import { settingsSchema } from "@popjot/config/settingsSchema";
 import type {
   ThemeMode,
   ColorPalette,
@@ -20,7 +20,7 @@ import type {
   GridSize,
   OverlayMode,
   TextColor,
-} from "@/store/useStore";
+} from "@popjot/store/useStore";
 
 export {
   isDesktop,
@@ -39,8 +39,6 @@ const settings = createSettingsPlatform(settingsSchema);
 export const sendThemeMode = (mode: ThemeMode): void => settings.sendSetting("themeMode", mode);
 export const sendColorPalette = (palette: ColorPalette): void =>
   settings.sendSetting("colorPalette", palette);
-export const sendLastColorPalette = (palette: ColorPalette): void =>
-  settings.sendSetting("lastColorPalette", palette);
 export const sendAnimationIntensity = (intensity: AnimationIntensity): void =>
   settings.sendSetting("animationIntensity", intensity);
 export const sendMenuStyle = (style: MenuStyle): void => settings.sendSetting("menuStyle", style);
@@ -65,12 +63,16 @@ export const sendBrandingImage = (dataUrl: string): void =>
   settings.sendSetting("brandingImage", dataUrl);
 export const sendBrandingScale = (val: number): void =>
   settings.sendSetting("brandingScale", val);
+export const sendProDrawPalette = (json: string): void =>
+  settings.sendSetting("proDrawPalette", json);
+export const sendProHighlighterPalette = (json: string): void =>
+  settings.sendSetting("proHighlighterPalette", json);
+export const sendProPaletteActive = (val: boolean): void =>
+  settings.sendSetting("proPaletteActive", val);
 export const sendGlowIntensity = (val: number): void =>
   settings.sendSetting("glowIntensity", val);
 export const sendTextColor = (val: TextColor): void =>
   settings.sendSetting("textColor", val);
-export const sendSolidColor = (color: string): void =>
-  settings.sendSetting("solidColor", color);
 
 export function overlayActivated(): void {
   window.electronAPI?.overlayActivated();
@@ -78,6 +80,11 @@ export function overlayActivated(): void {
 
 export function overlayDeactivated(): void {
   window.electronAPI?.overlayDeactivated();
+}
+
+export function onOverlayDeactivateRequested(callback: () => void): () => void {
+  if (!window.electronAPI) return () => {};
+  return window.electronAPI.onOverlayDeactivateRequested(callback);
 }
 
 // ─── Spotlight presenter mode ──────────────────────────────────────
@@ -99,6 +106,11 @@ export function onShortcutActivate(
   return window.electronAPI.onShortcutActivate(callback);
 }
 
+export function onShortcutLastTool(callback: (snapshotDataUrl: string | null) => void): () => void {
+  if (!window.electronAPI) return () => {};
+  return window.electronAPI.onShortcutLastTool(callback);
+}
+
 export function onShortcutPersistent(
   callback: (pos: Position, snapshotDataUrl: string | null) => void
 ): () => void {
@@ -118,6 +130,10 @@ export async function setSpotlightShortcut(shortcut: string): Promise<ShortcutUp
   return setNamedShortcut("spotlight", shortcut);
 }
 
-export async function getShortcuts(): Promise<{ main: string; persistent: string; spotlight: string }> {
-  return getNamedShortcuts({ main: "", persistent: "", spotlight: "" });
+export async function setLastToolShortcut(shortcut: string): Promise<ShortcutUpdateResult> {
+  return setNamedShortcut("lastTool", shortcut);
+}
+
+export async function getShortcuts(): Promise<{ main: string; persistent: string; spotlight: string; lastTool: string }> {
+  return getNamedShortcuts({ main: "", persistent: "", spotlight: "", lastTool: "" });
 }

@@ -35,22 +35,19 @@ Install dependencies:
 npm install
 ```
 
-Run the browser experience (demo surface for settings/visualizers):
-
-```sh
-npm run dev
-```
-
-Run the Electron desktop app:
+Run the Electron desktop app standalone (this module in isolation):
 
 ```sh
 npm run dev:electron
 ```
 
-Build the browser bundle / Electron app:
+The browser experience (demo surface for settings/visualizers) is served by the
+unified popsuite.app site — run `npm run dev` from the repo root (see
+[`../../../README.md`](../../../README.md)).
+
+Build the Electron app:
 
 ```sh
-npm run build       # web bundle
 npm run build:electron
 ```
 

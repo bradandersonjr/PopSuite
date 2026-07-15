@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useStore } from "@/store/useStore";
-import { getBadgeColors } from "@/config/themes";
-import type { ClickRipple } from "@/hooks/useInputCapture";
+import { useStore } from "@popkey/store/useStore";
+import { getBadgeColors } from "@popkey/config/themes";
+import type { ClickRipple } from "@popkey/hooks/useInputCapture";
 
 interface MouseRippleProps {
   clicks: ClickRipple[];

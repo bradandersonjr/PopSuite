@@ -23,10 +23,13 @@ import {
 
 export interface SettingsSyncOptions<S extends SettingsSchema> {
   appName: string;
+  ipcNamespace?: string;
   schema: S;
   sendToRenderers: (channel: string, value: unknown) => void;
   /** The controller's live (mutable) values object. */
   getValues: () => SettingsValues<S>;
+  /** Extra fields merged into the per-app JSON on save (e.g. persisted shortcuts). */
+  getExtraPersistedFields?: () => Record<string, unknown>;
 }
 
 export interface SettingsSync<S extends SettingsSchema> {
@@ -43,6 +46,8 @@ export function createSettingsSync<S extends SettingsSchema>(
   opts: SettingsSyncOptions<S>
 ): SettingsSync<S> {
   const { appName, schema, sendToRenderers, getValues } = opts;
+  const ipcChannel = (name: string) =>
+    opts.ipcNamespace ? opts.ipcNamespace + ":" + name : name;
   ensureSettingsDir();
 
   const syncable = syncableKeysFor(schema);
@@ -90,7 +95,7 @@ export function createSettingsSync<S extends SettingsSchema>(
     const values = getValues() as Record<string, unknown>;
     const out: Record<string, unknown> = {};
     for (const key of nonVolatileKeys) out[key] = values[key];
-    return out;
+    return { ...out, ...opts.getExtraPersistedFields?.() };
   }
 
   let appSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -196,9 +201,9 @@ export function createSettingsSync<S extends SettingsSchema>(
   let unwatch: (() => void) | null = null;
 
   function start(): void {
-    ipcMain.handle("get-sync-prefs", () => prefsForRenderer());
-    ipcMain.on("set-sync-pref", (_e, key: string, enabled: boolean) => setPref(key, enabled));
-    ipcMain.on("set-sync-all", (_e, enabled: boolean) => setAll(enabled));
+    ipcMain.handle(ipcChannel("get-sync-prefs"), () => prefsForRenderer());
+    ipcMain.on(ipcChannel("set-sync-pref"), (_e, key: string, enabled: boolean) => setPref(key, enabled));
+    ipcMain.on(ipcChannel("set-sync-all"), (_e, enabled: boolean) => setAll(enabled));
     unwatch = watchSettingsFile("shared.json", onSharedChanged);
   }
 
@@ -218,10 +223,15 @@ export function createSettingsSync<S extends SettingsSchema>(
         });
       }
     }
-    ipcMain.removeHandler("get-sync-prefs");
-    ipcMain.removeAllListeners("set-sync-pref");
-    ipcMain.removeAllListeners("set-sync-all");
+    ipcMain.removeHandler(ipcChannel("get-sync-prefs"));
+    ipcMain.removeAllListeners(ipcChannel("set-sync-pref"));
+    ipcMain.removeAllListeners(ipcChannel("set-sync-all"));
   }
 
-  return { initialValues: initialValues as Partial<SettingsValues<S>>, onLocalChange, start, dispose };
+  return {
+    initialValues: initialValues as Partial<SettingsValues<S>>,
+    onLocalChange,
+    start,
+    dispose,
+  };
 }

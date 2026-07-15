@@ -4,7 +4,7 @@ import path from "path";
 import { aliases } from "./vite";
 
 /** Shared Vitest config (vitest.config.ts). */
-export function createVitestConfig({ root }: { root: string }) {
+export function createVitestConfig({ root, moduleAlias }: { root: string; moduleAlias: string }) {
   // shared/ lives at the repo root; each app module is nested at
   // app/modules/<name>, so shared src is three levels up. Its tests/setup live
   // outside the app root; use an absolute POSIX glob (fast-glob/tinyglobby
@@ -22,7 +22,7 @@ export function createVitestConfig({ root }: { root: string }) {
       ],
     },
     resolve: {
-      alias: aliases(root),
+      alias: aliases(root, moduleAlias),
     },
   });
 }
