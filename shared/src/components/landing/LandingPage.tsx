@@ -505,12 +505,14 @@ export const LandingPage = ({
                 <SectionIntro heading={content.pricing.heading} description={content.pricing.description} />
               </div>
 
-              {/* items-stretch + h-full: every card fills the height of the
-                  tallest one, so the three tiers read as one aligned row.
+              {/* items-stretch keeps the three tiers one aligned row; the
+                  non-popular wrappers get a top margin, which grid stretch
+                  subtracts from their height — so the side cards sit lower
+                  and bottom-aligned while the popular card rises above them.
                   planMinHeight stays as a floor for sparse content. */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 max-w-5xl mx-auto items-stretch">
                 {content.pricing.plans.map((plan) => (
-                  <div key={plan.name} className="h-full">
+                  <div key={plan.name} className={plan.popular ? undefined : "md:mt-10"}>
                     <div
                       className={`${card(plan.colorIndex, plan.colorIndex).className} neo-box-hover p-8 h-full flex flex-col gap-5 relative overflow-hidden`}
                       style={{ ...card(plan.colorIndex, plan.colorIndex).style, minHeight: `${content.pricing.planMinHeight}px` }}
