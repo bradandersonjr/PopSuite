@@ -410,10 +410,14 @@ const DocsRoot = ({ brand = "PopJot" }: { brand?: string }) => {
 
             <SubHeading>Overlay mode</SubHeading>
             <P>
-              <strong>Live</strong> (default) — The canvas shows real-time screen content beneath your strokes.
+              <strong>Live</strong> (default) — You draw straight onto the live screen. Live mode keeps
+              its hands off the app underneath, so open menus, dropdowns, and tooltips stay open while
+              you annotate over them.
               <br />
-              <strong>Snapshot</strong> — Captures the screen once when you activate the overlay, then freezes it.
-              Annotate over a static image of your screen.
+              <strong>Snapshot</strong> — Captures the screen once when you activate the overlay, then
+              freezes it so you annotate over a static image. Use this as the fallback for the rare cases
+              Live mode can&apos;t hold — mainly menus that dismiss themselves the moment you click away.
+              It takes a moment longer to appear because it has to grab the screen first.
             </P>
 
             {/* ─── Spotlight Mode ─── */}
@@ -422,8 +426,9 @@ const DocsRoot = ({ brand = "PopJot" }: { brand?: string }) => {
             <P>
               Spotlight is a presenter aid, separate from drawing: it dims the entire screen except
               a soft circle that follows your cursor, so you can call attention to one spot without
-              annotating anything. Press <Kbd>Alt</Kbd>+<Kbd>Shift</Kbd>+<Kbd>D</Kbd> (or{" "}
-              <Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>D</Kbd> on macOS) to toggle it on and off.
+              annotating anything. Hold <Kbd>Alt</Kbd>+<Kbd>Shift</Kbd>+<Kbd>D</Kbd> (or{" "}
+              <Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>D</Kbd> on macOS) to keep it active, and release to
+              exit — the same hold-to-activate feel as drawing.
             </P>
             <ul className="list-disc list-inside text-foreground/80 space-y-1 mb-4">
               <li><strong>Scroll the mouse wheel</strong> to resize the spotlight circle live, the same way brush size works while drawing.</li>
@@ -592,7 +597,7 @@ const DocsRoot = ({ brand = "PopJot" }: { brand?: string }) => {
                     <td className="py-2"><Kbd>Esc</Kbd></td>
                   </tr>
                   <tr className="border-b border-foreground/10">
-                    <td className="py-2 pr-4">Toggle Spotlight mode</td>
+                    <td className="py-2 pr-4">Spotlight mode (hold)</td>
                     <td className="py-2 pr-4"><Kbd>Alt</Kbd>+<Kbd>Shift</Kbd>+<Kbd>D</Kbd></td>
                     <td className="py-2"><Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>D</Kbd></td>
                   </tr>

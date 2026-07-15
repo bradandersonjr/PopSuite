@@ -1,7 +1,7 @@
 {
   "name": "popsuite-app",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "PopSuite desktop app: one Electron runtime with independent PopJot and PopKey overlay windows.",
   "author": "Brad Anderson <brad@bradandersonjr.com>",
   "main": "out/main/index.js",

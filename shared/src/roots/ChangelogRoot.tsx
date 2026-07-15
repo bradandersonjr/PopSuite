@@ -57,8 +57,22 @@ const ChangelogRoot = ({ brand = "PopJot" }: { brand?: string }) => {
         <h1 className="text-3xl font-bold text-foreground mb-2">Changelog</h1>
         <P>All notable changes, bug fixes, and improvements to {brand} are documented here.</P>
 
+        {/* ── PopSuite 1.1.0 ── */}
+        <SectionHeading id="popsuite-1-1-0" isFirst>PopSuite 1.1.0 &mdash; July 15, 2026</SectionHeading>
+        <P>
+          A big improvement to how PopJot draws over other apps, plus a smoother
+          Spotlight and several fixes.
+        </P>
+        <ul className="space-y-1 mb-6">
+          <Entry tag="improved">Live drawing mode no longer steals focus &mdash; open menus, dropdowns, and tooltips in the app underneath stay open while you draw over them (a big improvement when annotating apps like Fusion 360)</Entry>
+          <Entry tag="improved">Spotlight now works like drawing: hold the shortcut to keep it active and release to exit, instead of toggling on and off</Entry>
+          <Entry tag="improved">Snapshot mode activates faster, and Settings now explains it as the fallback for the rare cases Live mode can&apos;t hold (like menus that close the instant you click away)</Entry>
+          <Entry tag="fix">Fixed the system cursor briefly flickering into view when PopJot activated</Entry>
+          <Entry tag="fix">Fixed the Settings window occasionally showing one app&apos;s keyboard shortcut under the other app</Entry>
+        </ul>
+
         {/* ── PopSuite 1.0.0 ── */}
-        <SectionHeading id="popsuite-1-0-0" isFirst>PopSuite 1.0.0 &mdash; July 8, 2026</SectionHeading>
+        <SectionHeading id="popsuite-1-0-0">PopSuite 1.0.0 &mdash; July 8, 2026</SectionHeading>
         <P>
           PopJot now ships as part of <strong>PopSuite</strong>, a single desktop install
           that bundles PopJot and PopKey together. One installer, one tray icon, one
@@ -76,9 +90,12 @@ const ChangelogRoot = ({ brand = "PopJot" }: { brand?: string }) => {
           <Entry tag="improved">macOS and Linux builds are now available (unsigned) alongside the signed Windows installer</Entry>
         </ul>
 
-        {/* ── PopJot v1.0.0 ── */}
-        <SectionHeading id="v1-0-0">PopJot v1.0.0 &mdash; March 2026</SectionHeading>
-        <P>Initial public release of PopJot.</P>
+        {/* ── Earlier: the standalone apps ── */}
+        <SectionHeading id="before-popsuite">Before PopSuite</SectionHeading>
+        <P>
+          PopSuite grew out of two standalone apps, PopJot and PopKey, first
+          released in 2026. PopJot&apos;s initial release included:
+        </P>
         <ul className="space-y-1 mb-6">
           <Entry tag="new">Transparent fullscreen drawing overlay for desktop (Windows, macOS, Linux)</Entry>
           <Entry tag="new">Chrome extension with Shadow DOM overlay on any webpage</Entry>
