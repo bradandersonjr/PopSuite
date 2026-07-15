@@ -37,7 +37,7 @@ export function buildSuiteContent({
     hero: {
       brand: (
         <div className="flex flex-col items-center gap-3">
-          <h1 className="font-brand text-6xl md:text-8xl leading-none">
+          <h1 className="font-brand text-6xl md:text-8xl leading-none neo-text-lg">
             <span className="text-pop-yellow">Pop</span>
             <span className="text-foreground">Suite</span>
           </h1>
