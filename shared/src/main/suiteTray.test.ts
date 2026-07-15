@@ -32,6 +32,7 @@ function noopHandlers(): SuiteTrayHandlers {
   return {
     onToggle: vi.fn(),
     onAction: vi.fn(),
+    onToggleExtra: vi.fn(),
     onOpenAtLoginToggle: vi.fn(),
     onOpenLink: vi.fn(),
     onAbout: vi.fn(),
@@ -104,6 +105,46 @@ describe("buildSuiteTrayMenu", () => {
     expect(menu[2].label).toContain("PopJot");
     expect(menu[3].type).toBe("checkbox");
     expect(menu[3].label).toContain("PopKey");
+  });
+
+  it("renders a module's extra toggles right after its own Enable/Disable checkbox", () => {
+    const menu = buildSuiteTrayMenu(
+      [
+        makeModule({
+          appName: "PopKey",
+          extraToggles: [{ id: "obsMode", label: "OBS Mode", checked: false }],
+        }),
+      ],
+      noopHandlers(),
+      opts()
+    );
+    const toggleIndex = menu.findIndex((i) => i.type === "checkbox" && i.label?.includes("PopKey"));
+    const extra = menu[toggleIndex + 1];
+    expect(extra.type).toBe("checkbox");
+    expect(extra.label).toBe("OBS Mode");
+    expect(extra.checked).toBe(false);
+  });
+
+  it("wires an extra toggle's click to onToggleExtra with the module and toggle id", () => {
+    const handlers = noopHandlers();
+    const menu = buildSuiteTrayMenu(
+      [
+        makeModule({
+          appName: "PopKey",
+          extraToggles: [{ id: "obsMode", label: "OBS Mode", checked: true }],
+        }),
+      ],
+      handlers,
+      opts()
+    );
+    const extra = menu.find((i) => i.label === "OBS Mode")!;
+    extra.click!();
+    expect(handlers.onToggleExtra).toHaveBeenCalledWith("PopKey", "obsMode");
+  });
+
+  it("omits extra toggles entirely when a module reports none", () => {
+    const menu = buildSuiteTrayMenu([makeModule({ appName: "PopKey" })], noopHandlers(), opts());
+    expect(menu.find((i) => i.label === "OBS Mode")).toBeUndefined();
   });
 
   it("shows a single Settings item when any module offers settings", () => {
@@ -197,11 +238,11 @@ describe("buildSuiteTrayMenu", () => {
 
     menu.find((i) => i.label === "Changelog")!.click!();
     expect(handlers.onOpenLink).toHaveBeenCalledWith(SUITE_CHANGELOG_URL);
-    expect(SUITE_CHANGELOG_URL).toBe("https://popjot.app/changelog");
+    expect(SUITE_CHANGELOG_URL).toBe("https://popsuite.app/changelog");
 
     menu.find((i) => i.label === "Documentation")!.click!();
     expect(handlers.onOpenLink).toHaveBeenCalledWith(SUITE_DOCS_URL);
-    expect(SUITE_DOCS_URL).toBe("https://popjot.app/docs");
+    expect(SUITE_DOCS_URL).toBe("https://popsuite.app/docs");
   });
 
   it("wires toggle and Quit PopSuite clicks to the handlers", () => {

@@ -13,14 +13,14 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, ChevronDown, Plus, Minus, Settings } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { TooltipProvider } from "@shared/components/ui/tooltip";
 import { useMobileDetect } from "@shared/hooks/useMobileDetect";
 import MobileGate from "@shared/roots/MobileGate";
 
 export type CardStyle = { className: string; style: React.CSSProperties };
 
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-type IconComponent = React.ComponentType<any>;
+type IconComponent = LucideIcon;
 
 export interface LandingFeature {
   icon: IconComponent;
@@ -205,6 +205,7 @@ export const LandingPage = ({
   theme,
   settingsPanel,
   engine,
+  navExtras,
 }: {
   content: LandingContent;
   theme: LandingTheme;
@@ -212,6 +213,11 @@ export const LandingPage = ({
   settingsPanel: React.ReactNode;
   /** The app's live overlay engine, mounted at the page root. */
   engine: React.ReactNode;
+  /**
+   * Optional controls pinned top-left over the page (e.g. the PopSuite site's
+   * per-app engine toggles). Single-app WebRoots omit it.
+   */
+  navExtras?: React.ReactNode;
 }) => {
   const { appName } = content;
   const { card, colors, themeMode } = theme;
@@ -288,6 +294,8 @@ export const LandingPage = ({
         style={theme.cssVars}
       >
         {isMobile && <MobileGate />}
+
+        {navExtras}
 
         {theme.defs}
 
@@ -699,3 +707,4 @@ export const LandingPage = ({
     </TooltipProvider>
   );
 };
+

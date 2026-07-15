@@ -16,10 +16,19 @@
  * `effectiveIsPro` in SystemTray, so the UI is fully unlocked. The in-memory
  * state below makes the features actually functional during a web session
  * without requiring the private Pro build.
+ *
+ * Custom-palette state (proDrawPalette/proHighlighterPalette/proPaletteActive)
+ * is NOT module-level here — it lives in the Zustand store as real schema
+ * settings (see config/settingsSchema.ts) so edits made in the Settings window
+ * sync via the normal tray-settings IPC to the overlay window that actually
+ * renders the real menu. Those are two separate Electron renderer processes;
+ * plain module state doesn't cross that boundary.
  */
 
-import { getColors } from "@/config/themes";
-import type { ColorPalette } from "@/store/useStore";
+import { getColors } from "@popjot/config/themes";
+import { useStore, type ColorPalette } from "@popjot/store/useStore";
+import { isDesktop } from "@popjot/lib/platform";
+import { sendProDrawPalette, sendProHighlighterPalette, sendProPaletteActive } from "@popjot/lib/platform";
 
 /**
  * License gate. The real (private) build flips this via `setProLicensed` when a
@@ -37,28 +46,54 @@ export const isPro = (): boolean => licensed;
 
 // ─── Custom Palette ───────────────────────────────────────────────────────────
 
-let _palette: { draw: string[]; highlighter: string[] } | null = null;
+function parsePaletteJson(json: string): string[] | null {
+  if (!json) return null;
+  try {
+    const parsed = JSON.parse(json);
+    return Array.isArray(parsed) && parsed.every((c) => typeof c === "string") ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 export const getProPalette = (
   _p: ColorPalette | null,
-): { draw: readonly string[]; highlighter: readonly string[] } | null => _palette;
+): { draw: readonly string[]; highlighter: readonly string[] } | null => {
+  const state = useStore.getState();
+  if (!state.proPaletteActive) return null;
+  const draw = parsePaletteJson(state.proDrawPalette);
+  const highlighter = parsePaletteJson(state.proHighlighterPalette);
+  if (!draw || !highlighter) return null;
+  return { draw, highlighter };
+};
 
 export const setProPalette = (draw: string[], highlighter: string[]): void => {
-  _palette = { draw, highlighter };
+  const drawJson = JSON.stringify(draw);
+  const hlJson = JSON.stringify(highlighter);
+  useStore.getState().setProDrawPalette(drawJson);
+  useStore.getState().setProHighlighterPalette(hlJson);
+  if (isDesktop()) {
+    sendProDrawPalette(drawJson);
+    sendProHighlighterPalette(hlJson);
+  }
 };
 
 export const clearProPalette = (): void => {
-  _palette = null;
+  useStore.getState().setProDrawPalette("");
+  useStore.getState().setProHighlighterPalette("");
+  if (isDesktop()) {
+    sendProDrawPalette("");
+    sendProHighlighterPalette("");
+  }
 };
 
 // ─── Palette Active Toggle ────────────────────────────────────────────────────
 
-let _paletteActive = false;
-
-export const isProPaletteActive = (): boolean => _paletteActive && _palette !== null;
+export const isProPaletteActive = (): boolean => getProPalette(null) !== null;
 
 export const setProPaletteActive = (active: boolean): void => {
-  _paletteActive = active;
+  useStore.getState().setProPaletteActive(active);
+  if (isDesktop()) sendProPaletteActive(active);
 };
 
 // ─── Presets ──────────────────────────────────────────────────────────────────
@@ -125,10 +160,11 @@ export const getEffectiveColors = (
   palette: ColorPalette,
 ): { draw: readonly string[]; highlighter: readonly string[]; tertiary: readonly string[] } => {
   const base = getColors(palette);
-  if (_paletteActive && _palette) {
+  const pro = getProPalette(null);
+  if (pro) {
     return {
-      draw: _palette.draw as readonly string[],
-      highlighter: _palette.highlighter as readonly string[],
+      draw: pro.draw,
+      highlighter: pro.highlighter,
       tertiary: base.tertiary,
     };
   }

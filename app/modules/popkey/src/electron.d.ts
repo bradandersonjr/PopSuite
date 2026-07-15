@@ -1,6 +1,6 @@
 import type { SettingsSetters } from "@shared/settings/schema";
 import type { LicenseStatus } from "@shared/license/types";
-import type { settingsSchema } from "@/config/settingsSchema";
+import type { settingsSchema } from "@popkey/config/settingsSchema";
 
 type ShortcutUpdateResult =
   | { ok: true; shortcut: string }

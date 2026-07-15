@@ -1,0 +1,4 @@
+{
+  "extends": "../shared/tsconfig/node.json",
+  "include": ["vite.config.mts", "tailwind.config.ts", "../shared/config"]
+}

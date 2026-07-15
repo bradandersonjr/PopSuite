@@ -6,14 +6,14 @@ import {
   ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight,
   type LucideIcon,
 } from "lucide-react";
-import { useStore } from "@/store/useStore";
-import { isDesktop } from "@/lib/platform";
+import { useStore } from "@popkey/store/useStore";
+import { isDesktop } from "@popkey/lib/platform";
 import { getAnimationConfig } from "@shared/config/animations";
 import PaletteEffectOverlay from "@shared/components/PaletteEffectOverlay";
-import type { BadgeType } from "@/hooks/useInputCapture";
-import { getBadgeGradientStops } from "@/config/themes";
-import { fontStackFor } from "@/config/fonts";
-import { getBadgeMotion } from "@/config/badgeAnimations";
+import type { BadgeType } from "@popkey/hooks/useInputCapture";
+import { getBadgeGradientStops } from "@popkey/config/themes";
+import { fontStackFor } from "@popkey/config/fonts";
+import { getBadgeMotion } from "@popkey/config/badgeAnimations";
 
 function withAlpha(color: string, alpha: number): string {
   const clamped = Math.max(0, Math.min(1, alpha));

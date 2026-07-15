@@ -68,6 +68,18 @@ function subscribeSetting(
   return onTrayMenuChange(channel, callback);
 }
 
+// Module-fixed shortcut read, same reasoning as subscribeSetting above: both
+// panels' mount-time getShortcuts() calls would otherwise resolve through the
+// mutable `activeId` and race — whichever module ISN'T active at that instant
+// reads the OTHER module's shortcuts (this is the bug that made PopKey's
+// Settings briefly show PopJot's "Alt+Shift+A" as its own shortcut).
+function getShortcuts(id: ModuleId): Promise<Record<string, string>> {
+  const getter = moduleApis[id].getShortcuts as
+    | (() => Promise<Record<string, string>>)
+    | undefined;
+  return getter?.() ?? Promise.resolve({});
+}
+
 const stateListeners = new Set<(state: SettingsState) => void>();
 
 ipcRenderer.on(
@@ -95,6 +107,7 @@ contextBridge.exposeInMainWorld("suiteSettings", {
     ipcRenderer.send("suite:settings-seed", id);
   },
   subscribeSetting,
+  getShortcuts,
   close: (): void => {
     ipcRenderer.send("suite:settings-close");
   },

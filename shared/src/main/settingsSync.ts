@@ -28,6 +28,8 @@ export interface SettingsSyncOptions<S extends SettingsSchema> {
   sendToRenderers: (channel: string, value: unknown) => void;
   /** The controller's live (mutable) values object. */
   getValues: () => SettingsValues<S>;
+  /** Extra fields merged into the per-app JSON on save (e.g. persisted shortcuts). */
+  getExtraPersistedFields?: () => Record<string, unknown>;
 }
 
 export interface SettingsSync<S extends SettingsSchema> {
@@ -93,7 +95,7 @@ export function createSettingsSync<S extends SettingsSchema>(
     const values = getValues() as Record<string, unknown>;
     const out: Record<string, unknown> = {};
     for (const key of nonVolatileKeys) out[key] = values[key];
-    return out;
+    return { ...out, ...opts.getExtraPersistedFields?.() };
   }
 
   let appSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -226,5 +228,10 @@ export function createSettingsSync<S extends SettingsSchema>(
     ipcMain.removeAllListeners(ipcChannel("set-sync-all"));
   }
 
-  return { initialValues: initialValues as Partial<SettingsValues<S>>, onLocalChange, start, dispose };
+  return {
+    initialValues: initialValues as Partial<SettingsValues<S>>,
+    onLocalChange,
+    start,
+    dispose,
+  };
 }

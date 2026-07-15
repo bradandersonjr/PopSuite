@@ -145,6 +145,7 @@ function launcherTrayIconPath(): string {
             if (actionId === SUITE_ACTION_SETTINGS) openSettingsFor(appName);
             else trayServer?.action(appName, actionId);
           },
+          onToggleExtra: (appName, toggleId) => trayServer?.toggleExtra(appName, toggleId),
           onOpenAtLoginToggle: () => {
             setLauncherOpenAtLogin(!getLauncherOpenAtLogin());
             // Rebuild so the checkbox reflects the new state immediately.

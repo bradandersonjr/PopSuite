@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { getLicenseStatus, onLicenseChange, type LicenseStatus } from "@shared/license/renderer";
-import { setProLicensed } from "@/pro";
-import { useStore } from "@/store/useStore";
+import { setProLicensed } from "@popjot/pro";
+import { useStore } from "@popjot/store/useStore";
 
 /**
  * Syncs Pro license state into this renderer window. Mount once per window

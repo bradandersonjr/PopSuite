@@ -10,7 +10,7 @@ const P = ({ children }: { children: React.ReactNode }) => (
   <p className="text-foreground/80 leading-relaxed mb-4">{children}</p>
 );
 
-const TermsRoot = () => {
+const TermsRoot = ({ brand = "PopJot" }: { brand?: string }) => {
   return (
     <div className="w-full min-h-screen bg-background theme-dark">
       {/* ─── Top bar ─── */}
@@ -21,7 +21,7 @@ const TermsRoot = () => {
               <ArrowLeft className="w-4 h-4" />
               <span className="font-brand text-lg">
                 <span className="text-pop-yellow">Pop</span>
-                <span className="text-foreground">Jot</span>
+                <span className="text-foreground">{brand.replace(/^Pop/, "")}</span>
               </span>
             </a>
             <span className="text-foreground/30">/</span>
@@ -37,28 +37,28 @@ const TermsRoot = () => {
 
         <SectionHeading id="agreement" isFirst>Agreement</SectionHeading>
         <P>
-          By downloading, installing, or using PopJot (&ldquo;the Software&rdquo;), you agree to
-          these Terms of Service. PopJot is distributed as part of the PopSuite desktop install
-          alongside PopKey; these terms apply equally to both. If you do not agree, do not use the
+          By downloading, installing, or using {brand} (&ldquo;the Software&rdquo;), you agree to
+          these Terms of Service. {brand} is distributed as part of the PopSuite desktop install
+          (PopJot and PopKey); these terms apply equally to both. If you do not agree, do not use the
           Software. These terms are governed by the laws of the State of Georgia, United States.
         </P>
 
         <SectionHeading id="license">License</SectionHeading>
         <P>
-          PopJot is free to use. Optional Pro features are available as a one-time purchase.
+          {brand} is free to use. Optional Pro features are available as a one-time purchase.
           Whether or not you purchase Pro, you receive a personal, non-exclusive,
           non-transferable license to install and use the Software on your own devices. You may
           install it on multiple devices that you personally own or control.
         </P>
         <P>
           The license is granted to you as an individual. It may not be shared, transferred,
-          sublicensed, or sold to another person. Organizations wishing to deploy PopJot across
+          sublicensed, or sold to another person. Organizations wishing to deploy {brand} across
           multiple users must purchase a license for each user.
         </P>
 
         <SectionHeading id="permitted-use">Permitted Use</SectionHeading>
         <P>
-          You may use PopJot for personal and professional purposes, including:
+          You may use {brand} for personal and professional purposes, including:
         </P>
         <ul className="list-disc list-inside text-foreground/80 space-y-1 mb-4">
           <li>Screen recordings and video tutorials published commercially</li>
@@ -82,9 +82,9 @@ const TermsRoot = () => {
 
         <SectionHeading id="refunds">Refund Policy</SectionHeading>
         <P>
-          All sales are final. Because PopJot is a digital software product that is immediately
+          All sales are final. Because {brand} is a digital software product that is immediately
           accessible upon purchase, refunds are not offered. Please review the free web demo and
-          documentation at <a href="https://popjot.app" className="text-foreground hover:underline">popjot.app</a> before
+          documentation at <a href="/" className="text-foreground hover:underline">the website</a> before
           purchasing to ensure the Software meets your needs.
         </P>
         <P>
@@ -98,7 +98,7 @@ const TermsRoot = () => {
 
         <SectionHeading id="updates">Updates</SectionHeading>
         <P>
-          Your purchase includes all future updates to the major version of PopJot you purchased.
+          Your purchase includes all future updates to the major version of {brand} you purchased.
           Brad Anderson Jr reserves the right to determine what constitutes a major version change
           at their sole discretion.
         </P>
@@ -140,7 +140,7 @@ const TermsRoot = () => {
         <div className="mt-20 pt-8 border-t border-foreground/10">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <a href="/" className="text-sm text-foreground/50 hover:text-foreground transition-colors">
-              &larr; Back to PopJot
+              &larr; Back to {brand}
             </a>
             <div className="flex gap-6 text-sm text-foreground/40">
               <a href="/docs" className="hover:text-foreground transition-colors">Docs</a>

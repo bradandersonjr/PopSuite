@@ -31,6 +31,12 @@ declare module "@popjot/components/SystemTray" {
   const SystemTray: import("react").ComponentType<{
     unifiedSettingsMode?: boolean;
     suiteSection?: SuiteSectionRequest;
+    getShortcutsOverride?: () => Promise<{
+      main: string;
+      persistent: string;
+      spotlight: string;
+      lastTool: string;
+    }>;
   }>;
   export default SystemTray;
 }
@@ -50,6 +56,7 @@ declare module "@popkey/components/SystemTray" {
   const SystemTray: import("react").ComponentType<{
     unifiedSettingsMode?: boolean;
     suiteSection?: SuiteSectionRequest;
+    getShortcutsOverride?: () => Promise<{ main: string }>;
   }>;
   export default SystemTray;
 }

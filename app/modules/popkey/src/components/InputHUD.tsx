@@ -1,8 +1,8 @@
 import { AnimatePresence } from "framer-motion";
-import { useStore } from "@/store/useStore";
-import { resolvePaletteColors } from "@/config/themes";
+import { useStore } from "@popkey/store/useStore";
+import { resolvePaletteColors } from "@popkey/config/themes";
 import KeyBadge from "./KeyBadge";
-import type { Badge } from "@/hooks/useInputCapture";
+import type { Badge } from "@popkey/hooks/useInputCapture";
 
 interface InputHUDProps {
   badges: Badge[];

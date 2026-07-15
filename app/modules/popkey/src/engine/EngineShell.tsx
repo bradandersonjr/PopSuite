@@ -1,9 +1,9 @@
-import { useStore } from "@/store/useStore";
-import { useInputCapture } from "@/hooks/useInputCapture";
-import InputHUD from "@/components/InputHUD";
-import MouseRipple from "@/components/MouseRipple";
-import ScrollIndicator from "@/components/ScrollIndicator";
-import BrandingOverlay from "@/components/BrandingOverlay";
+import { useStore } from "@popkey/store/useStore";
+import { useInputCapture } from "@popkey/hooks/useInputCapture";
+import InputHUD from "@popkey/components/InputHUD";
+import MouseRipple from "@popkey/components/MouseRipple";
+import ScrollIndicator from "@popkey/components/ScrollIndicator";
+import BrandingOverlay from "@popkey/components/BrandingOverlay";
 
 const EngineShell = () => {
   const { appEnabled, showMouseClicks, showScrollWheel } = useStore();

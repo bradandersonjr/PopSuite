@@ -1,5 +1,4 @@
-import { isValidElement, useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { createPortal } from "react-dom";
+import { isValidElement, useCallback, useEffect, useMemo, useState } from "react";
 import {
   getShortcuts,
   isDesktop,
@@ -17,9 +16,11 @@ import {
   sendDisplayPosition,
   sendKeyboardEnabled,
   sendShowKeyRepeat,
+  sendPlainNumpadDigits,
   sendMaxBadges,
   sendMouseEnabled,
   sendObsMode,
+  sendHideDuringAnnotation,
   sendScaleMultiplier,
   sendPositionOffsetX,
   sendPositionOffsetY,
@@ -33,7 +34,7 @@ import {
   sendShowScrollWheel,
   sendThemeMode,
   setMainShortcut,
-} from "@/lib/platform";
+} from "@popkey/lib/platform";
 import {
   type Option,
   OptionGrid,
@@ -50,12 +51,13 @@ import {
   ShortcutErrorBanner,
   SliderRow,
   ToggleRow,
+  ColorMixerPopover,
   useOpenAtLogin,
   useShortcutRecorder,
 } from "@shared/components/settings";
-import { settingsSchema } from "@/config/settingsSchema";
-import { BADGE_FONTS, fontStackFor } from "@/config/fonts";
-import { BADGE_ANIMATIONS } from "@/config/badgeAnimations";
+import { settingsSchema } from "@popkey/config/settingsSchema";
+import { BADGE_FONTS, fontStackFor } from "@popkey/config/fonts";
+import { BADGE_ANIMATIONS } from "@popkey/config/badgeAnimations";
 import { activateLicense, deactivateLicense } from "@shared/license/renderer";
 import { LogOut, Lock, Settings } from "lucide-react";
 import {
@@ -69,280 +71,16 @@ import {
   DisplayPosition,
   ThemeMode,
   useStore,
-} from "@/store/useStore";
+} from "@popkey/store/useStore";
 import { getMenuColors, getSurfacePalette, type SurfacePalette } from "@shared/config/desktopTheme";
-import { getBadgeColors, getBadgeGradientStops, PALETTE_NAMES, isProPalette, resolvePaletteColors } from "@/config/themes";
-import BrandingSettings from "@/components/BrandingSettings";
-import { FontPicker } from "@/components/FontPicker";
+import { getBadgeColors, getBadgeGradientStops, PALETTE_NAMES, isProPalette, resolvePaletteColors } from "@popkey/config/themes";
+import BrandingSettings from "@popkey/components/BrandingSettings";
+import { FontPicker } from "@popkey/components/FontPicker";
 
 /** Ko-fi product page where buyers get a PopKey Pro key. */
 const POPKEY_PRO_URL = "https://ko-fi.com/s/264fd0031f";
 import { isMac } from "@shared/lib/hotkeys";
-import { useTraySettingsSync } from "@/hooks/useTraySettingsSync";
-
-// ─── Custom Color Mixer Helpers ──────────────────────────────────────
-
-function hexToHsl(hex: string): { h: number; s: number; l: number } {
-  let r = 0, g = 0, b = 0;
-  if (/^#?([0-9a-fA-F]{3})$/.test(hex)) {
-    r = parseInt(hex[1] + hex[1], 16);
-    g = parseInt(hex[2] + hex[2], 16);
-    b = parseInt(hex[3] + hex[3], 16);
-  } else if (/^#?([0-9a-fA-F]{6})$/.test(hex)) {
-    r = parseInt(hex.slice(1, 3), 16);
-    g = parseInt(hex.slice(3, 5), 16);
-    b = parseInt(hex.slice(5, 7), 16);
-  }
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0;
-  const l = (max + min) / 2;
-
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
-    }
-    h /= 6;
-  }
-  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
-}
-
-function hslToHex(h: number, s: number, l: number): string {
-  s /= 100;
-  l /= 100;
-  const k = (n: number) => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n: number) =>
-    l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
-  const toHex = (x: number) => {
-    const hex = Math.round(x * 255).toString(16);
-    return hex.length === 1 ? "0" + hex : hex;
-  };
-  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
-}
-
-interface CustomColorPickerProps {
-  currentColor: string;
-  onColorChange: (hex: string) => void;
-  surfacePalette: SurfacePalette;
-  paletteColors: string[];
-}
-
-const CustomColorPicker = ({ currentColor, onColorChange, surfacePalette, paletteColors }: CustomColorPickerProps) => {
-  const [showPicker, setShowPicker] = useState(false);
-  const [tempHex, setTempHex] = useState(currentColor);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const [coords, setCoords] = useState({ top: 0, left: 0, showBelow: false });
-
-  useEffect(() => {
-    setTempHex(currentColor);
-  }, [currentColor]);
-
-  const { h, s, l } = useMemo(() => {
-    try {
-      return hexToHsl(tempHex);
-    } catch {
-      return { h: 0, s: 100, l: 50 };
-    }
-  }, [tempHex]);
-
-  const updateCoords = () => {
-    if (triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      const popoverWidth = 250;
-      const showBelow = rect.top - 290 < 10;
-      
-      setCoords({
-        top: showBelow ? rect.bottom + 8 : rect.top - 8,
-        left: Math.max(10, Math.min(window.innerWidth - popoverWidth - 10, rect.right - popoverWidth)),
-        showBelow
-      });
-    }
-  };
-
-  const closePicker = () => {
-    // Apply color when closing picker
-    if (tempHex !== currentColor && /^#[0-9a-fA-F]{6}$/.test(tempHex)) {
-      onColorChange(tempHex);
-    }
-    setShowPicker(false);
-  };
-
-  const togglePicker = () => {
-    if (!showPicker) {
-      updateCoords();
-      setShowPicker(true);
-    } else {
-      closePicker();
-    }
-  };
-
-  useEffect(() => {
-    if (showPicker) {
-      updateCoords();
-      window.addEventListener("scroll", updateCoords, true);
-      window.addEventListener("resize", updateCoords);
-      return () => {
-        window.removeEventListener("scroll", updateCoords, true);
-        window.removeEventListener("resize", updateCoords);
-      };
-    }
-  }, [showPicker]);
-
-  const handleHslChange = (newH: number, newS: number, newL: number) => {
-    const hex = hslToHex(newH, newS, newL);
-    setTempHex(hex);
-  };
-
-  const handleHexInput = (val: string) => {
-    setTempHex(val);
-  };
-
-  return (
-    <div className="relative">
-      <div
-        className="flex items-center gap-2 rounded-[12px] px-2.5 py-1.5 animate-in fade-in duration-200"
-        style={{ backgroundColor: surfacePalette.card, border: `1.5px solid ${surfacePalette.divider}` }}
-      >
-        <button
-          ref={triggerRef}
-          onClick={togglePicker}
-          title="Open color mixer"
-          className="w-5 h-5 rounded-full flex-shrink-0 cursor-pointer transition-transform hover:scale-110 active:scale-95 ring-1 ring-black/10"
-          style={{
-            backgroundColor: tempHex,
-            boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
-          }}
-        />
-        <input
-          type="text"
-          value={tempHex}
-          onChange={(e) => handleHexInput(e.target.value)}
-          maxLength={7}
-          spellCheck={false}
-          style={{
-            width: 68,
-            fontFamily: "'Space Mono', monospace",
-            fontSize: 13,
-            fontWeight: 600,
-            color: surfacePalette.text,
-            background: "transparent",
-            border: "none",
-            outline: "none",
-          }}
-        />
-      </div>
-
-      {showPicker && createPortal(
-        <>
-          <div className="fixed inset-0 z-[9998]" onClick={closePicker} />
-          <div
-            className="fixed z-[9999] w-[250px]"
-            style={{
-              top: coords.top,
-              left: coords.left,
-              transform: coords.showBelow ? "none" : "translateY(-100%)",
-            }}
-          >
-            <div
-              className={`w-full rounded-2xl p-4 flex flex-col gap-3 shadow-2xl border animate-in fade-in zoom-in-95 duration-150 ${
-                coords.showBelow ? "origin-top" : "origin-bottom"
-              }`}
-              style={{
-                backgroundColor: surfacePalette.panel,
-                borderColor: surfacePalette.divider,
-                color: surfacePalette.text,
-              }}
-            >
-              <div className="text-xs font-bold uppercase tracking-wider opacity-60">Color Mixer</div>
-              
-              {/* Hue Slider (Red to Red) */}
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-between text-[11px] font-semibold opacity-70">
-                  <span>Hue</span>
-                  <span>{h}°</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={360}
-                  value={h}
-                  onChange={(e) => handleHslChange(Number(e.target.value), s, l)}
-                  className="w-full mixer-slider cursor-pointer"
-                  style={{
-                    background: "linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
-                  }}
-                />
-              </div>
-
-              {/* Saturation Slider */}
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-between text-[11px] font-semibold opacity-70">
-                  <span>Saturation</span>
-                  <span>{s}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={s}
-                  onChange={(e) => handleHslChange(h, Number(e.target.value), l)}
-                  className="w-full mixer-slider cursor-pointer"
-                  style={{
-                    background: `linear-gradient(to right, #808080, hsl(${h}, 100%, 50%))`,
-                  }}
-                />
-              </div>
-
-              {/* Lightness Slider */}
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-between text-[11px] font-semibold opacity-70">
-                  <span>Lightness</span>
-                  <span>{l}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={10}
-                  max={90}
-                  value={l}
-                  onChange={(e) => handleHslChange(h, s, Number(e.target.value))}
-                  className="w-full mixer-slider cursor-pointer"
-                  style={{
-                    background: `linear-gradient(to right, #000000, hsl(${h}, ${s}%, 50%), #ffffff)`,
-                  }}
-                />
-              </div>
-
-              {/* Color History */}
-              {paletteColors.length > 0 && (
-                <div className="flex flex-col gap-2 pt-2.5 border-t" style={{ borderColor: surfacePalette.divider }}>
-                  <div className="text-[10px] font-bold uppercase tracking-wider opacity-60">History</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 22px)", gap: 6 }}>
-                    {paletteColors.map((hex) => (
-                      <button
-                        key={hex}
-                        onClick={() => {
-                          setTempHex(hex);
-                        }}
-                        className="w-[22px] h-[22px] rounded-full border border-black/10 transition-transform hover:scale-110 active:scale-95"
-                        style={{ backgroundColor: hex }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </>,
-        document.body
-      )}
-    </div>
-  );
-};
+import { useTraySettingsSync } from "@popkey/hooks/useTraySettingsSync";
 
 interface BadgeStylePickerProps {
   badgeStyle: BadgeStyle;
@@ -470,6 +208,18 @@ type SystemTrayProps = {
   embedded?: boolean;
   unifiedSettingsMode?: boolean;
   suiteSection?: SuiteSectionRequest;
+  /** Web-demo override: record real hotkeys into the store even off desktop. */
+  demoShortcuts?: boolean;
+  /**
+   * Module-fixed shortcut read for the suite Settings window, which mounts
+   * BOTH modules' panels at once against a single mutable-`activeId` bridge
+   * (see app/src/main/suiteSettings/preload.ts). Without this, the ambient
+   * getShortcuts() below would resolve through whichever module happens to be
+   * "active" at mount time, so the non-active panel would read the OTHER
+   * module's shortcuts. Standalone builds omit it and use the module's own
+   * (already correctly namespaced) getShortcuts().
+   */
+  getShortcutsOverride?: () => Promise<{ main: string }>;
 };
 
 const SystemTray = ({
@@ -477,6 +227,8 @@ const SystemTray = ({
   embedded = false,
   unifiedSettingsMode = false,
   suiteSection,
+  demoShortcuts = false,
+  getShortcutsOverride,
 }: SystemTrayProps) => {
   const [colorHistory, setColorHistory] = useState<string[]>([]);
 
@@ -523,6 +275,8 @@ const SystemTray = ({
     setKeyboardEnabled: setKeyboardEnabledLocal,
     showKeyRepeat,
     setShowKeyRepeat: setShowKeyRepeatLocal,
+    plainNumpadDigits,
+    setPlainNumpadDigits: setPlainNumpadDigitsLocal,
     mouseEnabled,
     setMouseEnabled: setMouseEnabledLocal,
     badgeRoundness,
@@ -539,6 +293,8 @@ const SystemTray = ({
     setSolidColor: setSolidColorLocal,
     obsMode,
     setObsMode: setObsModeLocal,
+    hideDuringAnnotation,
+    setHideDuringAnnotation: setHideDuringAnnotationLocal,
     isPro,
   } = useStore();
 
@@ -565,11 +321,12 @@ const SystemTray = ({
   useEffect(() => {
     if (!desktop) return;
     let mounted = true;
-    void getShortcuts().then(({ main }) => {
+    const load = getShortcutsOverride ?? getShortcuts;
+    void load().then(({ main }) => {
       if (mounted) setHotkey(main);
     });
     return () => { mounted = false; };
-  }, [desktop, setHotkey]);
+  }, [desktop, setHotkey, getShortcutsOverride]);
 
   const commitShortcut = useCallback(
     async (_kind: string, formatted: string) => {
@@ -682,6 +439,11 @@ const SystemTray = ({
     setShowKeyRepeatLocal(v);
     sendShowKeyRepeat(v);
   };
+  const togglePlainNumpadDigits = () => {
+    const v = !plainNumpadDigits;
+    setPlainNumpadDigitsLocal(v);
+    sendPlainNumpadDigits(v);
+  };
   // Word mode toggle — disabled, see src/hooks/useWordCapture.ts
   const toggleMouseEnabled = () => {
     const v = !mouseEnabled;
@@ -717,6 +479,11 @@ const SystemTray = ({
     const v = !obsMode;
     setObsModeLocal(v);
     sendObsMode(v);
+  };
+  const toggleHideDuringAnnotation = () => {
+    const v = !hideDuringAnnotation;
+    setHideDuringAnnotationLocal(v);
+    sendHideDuringAnnotation(v);
   };
 
   // ─── PopKey-specific pickers ──────────────────────────────────────────
@@ -755,11 +522,11 @@ const SystemTray = ({
             <span className="capitalize">{name}</span>
             {isSolid && isSelected ? (
               <div onClick={(e) => e.stopPropagation()}>
-                <CustomColorPicker
+                <ColorMixerPopover
                   currentColor={solidColor}
                   onColorChange={applySolidColor}
                   surfacePalette={surfacePalette}
-                  paletteColors={colorHistory}
+                  historyColors={colorHistory}
                 />
               </div>
             ) : (
@@ -827,11 +594,11 @@ const SystemTray = ({
             }}
           />
         )}
-        <CustomColorPicker
+        <ColorMixerPopover
           currentColor={isPalette ? paletteColors[0] : currentColor}
           onColorChange={onColorChange}
           surfacePalette={surfacePalette}
-          paletteColors={paletteColors}
+          historyColors={paletteColors}
         />
       </div>
     );
@@ -979,6 +746,9 @@ const SystemTray = ({
             {keyboardEnabled && (
               <ToggleRow label="Key repeats" description="Count a held key as it auto-repeats (×N)" checked={showKeyRepeat} onChange={toggleShowKeyRepeat} />
             )}
+            {keyboardEnabled && (
+              <ToggleRow label="Plain numpad digits" description="Show numpad numbers as 1, 2, 3... instead of Num1, Num2, Num3 (handy for CAD)" checked={plainNumpadDigits} onChange={togglePlainNumpadDigits} />
+            )}
             {/* Word mode toggle — disabled, see src/hooks/useWordCapture.ts */}
             <ToggleRow label="Mouse" description="Show mouse input" checked={mouseEnabled} onChange={toggleMouseEnabled} />
           </div>
@@ -1015,7 +785,7 @@ const SystemTray = ({
     },
     {
       title: "Shortcuts",
-      items: desktop ? [
+      items: desktop || demoShortcuts ? [
         <SettingGroup key="shortcut" title="Toggle Shortcut" description="Global shortcut to show/hide PopKey">
           <ShortcutButton
             currentShortcut={hotkey}
@@ -1082,6 +852,14 @@ const SystemTray = ({
             description="Overlay drops to normal z-order — capture it separately and composite in OBS"
             checked={obsMode}
             onChange={toggleObsMode}
+          />
+        </SettingGroup>,
+        <SettingGroup key="suite" title="PopSuite" description="Behavior when running alongside PopJot">
+          <ToggleRow
+            label="Hide while PopJot is active"
+            description="Auto-hide PopKey while PopJot is annotating or in spotlight"
+            checked={hideDuringAnnotation}
+            onChange={toggleHideDuringAnnotation}
           />
         </SettingGroup>,
         <SettingGroup key="startup" title="Startup" description="Configure application startup behavior">

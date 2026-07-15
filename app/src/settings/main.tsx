@@ -17,13 +17,13 @@ import {
   SettingGroup,
   SettingsUIProvider,
   SuiteImportExport,
+  SuitePresets,
   ToastProvider,
 } from "@shared/components/settings";
 import { getSurfacePalette } from "@shared/config/desktopTheme";
 import { quitApp } from "@shared/settings/renderer";
 import { getLicenseStatus, onLicenseChange } from "@shared/license/renderer";
 import { isMac } from "@shared/lib/hotkeys";
-import { SuitePresets } from "./SuitePresets";
 import PopJotSystemTray, {
   type SuiteSectionRequest,
 } from "@popjot/components/SystemTray";
@@ -64,6 +64,15 @@ declare global {
         channel: string,
         callback: (value: unknown) => void,
       ): () => void;
+      // Module-fixed shortcut read, same reasoning as subscribeSetting: avoids
+      // racing the mutable activeId on mount. See preload.ts's getShortcuts.
+      getShortcuts(id: "popjot"): Promise<{
+        main: string;
+        persistent: string;
+        spotlight: string;
+        lastTool: string;
+      }>;
+      getShortcuts(id: "popkey"): Promise<{ main: string }>;
       close(): void;
       onStateChanged(callback: (state: SettingsState) => void): () => void;
       syncPresets(payload: {
@@ -238,14 +247,24 @@ function PopJotPanel({ section }: { section: SuiteSectionRequest }) {
   usePopJotTraySettingsSync(subscribePopJotSetting);
   usePopJotLicenseSync();
   useEffect(() => window.suiteSettings.seed("popjot"), []);
-  return <PopJotSystemTray suiteSection={section} />;
+  return (
+    <PopJotSystemTray
+      suiteSection={section}
+      getShortcutsOverride={() => window.suiteSettings.getShortcuts("popjot")}
+    />
+  );
 }
 
 function PopKeyPanel({ section }: { section: SuiteSectionRequest }) {
   usePopKeyTraySettingsSync(subscribePopKeySetting);
   usePopKeyLicenseSync();
   useEffect(() => window.suiteSettings.seed("popkey"), []);
-  return <PopKeySystemTray suiteSection={section} />;
+  return (
+    <PopKeySystemTray
+      suiteSection={section}
+      getShortcutsOverride={() => window.suiteSettings.getShortcuts("popkey")}
+    />
+  );
 }
 
 /**

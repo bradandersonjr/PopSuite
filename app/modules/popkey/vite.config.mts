@@ -1,3 +1,3 @@
 import { createWebConfig } from "../../../shared/config/vite";
 
-export default createWebConfig({ root: __dirname, port: 8081 });
+export default createWebConfig({ root: __dirname, port: 8081, moduleAlias: "@popkey" });

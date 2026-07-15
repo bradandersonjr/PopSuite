@@ -40,6 +40,9 @@ export const settingsSchema = {
   keyboardEnabled: setting.boolean(true),
   // Show a ×N counter on a held key as the OS auto-repeats it.
   showKeyRepeat: setting.boolean(false),
+  // Display numpad digits as plain numbers (e.g. "1" instead of "Num1") — handy
+  // for CAD/DAW workflows where the numpad is just a numeric input.
+  plainNumpadDigits: setting.boolean(false),
   wordMode: setting.boolean(false),
   mouseEnabled: setting.boolean(true),
   showMouseClicks: setting.boolean(true),
@@ -48,6 +51,9 @@ export const settingsSchema = {
   // z-order. Lets OBS capture PopKey as its own window source (and composite
   // later) instead of hard-baking it on top of everything else on screen.
   obsMode: setting.boolean(false),
+  // Suite auto-suppression: hide PopKey while PopJot annotates/spotlights.
+  // Default on so the "PopJot always wins" behavior is preserved; suite-only.
+  hideDuringAnnotation: setting.boolean(true),
   scrollColor: setting.string("palette"), // "palette" = use palette, else hex
   clickColor: setting.string("palette"), // "palette" = use palette, else hex
   // Solid palette: single-color badges. Uses a custom color instead of palette colors.
@@ -60,6 +66,10 @@ export const settingsSchema = {
   brandingImage: setting.string(""), // data URL of the chosen image
   brandingCorner: setting.enum(["top-left", "top-right", "bottom-left", "bottom-right"], "top-right"),
   brandingSize: setting.number(80, { positive: true }), // max width/height in px
+  // Fine-tune the logo away from its corner, same convention as the badges'
+  // positionOffsetX/Y: positive X moves right, positive Y moves down.
+  brandingOffsetX: setting.number(0),
+  brandingOffsetY: setting.number(0),
   brandingOpacity: setting.number(100),
   brandingRadius: setting.number(0), // corner rounding 0–50%
   brandingGrayscale: setting.boolean(false), // render the logo black & white

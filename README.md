@@ -9,9 +9,11 @@ one codebase:
    runtime (app/) owns two independent PopJot and PopKey overlay windows under a
    single unified tray. The tools share a process, not a window or renderer.
    See app/README.md for the architecture.
-2. **Two websites** — [popjot.app](https://popjot.app) and
-   [popkey.app](https://popkey.app), static Vite builds of each app's
-   `src/roots/WebRoot.tsx`, deployed from this repo via Cloudflare Pages.
+2. **One website** — [popsuite.app](https://popsuite.app), a static Vite build
+   of the `site/` workspace that mounts BOTH apps' live demo engines on one
+   page (each individually toggleable), deployed from this repo via Cloudflare
+   Pages. The old per-app domains (popjot.app, popkey.app) now serve redirects
+   to popsuite.app (see `site/DEPLOY.md`).
 3. **Chromium extensions** — `app/modules/popjot/extension/` and
    `app/modules/popkey/extension/`, parked/dormant but buildable
    (`build:extension` per module).
@@ -49,9 +51,8 @@ shared by `shared/`, both modules, and `app`:
 
 ```sh
 npm install          # one hoisted workspace install for everything
-npm run dev          # runs PopJot + PopKey web dev servers in parallel
-npm run build        # builds both websites
-npm run dev:popjot   # single app's web dev server
+npm run dev          # runs the popsuite.app site dev server (both engines)
+npm run build        # builds the popsuite.app site (site/dist)
 ```
 
 To run a single app's desktop build directly (dev-only; standalone per-app
@@ -76,10 +77,10 @@ Run from the repo root; each fans out to the relevant workspace member(s) via
 
 | Script | What it does |
 | --- | --- |
-| `dev` | PopJot + PopKey web dev servers (Vite), in parallel |
-| `dev:popjot` / `dev:popkey` | Single app's web dev server |
-| `build` | Builds both apps' websites (`app/modules/popjot/dist`, `app/modules/popkey/dist`) |
-| `build:popjot` / `build:popkey` | Single app's website build |
+| `dev` / `dev:site` | popsuite.app site dev server (both live engines) |
+| `build` / `build:site` | Builds the popsuite.app site (`site/dist`) |
+| `preview:site` | Serves the built `site/dist` locally |
+| `build:popjot` / `build:popkey` | Emits the redirect-only dist (`app/modules/<app>/dist`) that popjot.app / popkey.app publish to bounce visitors to popsuite.app |
 | `dev:module:popjot` / `dev:module:popkey` | Run that app's Electron desktop build standalone (dev) |
 | `dev:suite` | Both modules' Electron dev servers under `app/`'s own configs, in parallel |
 | `build:suite` | Builds the suite (launcher + both module bundles) |
@@ -104,9 +105,10 @@ enable toggles, shortcuts, settings, and overlay lifecycles remain separate.
 PopJot annotation state still suppresses PopKey temporarily and restores the
 previous PopKey state afterward.
 
-The two public websites remain independent static Vite builds from their existing
-WebRoot entry points. Standalone per-module Electron development commands also
-remain available for isolating and debugging one tool at a time.
+The public website is a single static Vite build (the `site/` workspace) that
+mounts both apps' live demo engines on one page; popjot.app and popkey.app
+redirect to it. Standalone per-module Electron development commands also remain
+available for isolating and debugging one tool at a time.
 
 Per-app standalone installers (`PopJot.exe` / `PopKey.exe` as separate products)
 are **deprecated**; their packaging scripts and workflows were removed. Desktop
@@ -151,7 +153,9 @@ The big shared pieces:
 - **Landing page template** (`src/components/landing/LandingPage.tsx`) — the
   full marketing-page structure (hero/demo/features/how-it-works/settings/
   use-cases/pricing/faq, section scroller, dot nav, FAQ accordion, settings
-  modal). Each app's `WebRoot.tsx` supplies only content and theme styling.
+  modal). The `site/` workspace supplies merged PopSuite content and theme
+  styling and mounts both apps' engines; per-app `WebRoot.tsx` files were
+  retired in favor of the single site.
 - **Build presets** (`config/`, `tsconfig/`, `scripts/`) — per-module config files
   are thin re-exports pointing at `../../../shared`; only the dev port and extension
   popup global differ. Shared config/script paths resolve the module root from
@@ -172,22 +176,21 @@ dance, no pointer bump. Re-run the quality gates and commit once in this repo.
 
 ## Testing
 
-Shared tests live in `shared/src/test` and run inside each module via Vitest (`npm run test` per module). See the per-module `AUDIT.md` for a point-in-time snapshot of test-wiring status (predates the suite/nest restructure; see its note at the top).
+Shared tests live in `shared/src/test` and run inside each module via Vitest (`npm run test` per module).
 
 ## Quality gates
 
 Run across both modules from the repo root, or per module with `--prefix app/modules/popjot` / `--prefix app/modules/popkey` (add `--prefix app` for the suite's own typecheck):
 
 ```sh
-npm run typecheck   # tsc --noEmit (PopJot, PopKey, suite; clean)
-npm run lint        # eslint      (PopJot, PopKey; 0 errors)
+npm run guard:pro   # Pro-stub guard (PopJot, PopKey)
+npm run typecheck   # tsc --noEmit (PopJot, PopKey, suite, site; clean)
+npm run lint        # eslint      (PopJot, PopKey, site; 0 errors)
 npm run test        # vitest      (PopJot, PopKey)
-npm run verify      # typecheck + lint + test
-npm run build       # vite build  (each app's website → dist/)
+npm run verify      # guard:pro + typecheck + lint + test
 ```
 
-`vite build` does not typecheck, so `typecheck` is a separate gate. Each app's
-`build` also runs a `prebuild` Pro-stub guard (`guard:pro`) that fails the build
-if real Pro code is present in the public source. CI (`.github/workflows/ci.yml`
-in each app repo) runs the full gate — guard, typecheck, lint, test, build — on
-every push and PR.
+`guard:pro` fails if real Pro code is present in a module's public
+`src/pro/index.ts` stub (the real implementation lives outside this public repo).
+It runs first in `verify`, which `.github/workflows/release.yml` runs before
+packaging so a leak can never ship.

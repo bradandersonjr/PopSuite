@@ -1,0 +1,16 @@
+{
+  "extends": "../shared/tsconfig/app.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@site/*": ["./src/*"],
+      "@popjot/*": ["../app/modules/popjot/src/*"],
+      "@popkey/*": ["../app/modules/popkey/src/*"],
+      "@shared/*": ["../shared/src/*"]
+    }
+  },
+  "include": [
+    "src",
+    "../shared/src/vite-env.d.ts"
+  ]
+}

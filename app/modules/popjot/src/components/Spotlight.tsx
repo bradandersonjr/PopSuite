@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
-import { useStore } from "@/store/useStore";
-import { onSpotlightCursor } from "@/lib/platform";
-import { spotlightGradient } from "@/lib/spotlight";
+import { useStore } from "@popjot/store/useStore";
+import { onSpotlightCursor } from "@popjot/lib/platform";
+import { spotlightGradient } from "@popjot/lib/spotlight";
 
 /**
  * Spotlight presenter overlay — a full-screen dim layer with a soft transparent

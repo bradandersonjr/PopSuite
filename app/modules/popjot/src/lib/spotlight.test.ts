@@ -4,7 +4,7 @@ import {
   DEFAULT_SPOTLIGHT_FEATHER_PCT,
   nextSpotlightActive,
   spotlightGradient,
-} from "@/lib/spotlight";
+} from "@popjot/lib/spotlight";
 
 // A round screen height so feather-ramp math in the assertions below stays
 // readable: at 1000px, FEATHER_SCREEN_FRACTION (0.12) gives a 120px max ramp.

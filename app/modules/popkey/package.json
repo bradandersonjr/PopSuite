@@ -3,23 +3,18 @@
   "private": true,
   "version": "1.1.0",
   "description": "On-screen keystroke & mouse-action visualizer for screencasts and demos.",
-  "homepage": "https://popkey.app",
+  "homepage": "https://popsuite.app",
   "author": "Brad Anderson <brad@bradandersonjr.com>",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "vite",
     "dev:electron": "electron-vite dev",
     "guard:pro": "node scripts/check-pro-stub.mjs",
-    "prebuild": "node scripts/check-pro-stub.mjs",
-    "build": "vite build",
     "build:electron": "electron-vite build",
     "build:extension": "vite build --config vite.extension.config.ts --mode popup && node ../../../shared/scripts/build-content.mjs && node ../../../shared/scripts/pack-extension.mjs",
-    "build:dev": "vite build --mode development",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.15",

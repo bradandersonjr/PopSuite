@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { getLicenseStatus, onLicenseChange, type LicenseStatus } from "@shared/license/renderer";
-import { setProLicensed } from "@/pro";
-import { useStore } from "@/store/useStore";
-import { isProPalette, DEFAULT_FREE_PALETTE } from "@/config/themes";
-import { sendColorPalette } from "@/lib/platform";
+import { setProLicensed } from "@popkey/pro";
+import { useStore } from "@popkey/store/useStore";
+import { isProPalette, DEFAULT_FREE_PALETTE } from "@popkey/config/themes";
+import { sendColorPalette } from "@popkey/lib/platform";
 
 /**
  * Syncs Pro license state into this renderer window. Mount once per window

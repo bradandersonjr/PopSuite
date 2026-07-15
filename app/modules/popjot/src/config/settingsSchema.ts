@@ -12,14 +12,6 @@ export const settingsSchema = {
     ["muted", "vibrant", "retro", "neon", "pastel", "gradient", "glitter", "solid"],
     "retro"
   ),
-  // Solid palette: single-color menu. Uses a custom color instead of palette colors.
-  solidColor: setting.string("#fcbf47"),
-  // Remembers the last non-Solid palette so stroke colors stay multi-color while
-  // the Solid palette is active (Solid only restyles the menu chrome).
-  lastColorPalette: setting.enum(
-    ["muted", "vibrant", "retro", "neon", "pastel", "gradient", "glitter", "solid"],
-    "retro"
-  ),
   animationIntensity: setting.enum(["low", "medium", "high"], "medium"),
   menuStyle: setting.enum(["flat", "flat-outline", "pop", "glow"], "pop"),
   // Glow style: halo intensity (0 = subtle, 100 = intense).
@@ -33,10 +25,17 @@ export const settingsSchema = {
   // Branding: replaces the radial-menu center shape with a custom logo (Pro).
   // Active whenever a center logo is set; brandingEnabled is synced with
   // PopKey's branding toggle (the image/scale stay per-app). Stored in settings
-  // — not the @/pro stub — so the logo actually renders in every build.
+  // — not the @popjot/pro stub — so the logo actually renders in every build.
   brandingEnabled: setting.boolean(false),
   brandingImage: setting.string(""), // data URL of the center logo
   brandingScale: setting.number(1, { positive: true }), // size multiplier (1 = 100%)
+  // Custom palette (Pro): per-slot colors for the Draw/Highlighter sub-menus,
+  // JSON-encoded arrays of hex strings. Stored in settings — not module state
+  // in @popjot/pro — so edits made in the Settings window sync to the overlay window
+  // that actually renders the real menu (they're separate renderer processes).
+  proDrawPalette: setting.string(""), // JSON string[] (6 hex colors) or "" if unset
+  proHighlighterPalette: setting.string(""), // JSON string[] (4 hex colors) or "" if unset
+  proPaletteActive: setting.boolean(false),
   gridMode: setting.enum(["none", "grid", "dots"], "none"),
   gridSize: setting.enum(["small", "large"], "small"),
   overlayMode: setting.enum(["live", "snapshot"], "live"),

@@ -19,10 +19,12 @@ type SettingsState = {
   tabs: Array<{ id: ModuleId; label: string; connected: boolean }>;
 };
 
-const WINDOW_WIDTH = 1160;
-const WINDOW_HEIGHT = 860;
-const WINDOW_MIN_WIDTH = 900;
-const WINDOW_MIN_HEIGHT = 640;
+// Matches the web demo's settings modal cap (min(920px,92vw) x min(680px,85vh))
+// so the desktop window and the popsuite.app settings panel are the same size.
+const WINDOW_WIDTH = 920;
+const WINDOW_HEIGHT = 680;
+const WINDOW_MIN_WIDTH = 760;
+const WINDOW_MIN_HEIGHT = 560;
 
 const MODULE_TABS: ReadonlyArray<{ id: ModuleId; label: string }> = [
   { id: "popjot", label: "PopJot" },

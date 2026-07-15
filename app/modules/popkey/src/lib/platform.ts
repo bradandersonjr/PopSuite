@@ -10,7 +10,7 @@ import {
   setNamedShortcut,
   type ShortcutUpdateResult,
 } from "@shared/settings/renderer";
-import { settingsSchema } from "@/config/settingsSchema";
+import { settingsSchema } from "@popkey/config/settingsSchema";
 import type {
   ThemeMode,
   ColorPalette,
@@ -22,7 +22,7 @@ import type {
   BrandingCorner,
   BadgeFont,
   BadgeAnimation,
-} from "@/store/useStore";
+} from "@popkey/store/useStore";
 
 export {
   isDesktop,
@@ -95,6 +95,8 @@ export const sendKeyboardEnabled = (val: boolean): void =>
   settings.sendSetting("keyboardEnabled", val);
 export const sendShowKeyRepeat = (val: boolean): void =>
   settings.sendSetting("showKeyRepeat", val);
+export const sendPlainNumpadDigits = (val: boolean): void =>
+  settings.sendSetting("plainNumpadDigits", val);
 export const sendWordMode = (val: boolean): void => settings.sendSetting("wordMode", val);
 export const sendMouseEnabled = (val: boolean): void => settings.sendSetting("mouseEnabled", val);
 export const sendShowMouseClicks = (val: boolean): void =>
@@ -114,6 +116,10 @@ export const sendBrandingImage = (dataUrl: string): void =>
 export const sendBrandingCorner = (corner: BrandingCorner): void =>
   settings.sendSetting("brandingCorner", corner);
 export const sendBrandingSize = (px: number): void => settings.sendSetting("brandingSize", px);
+export const sendBrandingOffsetX = (val: number): void =>
+  settings.sendSetting("brandingOffsetX", val);
+export const sendBrandingOffsetY = (val: number): void =>
+  settings.sendSetting("brandingOffsetY", val);
 export const sendBrandingOpacity = (val: number): void =>
   settings.sendSetting("brandingOpacity", val);
 export const sendBrandingRadius = (val: number): void =>
@@ -122,6 +128,8 @@ export const sendBrandingGrayscale = (val: boolean): void =>
   settings.sendSetting("brandingGrayscale", val);
 export const sendScaleFactor = (scale: number): void => settings.sendSetting("scaleFactor", scale);
 export const sendObsMode = (val: boolean): void => settings.sendSetting("obsMode", val);
+export const sendHideDuringAnnotation = (val: boolean): void =>
+  settings.sendSetting("hideDuringAnnotation", val);
 
 export async function setMainShortcut(shortcut: string): Promise<ShortcutUpdateResult> {
   return setNamedShortcut("main", shortcut);

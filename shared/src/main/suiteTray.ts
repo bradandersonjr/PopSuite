@@ -37,6 +37,17 @@ export interface SuiteTrayAction {
 }
 
 /**
+ * An extra named checkbox a module exposes beyond its Enable/Disable toggle,
+ * e.g. PopKey's "OBS Mode". `id` is echoed back in a ToggleExtraMessage so the
+ * module knows which one was clicked.
+ */
+export interface SuiteTrayExtraToggle {
+  id: string;
+  label: string;
+  checked: boolean;
+}
+
+/**
  * Snapshot of a module's tray-relevant state. Sent by the module on connect and
  * whenever anything changes (toggle flips active, a shortcut is rebound).
  */
@@ -53,6 +64,8 @@ export interface SuiteModuleState {
   canToggle: boolean;
   /** Extra per-module actions (settings, about, ...). */
   actions: SuiteTrayAction[];
+  /** Extra named checkboxes beyond Enable/Disable (e.g. PopKey's OBS Mode). */
+  extraToggles?: SuiteTrayExtraToggle[];
   /**
    * Suite-only cross-module signal: true while this module is actively
    * annotating (PopJot drawing mode on). The launcher relays this to the other
@@ -86,6 +99,12 @@ export interface ToggleMessage {
 /** Launcher → module: run a named extra action (settings/about/...). */
 export interface ActionMessage {
   type: "action";
+  id: string;
+}
+
+/** Launcher → module: flip a named extra toggle (e.g. PopKey's OBS Mode). */
+export interface ToggleExtraMessage {
+  type: "toggleExtra";
   id: string;
 }
 
@@ -161,6 +180,7 @@ export type ModuleToLauncher = StateMessage | RelayInvokeResultMessage | RelayPu
 export type LauncherToModule =
   | ToggleMessage
   | ActionMessage
+  | ToggleExtraMessage
   | QuitMessage
   | SuppressMessage
   | RelaySendMessage
@@ -216,8 +236,8 @@ export interface SuiteMenuItem {
 }
 
 /** Suite-wide external links, always shown regardless of connected modules. */
-export const SUITE_CHANGELOG_URL = "https://popjot.app/changelog";
-export const SUITE_DOCS_URL = "https://popjot.app/docs";
+export const SUITE_CHANGELOG_URL = "https://popsuite.app/changelog";
+export const SUITE_DOCS_URL = "https://popsuite.app/docs";
 
 /** Action ids modules honor for the Edit Settings picker (mirror createPopApp). */
 export const SUITE_ACTION_SETTINGS = "settings";
@@ -228,6 +248,8 @@ export const SUITE_ACTION_ABOUT = "about";
 export interface SuiteTrayHandlers {
   onToggle(appName: string): void;
   onAction(appName: string, actionId: string): void;
+  /** Flip a module's named extra toggle (e.g. PopKey's OBS Mode). */
+  onToggleExtra(appName: string, toggleId: string): void;
   /** Toggle whether the launcher (PopSuite.exe) is registered to run at login. */
   onOpenAtLoginToggle(): void;
   /** Open an external URL in the default browser (Changelog / Documentation). */
@@ -309,7 +331,8 @@ export function buildSuiteTrayMenu(
     items.push({ label: "No modules running", enabled: false });
   }
 
-  // Flat toggles: one checkbox per module directly under the title.
+  // Flat toggles: one checkbox per module directly under the title, followed
+  // by any of that module's extra named toggles (e.g. PopKey's OBS Mode).
   for (const mod of sorted) {
     if (mod.canToggle) {
       // While auto-suppressed by a sibling (PopJot annotating), flag it so the
@@ -328,6 +351,14 @@ export function buildSuiteTrayMenu(
     } else {
       // No toggle: still show the module name as a heading so it isn't lost.
       items.push({ label: mod.appName, enabled: false });
+    }
+    for (const extra of mod.extraToggles ?? []) {
+      items.push({
+        label: extra.label,
+        type: "checkbox",
+        checked: extra.checked,
+        click: () => handlers.onToggleExtra(mod.appName, extra.id),
+      });
     }
   }
 

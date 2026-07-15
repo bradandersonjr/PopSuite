@@ -3,11 +3,12 @@
  * be swapped in one click, e.g. a "Fusion" layout with badges bottom-right vs
  * a "Recording" layout with everything out of frame.
  *
- * Suite-only: presets capture and reapply the combined settings of PopJot and
- * PopKey, stored in this window's localStorage (persist:popsuite-settings
- * partition, so they survive restarts). The same nested shape as the suite
- * Config export ({ popjot: {...}, popkey: {...} }) keeps the formats
- * interchangeable.
+ * Presets capture and reapply the combined settings of PopJot and PopKey,
+ * stored in the current window's localStorage. The same nested shape as the
+ * suite Config export ({ popjot: {...}, popkey: {...} }) keeps the formats
+ * interchangeable. Used by the desktop suite's Settings window (persists
+ * across restarts there) and by the popsuite.app web demo (persists only for
+ * that browser tab's session).
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -15,6 +16,17 @@ import { Bookmark, Play, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react
 import { SettingGroup, useSettingsUI, useToast, type SuiteAppConfig } from "@shared/components/settings";
 import { applySettings, collectSettings } from "@shared/settings/io";
 import type { SettingsSchema } from "@shared/settings/schema";
+
+// The desktop suite launcher declares the full window.suiteSettings bridge
+// (app/src/settings/main.tsx); on web there is no such bridge. Read it as an
+// untyped, optional global instead of augmenting `Window` here, since the
+// desktop launcher's stricter (non-optional) declaration for the same global
+// would otherwise conflict with a second declaration in this shared file.
+const suiteSettingsBridge = (): {
+  syncPresets?(payload: { presets: Array<{ id: string; name: string }>; isPro: boolean }): void;
+  onApplyPreset?(callback: (id: string) => void): () => void;
+  notifyApplyDone?(): void;
+} | undefined => (window as unknown as { suiteSettings?: ReturnType<typeof suiteSettingsBridge> }).suiteSettings;
 
 type Preset = {
   id: string;
@@ -140,7 +152,7 @@ export function SuitePresets({
   // Mirror the preset index (+ Pro state) to the launcher so the tray can list
   // and gate them. Runs on mount and whenever the list or Pro state changes.
   useEffect(() => {
-    window.suiteSettings?.syncPresets?.({
+    suiteSettingsBridge()?.syncPresets?.({
       presets: presets.map((p) => ({ id: p.id, name: p.name })),
       isPro,
     });
@@ -159,11 +171,11 @@ export function SuitePresets({
     if (target) apply(target);
   };
   useEffect(() => {
-    return window.suiteSettings?.onApplyPreset?.((id) => {
+    return suiteSettingsBridge()?.onApplyPreset?.((id) => {
       applyByIdRef.current(id);
       // Tell the launcher the apply's settings IPC has been dispatched, so a
       // window opened only to run this apply (never shown) can be torn down.
-      window.suiteSettings?.notifyApplyDone?.();
+      suiteSettingsBridge()?.notifyApplyDone?.();
     });
   }, []);
 

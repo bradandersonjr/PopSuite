@@ -1,4 +1,11 @@
-import { AnimationIntensity } from "@/store/useStore";
+/**
+ * Single source of truth for the animation-intensity union. Both apps derive
+ * their own `AnimationIntensity` type from their settings schema (which uses
+ * this same "low" | "medium" | "high" enum) and re-export it from here so
+ * this file — reachable from both apps' web/engine graphs — never needs to
+ * import from either app's src.
+ */
+export type AnimationIntensity = "low" | "medium" | "high";
 
 /** Animation configurations for different intensity levels */
 export const ANIMATION_CONFIGS = {

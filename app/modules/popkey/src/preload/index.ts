@@ -5,7 +5,7 @@ import {
   subscribe,
 } from "@shared/settings/preload";
 import { createLicenseBridge } from "@shared/license/preload";
-import { settingsSchema } from "@/config/settingsSchema";
+import { settingsSchema } from "@popkey/config/settingsSchema";
 
 const IPC_NAMESPACE = "popkey";
 

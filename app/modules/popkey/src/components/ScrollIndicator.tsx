@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronUp, ChevronDown } from "lucide-react";
-import { useStore } from "@/store/useStore";
-import { getBadgeColors } from "@/config/themes";
-import type { ScrollEvent } from "@/hooks/useInputCapture";
+import { useStore } from "@popkey/store/useStore";
+import { getBadgeColors } from "@popkey/config/themes";
+import type { ScrollEvent } from "@popkey/hooks/useInputCapture";
 
 interface ScrollIndicatorProps {
   scrolls: ScrollEvent[];

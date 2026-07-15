@@ -10,6 +10,9 @@
 
 import { useEffect, useRef } from "react";
 import { TooltipProvider } from "@shared/components/ui/tooltip";
+// "@/" here is intentional dependency injection: this file is built per-app
+// (extension content-script bundle), and each app's build config points "@"
+// at its own src, so these resolve to the consuming app's store/engine.
 import { useStore } from "@/store/useStore";
 import { useScaleSync } from "@shared/hooks/useScaleSync";
 import EngineShell from "@/engine/EngineShell";

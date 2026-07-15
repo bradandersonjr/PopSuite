@@ -1,7 +1,7 @@
-import { useStore } from "@/store/useStore";
-import { isDesktop } from "@/lib/platform";
+import { useStore } from "@popkey/store/useStore";
+import { isDesktop } from "@popkey/lib/platform";
 import { BrandingOverlay as SharedBrandingOverlay } from "@shared/components/BrandingOverlay";
-import { blockedBrandingCorner } from "@/lib/branding";
+import { blockedBrandingCorner } from "@popkey/lib/branding";
 
 /** PopKey branding overlay — keystroke badges block their own corner. */
 const BrandingOverlay = () => {
@@ -11,6 +11,8 @@ const BrandingOverlay = () => {
     brandingImage,
     brandingCorner,
     brandingSize,
+    brandingOffsetX,
+    brandingOffsetY,
     brandingOpacity,
     brandingRadius,
     brandingGrayscale,
@@ -26,6 +28,8 @@ const BrandingOverlay = () => {
       image={brandingImage}
       corner={brandingCorner}
       size={brandingSize}
+      offsetX={brandingOffsetX}
+      offsetY={brandingOffsetY}
       opacity={brandingOpacity}
       radius={brandingRadius}
       grayscale={brandingGrayscale}

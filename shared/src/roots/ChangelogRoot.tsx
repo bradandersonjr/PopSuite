@@ -32,7 +32,7 @@ const Entry = ({ tag, children }: { tag: "new" | "fix" | "improved" | "removed";
   </li>
 );
 
-const ChangelogRoot = () => {
+const ChangelogRoot = ({ brand = "PopJot" }: { brand?: string }) => {
   return (
     <div className="w-full min-h-screen bg-background theme-dark">
       {/* ─── Top bar ─── */}
@@ -43,7 +43,7 @@ const ChangelogRoot = () => {
               <ArrowLeft className="w-4 h-4" />
               <span className="font-brand text-lg">
                 <span className="text-pop-yellow">Pop</span>
-                <span className="text-foreground">Jot</span>
+                <span className="text-foreground">{brand.replace(/^Pop/, "")}</span>
               </span>
             </a>
             <span className="text-foreground/30">/</span>
@@ -55,7 +55,7 @@ const ChangelogRoot = () => {
       {/* ─── Content ─── */}
       <main className="max-w-3xl mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold text-foreground mb-2">Changelog</h1>
-        <P>All notable changes, bug fixes, and improvements to PopJot are documented here.</P>
+        <P>All notable changes, bug fixes, and improvements to {brand} are documented here.</P>
 
         {/* ── PopSuite 1.0.0 ── */}
         <SectionHeading id="popsuite-1-0-0" isFirst>PopSuite 1.0.0 &mdash; July 8, 2026</SectionHeading>
@@ -97,7 +97,7 @@ const ChangelogRoot = () => {
         <div className="mt-20 pt-8 border-t border-foreground/10">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <a href="/" className="text-sm text-foreground/50 hover:text-foreground transition-colors">
-              &larr; Back to PopJot
+              &larr; Back to {brand}
             </a>
             <div className="flex gap-6 text-sm text-foreground/40">
               <a href="/docs" className="hover:text-foreground transition-colors">Docs</a>
