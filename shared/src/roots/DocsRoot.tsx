@@ -18,6 +18,7 @@ const navGroups = [
   {
     label: "PopJot — Annotation",
     items: [
+      { id: "popjot-overview", label: "Overview" },
       { id: "activation-modes", label: "Activation Modes" },
       { id: "drawing-tools", label: "Drawing Tools" },
       { id: "radial-menu", label: "Radial Menu" },
@@ -301,6 +302,29 @@ const DocsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
               overlay so the two never visually collide — its tray toggle shows &quot;(auto-hidden)&quot;
               during that time. PopKey&apos;s branding overlay, if enabled, stays visible. PopKey
               restores to whatever state you last asked for as soon as PopJot stops.
+            </P>
+
+            {/* ═══════════ PopJot ═══════════ */}
+
+            {/* ─── PopJot Overview ─── */}
+            <SectionHeading id="popjot-overview">PopJot Overview</SectionHeading>
+            <P>
+              PopJot is PopSuite&apos;s screen annotation tool. Press a hotkey and a transparent canvas
+              appears over your entire screen; draw, circle, underline, and highlight live so your
+              audience sees your marks in real time. It&apos;s built for pointing things out during
+              screen shares, recordings, demos, and lessons &mdash; not for saving artwork.
+            </P>
+            <P>
+              Activate it with <Kbd>Alt</Kbd>+<Kbd>Shift</Kbd>+<Kbd>A</Kbd>{" "}
+              (<Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>A</Kbd> on macOS) &mdash; hold to draw and release
+              to clear, or use a persistent toggle for longer sessions (see Activation Modes below). A
+              right-click radial menu switches tools and colors without leaving the canvas. When
+              you&apos;re done, everything vanishes and leaves the screen untouched.
+            </P>
+            <P>
+              PopJot also ships as a <strong>Chrome extension</strong> that draws over the active
+              webpage in any Chromium browser, with the same tools as the desktop app. The desktop app
+              draws over everything on your screen; the extension is scoped to the page.
             </P>
 
             {/* ─── Activation Modes ─── */}
@@ -856,6 +880,15 @@ const DocsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
               <li>The extension respects the page&apos;s zoom level and adjusts scaling accordingly.</li>
               <li>System tray and Open at Login features are not available in the extension.</li>
             </ul>
+
+            <SubHeading>Why there&apos;s no PopKey extension</SubHeading>
+            <P>
+              The extension is PopJot only. PopKey visualizes your keystrokes and clicks across your
+              whole computer, which needs global, OS-level input access — something a browser extension
+              is sandboxed away from. In a browser, an extension can only see input directed at the
+              current web page, so a PopKey extension couldn&apos;t do the thing PopKey is for.
+              PopKey stays desktop-only for that reason.
+            </P>
 
             {/* ─── Footer ─── */}
             <div className="mt-20 pt-8 border-t border-foreground/10">
