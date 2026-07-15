@@ -59,6 +59,56 @@ const getLandingCardStyle = (
   };
 };
 
+/**
+ * Bare-text counterpart to getLandingCardStyle: same four menu styles, but
+ * applied to plain colored text instead of a filled panel (no background,
+ * no padding) — for the "PopSuite" wordmark. Gradients don't translate
+ * cleanly to text without background-clip plumbing, so a gradient palette
+ * falls back to that color's first stop as a solid fill.
+ */
+const getLandingTextStyle = (
+  colorIndex: number,
+  menuStyle: MenuStyle,
+  drawColors: readonly string[],
+  isGradient: boolean,
+): CardStyle => {
+  const solid = isGradient
+    ? getGradientVariantStops(colorIndex)[0]
+    : drawColors[colorIndex % drawColors.length];
+
+  if (menuStyle === "pop") {
+    return {
+      className: "landing-text-pop",
+      style: {
+        color: solid,
+        WebkitTextStroke: `2px hsl(0 0% 5%)`,
+        paintOrder: "stroke fill",
+        textShadow: "4px 4px 0px hsl(0 0% 5%)",
+      },
+    };
+  }
+  if (menuStyle === "glow") {
+    return {
+      className: "landing-text-glow",
+      style: { color: solid, textShadow: `0 0 18px ${solid}, 0 0 36px ${solid}88` },
+    };
+  }
+  if (menuStyle === "flat-outline") {
+    return {
+      className: "landing-text-flat-outline",
+      style: {
+        color: solid,
+        WebkitTextStroke: `1.5px hsl(0 0% 5% / 0.35)`,
+        paintOrder: "stroke fill",
+      },
+    };
+  }
+  return {
+    className: "landing-text-flat",
+    style: { color: solid, textShadow: "2px 2px 4px rgb(0 0 0 / 0.15)" },
+  };
+};
+
 const floatingShapes = (draw: readonly string[], hl: readonly string[], grad: boolean): Shape[] => [
   { type: "box", className: "top-8 left-10 w-14 h-14 rotate-12 animate-float", color: draw[2], gradientStops: grad ? getGradientVariantStops(2) : undefined },
   { type: "box", className: "bottom-12 right-14 w-10 h-10 -rotate-6 animate-wiggle", color: hl[2], gradientStops: grad ? getGradientVariantStops(1) : undefined },
@@ -130,13 +180,23 @@ export function buildSuiteTheme({
   menuStyle,
   buttonRoundness,
   fabStyle,
-}: SuiteThemeInput): { theme: LandingTheme; card: (colorIndex: number, slot: number) => CardStyle } {
+}: SuiteThemeInput): {
+  theme: LandingTheme;
+  card: (colorIndex: number, slot: number) => CardStyle;
+  text: (colorIndex: number) => CardStyle;
+} {
   const isGradient = colorPalette === "gradient";
   const isGlitter = colorPalette === "glitter";
   const { draw: drawColors, highlighter: highlighterColors } = getColors(
     colorPalette as Parameters<typeof getColors>[0],
   );
   const cssVars = { "--radius": `${(buttonRoundness / 100) * 1.5}rem` } as React.CSSProperties;
+
+  // Bare-text variant for the "PopSuite" wordmark. No glitter overlay here —
+  // landing-glitter's sparkle layer assumes a filled box to sit on top of,
+  // which bare text doesn't have.
+  const text = (colorIndex: number): CardStyle =>
+    getLandingTextStyle(colorIndex, menuStyle, drawColors, isGradient);
 
   const card = (colorIndex: number, popSlot: number): CardStyle => {
     const popColor = drawColors[popSlot % drawColors.length];
@@ -179,5 +239,5 @@ export function buildSuiteTheme({
     ) : null,
   };
 
-  return { theme, card };
+  return { theme, card, text };
 }

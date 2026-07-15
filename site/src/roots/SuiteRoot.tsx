@@ -49,7 +49,7 @@ const SuiteRoot = () => {
   const [popjotOn, setPopjotOn] = useState(true);
   const [popkeyOn, setPopkeyOn] = useState(true);
 
-  const { theme, card } = buildSuiteTheme({
+  const { theme, card, text } = buildSuiteTheme({
     themeMode,
     colorPalette,
     menuStyle,
@@ -58,6 +58,7 @@ const SuiteRoot = () => {
   });
   const content = buildSuiteContent({
     card,
+    text,
     popjotHotkey,
     popjotPersistentHotkey,
     popjotLastToolHotkey,

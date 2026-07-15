@@ -21,6 +21,7 @@ const CHROME_STORE_URL: string | null = null;
 
 interface Options {
   card: (colorIndex: number, slot: number) => CardStyle;
+  text: (colorIndex: number) => CardStyle;
   popjotHotkey: string;
   popjotPersistentHotkey: string;
   popjotLastToolHotkey: string;
@@ -28,6 +29,7 @@ interface Options {
 
 export function buildSuiteContent({
   card,
+  text,
   popjotHotkey,
   popjotPersistentHotkey,
   popjotLastToolHotkey,
@@ -37,27 +39,9 @@ export function buildSuiteContent({
     hero: {
       brand: (
         <div className="flex flex-col items-center gap-3">
-          <h1 className="font-brand text-6xl md:text-8xl leading-none flex items-center gap-2 md:gap-3">
-            {(() => {
-              const pop = card(0, 0);
-              const suite = card(4, 4);
-              return (
-                <>
-                  <span
-                    className={`${pop.className} inline-block px-3 md:px-4 py-1 md:py-2 text-foreground`}
-                    style={pop.style}
-                  >
-                    Pop
-                  </span>
-                  <span
-                    className={`${suite.className} inline-block px-3 md:px-4 py-1 md:py-2 text-foreground`}
-                    style={suite.style}
-                  >
-                    Suite
-                  </span>
-                </>
-              );
-            })()}
+          <h1 className="font-brand text-6xl md:text-8xl leading-none">
+            <span className={text(0).className} style={text(0).style}>Pop</span>
+            <span className={text(4).className} style={text(4).style}>Suite</span>
           </h1>
           <p className="font-display text-sm md:text-base font-bold uppercase tracking-[0.3em] text-muted-foreground">
             PopJot + PopKey
