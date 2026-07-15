@@ -5,7 +5,7 @@ PopSuite ships two utilities — **PopJot** (screen annotation) and **PopKey**
 distributed as a single desktop install. The repo produces three surfaces from
 one codebase:
 
-1. **PopSuite desktop app** � the only shipped desktop deliverable. One Electron
+1. **PopSuite desktop app** — the only shipped desktop deliverable. One Electron
    runtime (app/) owns two independent PopJot and PopKey overlay windows under a
    single unified tray. The tools share a process, not a window or renderer.
    See app/README.md for the architecture.
@@ -18,10 +18,31 @@ one codebase:
    `app/modules/popkey/extension/`, parked/dormant but buildable
    (`build:extension` per module).
 
-- **[PopJot](app/modules/popjot/README.md)** — screen-annotation overlay with a radial tool menu and freehand drawing canvas.
-- **[PopKey](app/modules/popkey/README.md)** — on-screen keystroke & mouse-action visualizer for screencasts and demos.
+PopSuite is the parent brand; PopJot and PopKey are its two child apps.
+
+- **[PopJot](app/modules/popjot/README.md)** — screen annotation that stays out of your way: a transparent overlay with a radial tool menu and a freehand drawing canvas.
+- **[PopKey](app/modules/popkey/README.md)** — keystrokes worth noticing: an on-screen keystroke and mouse-action visualizer for screencasts and demos.
 
 Both apps are built with Electron + React + Vite + Tailwind + Zustand and consume shared code from **`shared/`**.
+
+## Download and install
+
+Grab the latest build from the
+**[GitHub releases page](https://github.com/bradandersonjr/PopSuite/releases/latest)**,
+or read more at **[popsuite.app](https://popsuite.app)**. One install gives you
+both PopJot and PopKey under a single tray.
+
+### Platform support
+
+- **Windows** — the installer is **signed** and installs like any normal Windows
+  app; it auto-updates in the background.
+- **macOS and Linux** — builds are provided but are **currently untested** on
+  real hardware, and they are **unsigned**. First-launch caveats: on macOS,
+  right-click (or Control-click) the app and choose **Open** (a normal
+  double-click is blocked by Gatekeeper); on Linux, make the AppImage executable
+  with `chmod +x` before running it. Auto-update is disabled on these unsigned
+  builds — use **Check for Updates** from the tray to update manually. Reports
+  welcome.
 
 PopSuite is a single git repository managed as an **npm workspace**. `shared/`, `app/`, `app/modules/popjot/`, and `app/modules/popkey/` are all members of one repo; there are no submodules and no separate copies of the shared code. The desktop app (`app/`) is the master; PopJot and PopKey are its child modules under `app/modules/`.
 
@@ -83,13 +104,17 @@ Run from the repo root; each fans out to the relevant workspace member(s) via
 | `build:popjot` / `build:popkey` | Emits the redirect-only dist (`app/modules/<app>/dist`) that popjot.app / popkey.app publish to bounce visitors to popsuite.app |
 | `dev:module:popjot` / `dev:module:popkey` | Run that app's Electron desktop build standalone (dev) |
 | `dev:suite` | Both modules' Electron dev servers under `app/`'s own configs, in parallel |
+| `dev:launcher` | Runs the suite launcher/tray-owner process (`app/`) in dev |
 | `build:suite` | Builds the suite (launcher + both module bundles) |
 | `typecheck:suite` | Typechecks the `app/` package |
 | `package:suite` | Builds and packages the PopSuite desktop installer for Windows (NSIS) |
-| `typecheck` | Typechecks PopJot, PopKey, and suite, in parallel |
-| `lint` | Lints PopJot and PopKey, in parallel |
+| `publish:suite` | Builds and publishes the Windows installer to GitHub Releases |
+| `publish:suite:mac` / `publish:suite:linux` | Builds and publishes the (unsigned, untested) macOS dmg / Linux AppImage |
+| `guard:pro` | Fails if real Pro code leaked into a module's public `src/pro/index.ts` stub |
+| `typecheck` | Typechecks PopJot, PopKey, suite, and site, in parallel |
+| `lint` | Lints PopJot, PopKey, and site, in parallel |
 | `test` | Runs PopJot and PopKey's test suites, in parallel |
-| `verify` | `typecheck` + `lint` + `test` |
+| `verify` | `guard:pro` + `typecheck` + `lint` + `test` |
 
 ## The suite (single desktop install)
 

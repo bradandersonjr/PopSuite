@@ -88,7 +88,7 @@ npm run package:win --prefix app    # build + electron-builder --win
 ```
 
 Packaged output lands in `app/release/` (e.g.
-`release/PopSuite Setup 1.0.0.exe`, `release/win-unpacked/PopSuite.exe`) per
+`release/PopSuite Setup <version>.exe`, `release/win-unpacked/PopSuite.exe`) per
 `electron-builder.yml`'s `directories.output: release`. Per-module tray/app
 icons and the launcher's own unified tray icon are copied in as
 `extraResources` under `popjot/`, `popkey/`, and `suite/` inside the packaged

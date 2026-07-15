@@ -25,7 +25,7 @@ PopKey is a desktop-first **on-screen keystroke and mouse-action visualizer** bu
 - `src/components/ScrollIndicator.tsx`: scroll-wheel direction indicator
 - `src/components/SystemTray.tsx`: in-app settings surface
 - `src/store/useStore.ts`: renderer state (palette, theme, position, badge style, durations, toggles)
-- `../pop-shared/`: the shared foundation at the repo root (UI primitives, hooks, config, lib), imported via the `@shared/*` alias
+- `../../../shared/` (npm package `pop-shared`): the shared foundation at the repo root (UI primitives, hooks, config, lib), imported via the `@shared/*` alias
 
 ## Development
 
@@ -45,25 +45,18 @@ The browser experience (demo surface for settings/visualizers) is served by the
 unified popsuite.app site — run `npm run dev` from the repo root (see
 [`../../../README.md`](../../../README.md)).
 
-Build the Electron app:
+Build this module's Electron bundle (dev/debug):
 
 ```sh
 npm run build:electron
 ```
 
-Desktop distribution is no longer per app: PopKey ships as part of the
-**PopSuite** desktop install (one Electron binary that launches PopJot and
-PopKey as module processes under a unified tray). Standalone per-app installer
-scripts have been removed. To build/package the desktop app, use the suite from
-the repo root:
-
-```sh
-npm run package:suite
-```
-
-See [`../../README.md`](../../README.md) for the suite's architecture and
-packaging details. `dev:electron` above (and `dev:module:popkey` from the repo
-root) remain the dev workflow for running PopKey standalone.
+PopKey is not shipped on its own. It is distributed as part of the **PopSuite**
+desktop install (one Electron binary that launches PopJot and PopKey as module
+processes under a unified tray); `dev:electron` above (and `dev:module:popkey`
+from the repo root) is only the dev workflow for isolating PopKey. For building,
+packaging, and the suite architecture, see the
+[root README](../../../README.md) and [`app/README.md`](../../README.md).
 
 Run the quality gates:
 
@@ -97,7 +90,7 @@ PopKey runs from the system tray. Toggle the on-screen overlay with the global s
 - Global input capture relies on `uiohook-napi`; on macOS the app needs Accessibility permission to observe input.
 - Overlay/position behavior is centered on the primary display.
 - Global shortcut registration can fail if another app already owns the accelerator.
-- The web root is a functional demo surface, so some desktop settings are exposed there intentionally.
+- PopKey's engine doubles as the live demo on the popsuite.app site, so some desktop settings are surfaced there intentionally.
 
 ### Known platform limitations
 

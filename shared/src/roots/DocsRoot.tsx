@@ -267,12 +267,12 @@ const DocsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
                 The build is currently unsigned, so on first launch macOS will refuse to open it normally.{" "}
                 <strong>Right-click (or Control-click) the app and choose Open</strong>, then confirm in the dialog
                 that appears. You only need to do this once. Auto-update is disabled on macOS by design — check{" "}
-                <em>Check for Updates</em> from the tray to update manually.
+                <em>Check for Updates</em> from the tray to update manually. This build is currently untested — reports welcome.
               </li>
               <li>
                 <strong>Linux</strong> — download the <code className="text-sm bg-foreground/10 px-1 rounded mx-0.5">.AppImage</code>, mark it
                 executable (<code className="text-sm bg-foreground/10 px-1 rounded mx-0.5">chmod +x</code>), and run it. Unsigned, same as macOS;
-                use <em>Check for Updates</em> from the tray to update manually.
+                use <em>Check for Updates</em> from the tray to update manually. This build is currently untested — reports welcome.
               </li>
             </ul>
             <P>

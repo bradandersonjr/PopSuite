@@ -17,8 +17,7 @@ PopJot is a desktop-first screen annotation tool built with Electron, React, Vit
 - `src/main/index.ts`: Electron main process, tray, windows, shortcuts, screenshot capture
 - `src/preload/index.ts`: typed IPC bridge exposed as `window.electronAPI`
 - `src/roots/DesktopRoot.tsx`: desktop renderer root
-- `src/roots/WebRoot.tsx`: browser demo/landing surface
-- `src/engine/EngineShell.tsx`: shared runtime shell for overlay + canvas + radial menu
+- `src/engine/EngineShell.tsx`: shared runtime shell for overlay + canvas + radial menu (also mounted by the popsuite.app site as the live PopJot demo)
 - `src/components/Canvas.tsx`: drawing engine and pointer state machine
 - `src/components/RadialMenu.tsx`: radial interaction model
 - `src/components/SystemTray.tsx`: in-app settings surfaces
@@ -41,25 +40,18 @@ npm run dev:electron
 The browser experience is served by the unified popsuite.app site — run
 `npm run dev` from the repo root (see [`../../../README.md`](../../../README.md)).
 
-Build the Electron app:
+Build this module's Electron bundle (dev/debug):
 
 ```sh
 npm run build:electron
 ```
 
-Desktop distribution is no longer per app: PopJot ships as part of the
-**PopSuite** desktop install (one Electron binary that launches PopJot and
-PopKey as module processes under a unified tray). Standalone per-app installer
-scripts have been removed. To build/package the desktop app, use the suite from
-the repo root:
-
-```sh
-npm run package:suite
-```
-
-See [`../../README.md`](../../README.md) for the suite's architecture and
-packaging details. `dev:electron` above (and `dev:module:popjot` from the repo
-root) remain the dev workflow for running PopJot standalone.
+PopJot is not shipped on its own. It is distributed as part of the **PopSuite**
+desktop install (one Electron binary that launches PopJot and PopKey as module
+processes under a unified tray); `dev:electron` above (and `dev:module:popjot`
+from the repo root) is only the dev workflow for isolating PopJot. For building,
+packaging, and the suite architecture, see the
+[root README](../../../README.md) and [`app/README.md`](../../README.md).
 
 Run the quality gates:
 
@@ -94,4 +86,4 @@ Press Alt+Shift+D (or Cmd+Shift+D on macOS) to toggle a presenter overlay that d
 
 - Current overlay/screenshot behavior is centered on the primary display.
 - Shortcut registration can fail if another app already owns the accelerator.
-- The web root is a functional demo surface, not just marketing content, so some desktop settings are exposed there intentionally.
+- PopJot's engine (`EngineShell`) doubles as the live demo on the popsuite.app site, so some desktop settings are surfaced there intentionally.
