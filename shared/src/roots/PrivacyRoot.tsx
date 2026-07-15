@@ -10,7 +10,7 @@ const P = ({ children }: { children: React.ReactNode }) => (
   <p className="text-foreground/80 leading-relaxed mb-4">{children}</p>
 );
 
-const PrivacyRoot = ({ brand = "PopJot" }: { brand?: string }) => {
+const PrivacyRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
   return (
     <div className="w-full min-h-screen bg-background theme-dark">
       {/* ─── Top bar ─── */}

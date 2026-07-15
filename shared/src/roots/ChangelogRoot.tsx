@@ -32,7 +32,7 @@ const Entry = ({ tag, children }: { tag: "new" | "fix" | "improved" | "removed";
   </li>
 );
 
-const ChangelogRoot = ({ brand = "PopJot" }: { brand?: string }) => {
+const ChangelogRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
   return (
     <div className="w-full min-h-screen bg-background theme-dark">
       {/* ─── Top bar ─── */}

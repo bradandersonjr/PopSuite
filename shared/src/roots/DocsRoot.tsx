@@ -2,23 +2,54 @@ import { useState, useEffect, useRef } from "react";
 import { ArrowLeft, Menu, X } from "lucide-react";
 
 /* ─── Table of Contents ─── */
+//
+// Grouped so PopSuite is the parent and PopJot / PopKey are its two apps.
+// `navGroups` drives the sidebar (headed groups); `sections` is the flat list
+// of leaf ids the IntersectionObserver watches, derived from the groups.
 
-const sections = [
-  { id: "getting-started", label: "Getting Started" },
-  { id: "the-suite", label: "The PopSuite Tray" },
-  { id: "activation-modes", label: "Activation Modes" },
-  { id: "drawing-tools", label: "Drawing Tools" },
-  { id: "radial-menu", label: "Radial Menu" },
-  { id: "canvas-controls", label: "Canvas Controls" },
-  { id: "background-modes", label: "Background Modes" },
-  { id: "spotlight", label: "Spotlight Mode" },
-  { id: "customization", label: "Customization" },
-  { id: "settings-window", label: "Settings & Sync" },
-  { id: "keyboard-shortcuts", label: "Keyboard Shortcuts" },
-  { id: "resolution-scaling", label: "Resolution Scaling" },
-  { id: "updates", label: "Updates" },
-  { id: "chrome-extension", label: "Chrome Extension" },
+const navGroups = [
+  {
+    label: "PopSuite",
+    items: [
+      { id: "getting-started", label: "Getting Started" },
+      { id: "the-suite", label: "The PopSuite Tray" },
+    ],
+  },
+  {
+    label: "PopJot — Annotation",
+    items: [
+      { id: "activation-modes", label: "Activation Modes" },
+      { id: "drawing-tools", label: "Drawing Tools" },
+      { id: "radial-menu", label: "Radial Menu" },
+      { id: "canvas-controls", label: "Canvas Controls" },
+      { id: "background-modes", label: "Background Modes" },
+      { id: "spotlight", label: "Spotlight Mode" },
+      { id: "popjot-customization", label: "Customization" },
+    ],
+  },
+  {
+    label: "PopKey — Keystrokes",
+    items: [
+      { id: "popkey-overview", label: "Overview" },
+      { id: "popkey-inputs", label: "Keys, Clicks & Scroll" },
+      { id: "popkey-position", label: "Position & Timing" },
+      { id: "popkey-customization", label: "Customization" },
+      { id: "popkey-obs", label: "OBS & Recording" },
+    ],
+  },
+  {
+    label: "Suite Reference",
+    items: [
+      { id: "settings-window", label: "Settings & Sync" },
+      { id: "keyboard-shortcuts", label: "Keyboard Shortcuts" },
+      { id: "resolution-scaling", label: "Resolution Scaling" },
+      { id: "updates", label: "Updates" },
+      { id: "chrome-extension", label: "Chrome Extension" },
+    ],
+  },
 ];
+
+const sections = navGroups.flatMap((g) => g.items);
 
 /* ─── Helpers ─── */
 
@@ -44,7 +75,7 @@ const P = ({ children }: { children: React.ReactNode }) => (
 
 /* ─── Component ─── */
 
-const DocsRoot = ({ brand = "PopJot" }: { brand?: string }) => {
+const DocsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("getting-started");
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -126,17 +157,26 @@ const DocsRoot = ({ brand = "PopJot" }: { brand?: string }) => {
         >
           <div className="bg-background/80 backdrop-blur-sm border border-foreground/10 rounded-xl p-4 shadow-sm">
             <ul className="space-y-1">
-              {sections.map((s) => (
-                <li key={s.id}>
-                  <button
-                    onClick={() => scrollTo(s.id)}
-                    className={`w-full text-left text-sm px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${activeSection === s.id
-                        ? "text-foreground font-semibold bg-foreground/10"
-                        : "text-foreground/50 hover:text-foreground/80 hover:bg-foreground/5"
-                      }`}
-                  >
-                    {s.label}
-                  </button>
+              {navGroups.map((group) => (
+                <li key={group.label}>
+                  <div className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-foreground/35 first:pt-0">
+                    {group.label}
+                  </div>
+                  <ul className="space-y-1">
+                    {group.items.map((s) => (
+                      <li key={s.id}>
+                        <button
+                          onClick={() => scrollTo(s.id)}
+                          className={`w-full text-left text-sm px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${activeSection === s.id
+                              ? "text-foreground font-semibold bg-foreground/10"
+                              : "text-foreground/50 hover:text-foreground/80 hover:bg-foreground/5"
+                            }`}
+                        >
+                          {s.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 </li>
               ))}
             </ul>
@@ -155,14 +195,23 @@ const DocsRoot = ({ brand = "PopJot" }: { brand?: string }) => {
             <div className="lg:hidden fixed inset-0 z-40 bg-background/95 backdrop-blur pt-14">
               <nav className="p-6">
                 <ul className="space-y-2">
-                  {sections.map((s) => (
-                    <li key={s.id}>
-                      <button
-                        onClick={() => scrollTo(s.id)}
-                        className="w-full text-left text-base px-3 py-2 rounded text-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors cursor-pointer"
-                      >
-                        {s.label}
-                      </button>
+                  {navGroups.map((group) => (
+                    <li key={group.label}>
+                      <div className="px-3 pt-4 pb-1 text-[10px] font-bold uppercase tracking-widest text-foreground/35 first:pt-0">
+                        {group.label}
+                      </div>
+                      <ul className="space-y-1">
+                        {group.items.map((s) => (
+                          <li key={s.id}>
+                            <button
+                              onClick={() => scrollTo(s.id)}
+                              className="w-full text-left text-base px-3 py-2 rounded text-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors cursor-pointer"
+                            >
+                              {s.label}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
                     </li>
                   ))}
                 </ul>
@@ -177,16 +226,23 @@ const DocsRoot = ({ brand = "PopJot" }: { brand?: string }) => {
             <SectionHeading id="getting-started" isFirst>Getting Started</SectionHeading>
 
             <P>
-              PopJot is a screen annotation tool. Press a hotkey and a transparent canvas appears on top of
-              your entire screen. Draw, circle, underline, highlight — your audience sees it live. Release
-              the hotkey and everything vanishes.
+              <strong>PopSuite</strong> is a pair of on-screen presentation tools in one install:
+            </P>
+            <ul className="list-disc list-inside text-foreground/80 space-y-1 mb-4">
+              <li><strong>PopJot</strong> — screen annotation. Press a hotkey and a transparent canvas appears over your whole screen; draw, circle, underline, and highlight live, then release to clear it.</li>
+              <li><strong>PopKey</strong> — a keystroke and click visualizer. Shows the keys, shortcuts, mouse clicks, and scrolls you make as on-screen badges, so your audience can follow along in demos and recordings.</li>
+            </ul>
+            <P>
+              They install together, share one tray icon and one settings window, and are documented
+              together here — PopSuite basics first, then each app&apos;s own features. You can run
+              either app on its own; they simply live under one roof.
             </P>
 
             <SubHeading>Platforms</SubHeading>
             <ul className="list-disc list-inside text-foreground/80 space-y-1 mb-4">
-              <li><strong>Desktop app</strong> — Windows, macOS, and Linux. Draws over your entire screen.</li>
-              <li><strong>Chrome extension</strong> — Any Chromium browser. Draws over the active webpage.</li>
-              <li><strong>Web demo</strong> — Try the radial menu and drawing engine directly on the landing page.</li>
+              <li><strong>Desktop app</strong> — Windows, macOS, and Linux. Both apps, one installer.</li>
+              <li><strong>Chrome extension</strong> — PopJot only. Draws over the active webpage in any Chromium browser.</li>
+              <li><strong>Web demo</strong> — try both apps&apos; engines directly on the landing page.</li>
             </ul>
 
             <SubHeading>Installation</SubHeading>
@@ -443,7 +499,7 @@ const DocsRoot = ({ brand = "PopJot" }: { brand?: string }) => {
             </P>
 
             {/* ─── Customization ─── */}
-            <SectionHeading id="customization">Customization</SectionHeading>
+            <SectionHeading id="popjot-customization">Customization</SectionHeading>
 
             <P>
               All customization options live in PopJot&apos;s tab of the PopSuite settings window
@@ -547,6 +603,81 @@ const DocsRoot = ({ brand = "PopJot" }: { brand?: string }) => {
               <li><strong>High</strong> — Playful. Exaggerated hover effects and bouncy animations.</li>
             </ul>
 
+            {/* ═══════════ PopKey ═══════════ */}
+
+            {/* ─── PopKey Overview ─── */}
+            <SectionHeading id="popkey-overview">PopKey Overview</SectionHeading>
+            <P>
+              PopKey is PopSuite&apos;s keystroke and click visualizer. It watches your keyboard and
+              mouse and shows each input as a badge on screen &mdash; the keys and shortcuts you press,
+              your mouse clicks, and your scroll direction &mdash; so viewers of a demo, screen recording,
+              or live class can see exactly what you&apos;re doing.
+            </P>
+            <P>
+              Toggle it from the PopSuite tray, or with its own shortcut{" "}
+              <Kbd>Alt</Kbd>+<Kbd>Shift</Kbd>+<Kbd>K</Kbd> (<Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>K</Kbd> on
+              macOS). Unlike PopJot, it has no canvas &mdash; it just displays what you type and click,
+              and stays out of the way otherwise.
+            </P>
+            <P>
+              On macOS, PopKey needs Accessibility and Input Monitoring permission to see your keys and
+              clicks. It prompts you on first launch; grant it in System Settings &gt; Privacy &amp;
+              Security, then restart PopKey.
+            </P>
+
+            {/* ─── PopKey Inputs ─── */}
+            <SectionHeading id="popkey-inputs">Keys, Clicks &amp; Scroll</SectionHeading>
+            <P>Each input type can be shown or hidden independently in PopKey&apos;s Settings tab.</P>
+            <SubHeading>Keyboard</SubHeading>
+            <ul className="list-disc list-inside text-foreground/80 space-y-1 mb-4">
+              <li>Keys and shortcut combinations appear as badges (e.g. <Kbd>Ctrl</Kbd>+<Kbd>C</Kbd>).</li>
+              <li><strong>Key repeat</strong> — optionally show repeated badges when a key is held down.</li>
+              <li><strong>Word mode</strong> — group consecutive letters into words instead of one badge per key.</li>
+              <li><strong>Plain numpad digits</strong> — show numpad numbers as plain digits rather than &quot;Num&quot; keys.</li>
+            </ul>
+            <SubHeading>Mouse &amp; scroll</SubHeading>
+            <ul className="list-disc list-inside text-foreground/80 space-y-1 mb-4">
+              <li><strong>Clicks</strong> — a visual effect at the cursor on each click. Choose the effect (ring, solid, pulse, or burst) and its size.</li>
+              <li><strong>Scroll wheel</strong> — an indicator showing scroll direction.</li>
+              <li>Click and scroll colors follow your palette by default, or set a custom color for each.</li>
+            </ul>
+
+            {/* ─── PopKey Position & Timing ─── */}
+            <SectionHeading id="popkey-position">Position &amp; Timing</SectionHeading>
+            <ul className="list-disc list-inside text-foreground/80 space-y-1 mb-4">
+              <li><strong>Position</strong> — anchor badges to any of the six screen positions (top/bottom &times; left/center/right), with fine horizontal and vertical offset sliders.</li>
+              <li><strong>Duration</strong> — how long each badge stays on screen before fading out (1&ndash;5 seconds).</li>
+              <li><strong>Max badges</strong> — how many badges show at once (3, 5, 8, or 12) before the oldest drop off.</li>
+              <li><strong>Scale</strong> — an overall size multiplier for badges, on top of the automatic resolution scaling PopKey shares with PopJot.</li>
+            </ul>
+
+            {/* ─── PopKey Customization ─── */}
+            <SectionHeading id="popkey-customization">PopKey Customization</SectionHeading>
+            <P>
+              PopKey shares PopJot&apos;s visual system, so badges match your annotations. Many of these
+              can be kept in sync with PopJot automatically &mdash; see Settings &amp; Sync below.
+            </P>
+            <ul className="list-disc list-inside text-foreground/80 space-y-1 mb-4">
+              <li><strong>Style</strong> — the same four looks as PopJot&apos;s menu: Flat, Flat Outline, Pop, and Glow.</li>
+              <li><strong>Color palette</strong> — the same palettes as PopJot, including Solid (a single custom color).</li>
+              <li><strong>Theme</strong> — dark or light.</li>
+              <li><strong>Font</strong> — mono, sans, serif, or a custom font; adjustable size.</li>
+              <li><strong>Badge animation</strong> — how badges appear: pop, slide, bounce, fade, or rise.</li>
+              <li><strong>Roundness, translucency, and glow</strong> — fine-tune the badge shape and finish.</li>
+              <li><strong>Text color</strong> — auto (follows theme) or forced white/black.</li>
+              <li><strong>Branding overlay</strong> — an optional logo/watermark image pinned to a screen corner (shared concept with PopJot).</li>
+            </ul>
+
+            {/* ─── PopKey OBS ─── */}
+            <SectionHeading id="popkey-obs">OBS &amp; Recording</SectionHeading>
+            <P>
+              <strong>OBS Mode</strong> (in the tray and PopKey&apos;s settings) drops the overlay&apos;s
+              always-on-top pinning and shrinks it to the work area, so OBS and other capture tools can
+              grab PopKey as an ordinary window source instead of a topmost overlay. Turn it on when you
+              want PopKey visible inside a recording or stream layout rather than only on your physical
+              screen.
+            </P>
+
             {/* ─── Settings & Sync ─── */}
             <SectionHeading id="settings-window">Settings & Sync</SectionHeading>
 
@@ -569,7 +700,10 @@ const DocsRoot = ({ brand = "PopJot" }: { brand?: string }) => {
             {/* ─── Keyboard Shortcuts ─── */}
             <SectionHeading id="keyboard-shortcuts">Keyboard Shortcuts</SectionHeading>
 
-            <P>All shortcuts can be customized in Settings &gt; System &gt; Keyboard Shortcuts.</P>
+            <P>
+              PopSuite&apos;s shortcuts across both apps. All of them are rebindable in the Settings
+              window&apos;s <strong>Shortcuts</strong> tab.
+            </P>
 
             <div className="overflow-x-auto mb-6">
               <table className="w-full text-sm text-foreground/80 border-collapse">
@@ -626,10 +760,15 @@ const DocsRoot = ({ brand = "PopJot" }: { brand?: string }) => {
                     <td className="py-2 pr-4">Hold right-click while drawing</td>
                     <td className="py-2">Hold right-click while drawing</td>
                   </tr>
-                  <tr>
+                  <tr className="border-b border-foreground/10">
                     <td className="py-2 pr-4">Resize brush</td>
                     <td className="py-2 pr-4">Scroll wheel</td>
                     <td className="py-2">Scroll wheel</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-4">Show / hide PopKey</td>
+                    <td className="py-2 pr-4"><Kbd>Alt</Kbd>+<Kbd>Shift</Kbd>+<Kbd>K</Kbd></td>
+                    <td className="py-2"><Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>K</Kbd></td>
                   </tr>
                 </tbody>
               </table>
@@ -639,8 +778,9 @@ const DocsRoot = ({ brand = "PopJot" }: { brand?: string }) => {
             <SectionHeading id="resolution-scaling">Resolution Scaling</SectionHeading>
 
             <P>
-              PopJot automatically detects your screen resolution and scales the UI accordingly. The base
-              reference is 1920x1080 (scale factor 1.0x). A 4K display (3840x2160) gets approximately 2.0x scaling.
+              Both apps automatically detect your screen resolution and scale their on-screen elements
+              accordingly — PopJot&apos;s menu and PopKey&apos;s badges alike. The base reference is
+              1920x1080 (scale factor 1.0x). A 4K display (3840x2160) gets approximately 2.0x scaling.
             </P>
 
             <SubHeading>How scaling works</SubHeading>
