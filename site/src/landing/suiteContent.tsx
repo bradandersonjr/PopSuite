@@ -15,7 +15,8 @@ import { Kbd, HotkeyBadge } from "@shared/components/landing/Kbd";
 // ─── Store URLs — swap in real links when ready ─────────────────────────────
 const GITHUB_RELEASE_URL: string | null =
   "https://github.com/bradandersonjr/PopSuite/releases";
-const POPSUITE_PRO_URL: string | null = "https://ko-fi.com/s/264fd0031f";
+// Pro purchases disabled for now — restore "https://ko-fi.com/s/264fd0031f" to re-enable.
+const POPSUITE_PRO_URL: string | null = null;
 const CHROME_STORE_URL: string | null = null;
 // ────────────────────────────────────────────────────────────────────────────
 
