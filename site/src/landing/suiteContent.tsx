@@ -48,21 +48,8 @@ export function buildSuiteContent({
       ),
       tagline: (
         <>
-          Screen annotation and on-screen input, together in one download.
-          <span className="mt-5 flex flex-col gap-1 text-base md:text-lg font-normal text-muted-foreground">
-            <span>
-              <span className="font-brand text-foreground">
-                <span className="text-pop-yellow">Pop</span>Jot
-              </span>{" "}
-              &mdash; Screen annotation that stays out of your way.
-            </span>
-            <span>
-              <span className="font-brand text-foreground">
-                <span className="text-pop-yellow">Pop</span>Key
-              </span>{" "}
-              &mdash; Keystrokes worth noticing.
-            </span>
-          </span>
+          Screen annotation that stays out of your way and keystrokes worth
+          noticing.
         </>
       ),
       pills: [
