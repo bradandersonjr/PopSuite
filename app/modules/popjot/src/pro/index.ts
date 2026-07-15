@@ -1,7 +1,7 @@
 /**
  * Pro features — PUBLIC STUB.
  *
- * This is the free/open-source build. Every Pro feature is disabled here and
+ * This is the free, fair-source build. Every Pro feature is disabled here and
  * each getter returns the "off" value while each setter is a no-op, so the app
  * compiles and runs identically to the free product.
  *
@@ -16,6 +16,13 @@
  * `effectiveIsPro` in SystemTray, so the UI is fully unlocked. The in-memory
  * state below makes the features actually functional during a web session
  * without requiring the private Pro build.
+ *
+ * DESKTOP GATE: on desktop the custom-palette settings persist to
+ * ~/.popsuite/popjot.json, so a free user could hand-edit that file to try to
+ * activate a Pro-only palette. `getProPalette` therefore refuses to return a
+ * palette on desktop unless the license flag (`licensed` / `isPro()`) is set —
+ * so hand-edited settings do nothing without a valid key. The web demo is
+ * unaffected because `isDesktop()` is false there.
  *
  * Custom-palette state (proDrawPalette/proHighlighterPalette/proPaletteActive)
  * is NOT module-level here — it lives in the Zustand store as real schema
@@ -59,6 +66,9 @@ function parsePaletteJson(json: string): string[] | null {
 export const getProPalette = (
   _p: ColorPalette | null,
 ): { draw: readonly string[]; highlighter: readonly string[] } | null => {
+  // Desktop gate: hand-edited ~/.popsuite/popjot.json can't unlock Pro palettes
+  // without a valid license. Web demo (isDesktop() === false) stays unlocked.
+  if (isDesktop() && !isPro()) return null;
   const state = useStore.getState();
   if (!state.proPaletteActive) return null;
   const draw = parsePaletteJson(state.proDrawPalette);

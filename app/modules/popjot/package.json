@@ -1,6 +1,7 @@
 {
   "name": "PopJot",
   "private": true,
+  "license": "FSL-1.1-MIT",
   "version": "1.1.0",
   "description": "Screen-annotation overlay with a radial tool menu and freehand drawing canvas.",
   "homepage": "https://popsuite.app",

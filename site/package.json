@@ -1,6 +1,7 @@
 {
   "name": "popsuite-site",
   "private": true,
+  "license": "FSL-1.1-MIT",
   "version": "1.0.0",
   "description": "PopSuite marketing site — PopJot + PopKey landing page with both live demo engines.",
   "homepage": "https://popsuite.app",

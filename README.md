@@ -220,3 +220,17 @@ npm run verify      # guard:pro + typecheck + lint + test
 `src/pro/index.ts` stub (the real implementation lives outside this public repo).
 It runs first in `verify`, which `.github/workflows/release.yml` runs before
 packaging so a leak can never ship.
+
+## License
+
+PopSuite is released under the **Functional Source License (FSL-1.1-MIT)** — fair
+source, not OSI open source.
+
+In plain English:
+
+- **Free to use anywhere**, including at work and for commercial purposes.
+- You can **read, modify, and share** the code.
+- You **may not sell PopSuite** or ship a competing product built from it.
+- Each release **becomes MIT-licensed two years** after it is published.
+
+See [LICENSE.md](LICENSE.md) for the exact terms.

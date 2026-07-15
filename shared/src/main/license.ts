@@ -20,7 +20,7 @@
  * below and ship an update; that invalidates ALL prior keys, legit buyers included,
  * so you'd re-issue a fresh key on Ko-fi.
  *
- * This is open-source and intentionally NOT hardened against piracy: the secret is
+ * This code is public and intentionally NOT hardened against piracy: the secret is
  * visible in the repo, so anyone reading the source can forge a key. That's the
  * accepted trade-off for a $7 unlock — it stops casual fabrication (eyeballing a
  * key, typing gibberish), not a determined user. No client-side scheme does.

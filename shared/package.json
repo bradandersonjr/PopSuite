@@ -2,5 +2,6 @@
   "name": "pop-shared",
   "version": "1.0.0",
   "private": true,
+  "license": "FSL-1.1-MIT",
   "description": "Shared foundation (Electron shell, settings system, UI kit, build presets) for the PopSuite apps. Lives at shared/ (repo root); npm package name stays pop-shared. Consumed by the popjot/popkey modules via a relative path (../../../shared) and the @shared/* alias; relies on the hoisted root node_modules for its dependencies."
 }

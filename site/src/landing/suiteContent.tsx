@@ -67,7 +67,7 @@ export function buildSuiteContent({
         </>
       ),
       footnote: (
-        <>Free &amp; open source &middot; Windows, macOS &amp; Linux</>
+        <>Free &amp; fair source &middot; Windows, macOS &amp; Linux</>
       ),
     },
     demo: {
@@ -215,7 +215,7 @@ export function buildSuiteContent({
         </>
       ),
       description:
-        "PopSuite is free and open source. One optional Pro purchase unlocks perks across both apps and helps keep development going.",
+        "PopSuite is free and fair source. One optional Pro purchase unlocks perks across both apps and helps keep development going.",
       planMinHeight: 540,
       plans: [
         {
@@ -239,7 +239,7 @@ export function buildSuiteContent({
         {
           name: "PopSuite Desktop",
           price: "Free",
-          period: "open source",
+          period: "fair source",
           colorIndex: 4,
           ctaColorIndex: 1,
           popular: true,
@@ -268,7 +268,7 @@ export function buildSuiteContent({
             "PopJot: custom center icon & scalable shape",
             "PopKey: any system font & badge animations",
             "Branding watermark overlay",
-            "Support open source development",
+            "Support PopSuite's development",
           ],
           cta: "Get Pro",
           url: POPSUITE_PRO_URL,
@@ -283,9 +283,9 @@ export function buildSuiteContent({
       ),
       description: "Everything you need to know about PopSuite.",
       items: [
-        { question: "What is PopSuite?", answer: "PopSuite is a single free download that bundles two tools. PopJot is a screen annotation overlay: press a hotkey and a transparent canvas appears over your screen to draw, circle, and highlight live, then it vanishes — plus a Spotlight mode that dims everything except a circle at your cursor. PopKey shows your keyboard presses, mouse clicks, and scrolls as styled badges on screen. They install together, share a tray, and can each be enabled or disabled independently. Nothing you type or click is stored, logged, or transmitted." },
+        { question: "What is PopSuite?", answer: "PopSuite is a single free download that bundles two tools. PopJot is a screen annotation overlay: press a hotkey and a transparent canvas appears over your screen to draw, circle, and highlight live, then it vanishes — plus a Spotlight mode that dims everything except a circle at your cursor. PopKey shows your keyboard presses, mouse clicks, and scrolls as styled badges on screen. They install together, share a tray, and can each be enabled or disabled independently. Nothing you type or click is stored, logged, or transmitted. The code is public on GitHub under the Functional Source License — free to use for anything except selling PopSuite itself, and each release becomes MIT-licensed two years after it ships." },
         { question: "Do the two apps interfere with each other?", answer: "No. Both run as independent processes. While PopJot is annotating or in Spotlight mode, PopKey automatically hides its overlay so the two never collide, then restores itself afterward. On this web page the same rule applies — activating PopJot's canvas takes over input while it's up." },
-        { question: "How does PopSuite Pro work?", answer: "Pay $7 once and get a download link for the Pro build — no subscriptions. Pro perks apply across both apps: custom color palettes, PopJot's custom center icon and scalable shape, PopKey's any-system-font and badge animations, and a branding watermark." },
+        { question: "How does PopSuite Pro work?", answer: "Pro is planned as a one-time $7 purchase — no subscriptions — but it is not available quite yet. When it launches, paying once will get you a download link for the Pro build. Pro perks apply across both apps: custom color palettes, PopJot's custom center icon and scalable shape, PopKey's any-system-font and badge animations, and a branding watermark." },
         { question: "What platforms are supported?", answer: "Windows, macOS, and Linux. All builds are currently unsigned. On Windows, SmartScreen may warn on first run — choose More info, then Run anyway; the installer auto-updates in the background after that. On macOS, right-click the app and choose Open on first launch; on Linux, mark the AppImage executable. A manual Check for Updates works everywhere; on macOS, PopKey also needs Accessibility and Input Monitoring permission." },
         { question: "Can I use this during recordings and calls?", answer: "Yes — that's exactly what it's for. Both apps draw on a transparent overlay, so your annotations and input badges show up in any screen recorder, OBS capture, or screen share (Zoom, Teams, Discord)." },
       ],

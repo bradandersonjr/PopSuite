@@ -1,6 +1,7 @@
 {
   "name": "popsuite",
   "private": true,
+  "license": "FSL-1.1-MIT",
   "workspaces": [
     "shared",
     "app/modules/popjot",

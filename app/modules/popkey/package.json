@@ -1,6 +1,7 @@
 {
   "name": "PopKey",
   "private": true,
+  "license": "FSL-1.1-MIT",
   "version": "1.1.0",
   "description": "On-screen keystroke & mouse-action visualizer for screencasts and demos.",
   "homepage": "https://popsuite.app",
