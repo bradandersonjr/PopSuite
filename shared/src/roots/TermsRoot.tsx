@@ -99,24 +99,24 @@ const TermsRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
         <SectionHeading id="updates">Updates</SectionHeading>
         <P>
           Your purchase includes all future updates to the major version of {brand} you purchased.
-          Brad Anderson Jr reserves the right to determine what constitutes a major version change
+          Brad Anderson Jr Jr reserves the right to determine what constitutes a major version change
           at their sole discretion.
         </P>
 
         <SectionHeading id="disclaimer">Disclaimer of Warranties</SectionHeading>
         <P>
           The Software is provided &ldquo;as is&rdquo; without warranty of any kind, express or
-          implied. Brad Anderson Jr does not warrant that the Software will be error-free, uninterrupted,
+          implied. Brad Anderson Jr Jr does not warrant that the Software will be error-free, uninterrupted,
           or compatible with all operating systems or configurations. Your use of the Software is
           at your own risk.
         </P>
 
         <SectionHeading id="liability">Limitation of Liability</SectionHeading>
         <P>
-          To the maximum extent permitted by applicable law, Brad Anderson Jr shall not be liable
+          To the maximum extent permitted by applicable law, Brad Anderson Jr Jr shall not be liable
           for any indirect, incidental, special, consequential, or punitive damages arising from
           your use of or inability to use the Software, even if advised of the possibility of such
-          damages. Brad Anderson Jr&apos;s total liability to you for any claim shall not exceed the
+          damages. Brad Anderson Jr Jr&apos;s total liability to you for any claim shall not exceed the
           amount you paid for the Software.
         </P>
 

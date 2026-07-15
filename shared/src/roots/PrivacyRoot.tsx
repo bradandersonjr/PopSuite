@@ -37,7 +37,7 @@ const PrivacyRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
 
         <SectionHeading id="overview" isFirst>Overview</SectionHeading>
         <P>
-          {brand} is made by Brad Anderson Jr and distributed as part of the PopSuite desktop
+          {brand} is made by Brad Anderson Jr Jr and distributed as part of the PopSuite desktop
           install (PopJot and PopKey). This policy explains what data {brand} does and
           does not collect. The short version: {brand} collects nothing. Everything stays
           on your device.
@@ -78,7 +78,7 @@ const PrivacyRoot = ({ brand = "PopSuite" }: { brand?: string }) => {
         </P>
         <P>
           License purchases are handled by a third-party payment processor. Please review their
-          privacy policy at the point of purchase. Brad Anderson Jr does not store your payment
+          privacy policy at the point of purchase. Brad Anderson Jr Jr does not store your payment
           information.
         </P>
 

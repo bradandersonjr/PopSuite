@@ -4,7 +4,7 @@
   "license": "FSL-1.1-MIT",
   "version": "1.1.0",
   "description": "PopSuite desktop app: one Electron runtime with independent PopJot and PopKey overlay windows.",
-  "author": "Brad Anderson <brad@bradandersonjr.com>",
+  "author": "Brad Anderson Jr <brad@bradandersonjr.com>",
   "main": "out/main/index.js",
   "dependencies": {
     "electron-updater": "^6.8.9",

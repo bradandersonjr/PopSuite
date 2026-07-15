@@ -5,7 +5,7 @@
   "version": "1.1.0",
   "description": "On-screen keystroke & mouse-action visualizer for screencasts and demos.",
   "homepage": "https://popsuite.app",
-  "author": "Brad Anderson <brad@bradandersonjr.com>",
+  "author": "Brad Anderson Jr <brad@bradandersonjr.com>",
   "main": "out/main/index.js",
   "scripts": {
     "dev:electron": "electron-vite dev",

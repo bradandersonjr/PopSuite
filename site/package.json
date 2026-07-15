@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "description": "PopSuite marketing site — PopJot + PopKey landing page with both live demo engines.",
   "homepage": "https://popsuite.app",
-  "author": "Brad Anderson <brad@bradandersonjr.com>",
+  "author": "Brad Anderson Jr <brad@bradandersonjr.com>",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
