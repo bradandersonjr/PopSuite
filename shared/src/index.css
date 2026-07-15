@@ -121,23 +121,6 @@
     transform: translate(1px, 1px);
   }
 
-  /* Text version of .neo-box: a solid outline (via text-stroke) plus the same
-     hard, blur-free offset shadow used on the neo-brutalist cards, instead of
-     a bordered box. paint-order draws the stroke behind the fill so it reads
-     as an outline rather than thinning the glyph. Works on colored text
-     (e.g. the yellow "Pop" span) since it doesn't touch color/background. */
-  .neo-text {
-    -webkit-text-stroke: 2px hsl(0 0% 5%);
-    paint-order: stroke fill;
-    text-shadow: var(--neo-shadow);
-  }
-
-  .neo-text-lg {
-    -webkit-text-stroke: 3px hsl(0 0% 5%);
-    paint-order: stroke fill;
-    text-shadow: var(--neo-shadow-lg);
-  }
-
 }
 
 /* Font picker list — slim styled scrollbar */
